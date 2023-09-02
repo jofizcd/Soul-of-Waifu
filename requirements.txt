@@ -1,0 +1,4 @@
+characterai
+elevenlabs
+keyboard
+whisper_mic
