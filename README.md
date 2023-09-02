@@ -28,3 +28,6 @@
 - You need to download this repository, [download](https://github.com/jofizcd/your-ai-waifu/archive/refs/heads/main.zip)
 - Change some values in the code to match your values
 - Now you can launch `ai-waifu.py`
+
+## 👀 What next? | Что дальше?
+</p> If you have any questions, feel free to go to my discord server where myself and the server members can help you. [Link](https://discord.gg/6UvYzBKCZK)
