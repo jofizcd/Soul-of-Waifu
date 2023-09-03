@@ -29,5 +29,8 @@
 - Change some values in the code to match your values
 - Now you can launch `ai-waifu.py`
 
+📌 Optional | Дополнительно:
+- You can [download](https://olmewe.itch.io/veadotube-mini) a program to make a vtuber model for your AI character
+
 ## 👀 What next? | Что дальше?
 </p> If you have any questions, feel free to go to my discord server where myself and the server members can help you. Link: https://discord.gg/6UvYzBKCZK
