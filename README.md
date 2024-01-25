@@ -29,16 +29,15 @@
 - Install the `keyboard` `pip install keyboard`
 - Install the Whisper Mic ```pip install whisper-mic```
 - Install the ElevenLabs ```pip install elevenlabs```
-- Change some values in the code to match your values
 - Now you can launch `ai_waifu.py`
   </p>
 -----------------------------------------------------------------------------------------
 - Character AI API-ключ. Ты можешь почитать об этом [здесь](https://pycai.gitbook.io/welcome/api/values) или [здесь](https://github.com/kramcat/CharacterAI/tree/main#-get-token)
 - ElevenLABS API-ключ, ты можешь найти его на их [сайте](https://elevenlabs.io/subscription)
-- Установленная библиотека Character AI: ```pip install characterai``` После этого запусти эту команду: `python -m playwright install`
+- Установленная библиотека Character AI: ```pip install characterai``` После этого запусти эту команду: ```python -m playwright install```
 - Установленная библиотека `keyboard` `pip install keyboard`
-- Установленная библиотека Whisper Mic ```pip install whisper-mic```
-- Установленная библиотека ElevenLabs ```pip install elevenlabs```
+- Установленная библиотека `Whisper Mic` ```pip install whisper-mic```
+- Установленная библиотека `ElevenLabs` ```pip install elevenlabs```
 - Теперь ты можешь запустить файл `ai_waifu.py`
 
 📌 Optional | Дополнительно:
