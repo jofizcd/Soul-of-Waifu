@@ -14,7 +14,7 @@
  - Now you can talk to your favorite character with a realistic voice.
  - If you're sick of texting your "AI Girlfriend", try talking with her, using voice and animations.
  - You can use any pictures of your waifu without having to make complicated models for VTube Studio.
-</p>
+
  - Теперь ты можешь буквально поговорить со своими любимыми персонажами с Character AI на родном языке.
  - Если ты устал писать своей "ИИ Вайфу", тогда попробуй говорить с ней, используя реалистичный голос и анимации.
  - Ты можешь использовать изображения персонажа в полный рост, чтобы сделать PNGTuber модель.
