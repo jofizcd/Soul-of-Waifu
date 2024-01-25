@@ -14,7 +14,7 @@
  - Now you can talk to your favorite character with a realistic voice.
  - If you're sick of texting your "AI Girlfriend", try talking with her, using voice and animations.
  - You can use any pictures of your waifu without having to make complicated models for VTube Studio.
-
+----------------------------------------------------------------------------------------------------------
  - Теперь ты можешь буквально поговорить со своими любимыми персонажами с Character AI на родном языке.
  - Если ты устал писать своей "ИИ Вайфу", тогда попробуй говорить с ней, используя реалистичный голос и анимации.
  - Ты можешь использовать изображения персонажа в полный рост, чтобы сделать PNGTuber модель.
@@ -32,6 +32,7 @@
 - Change some values in the code to match your values
 - Now you can launch `ai_waifu.py`
   </p>
+-----------------------------------------------------------------------------------------
 - Character AI API-ключ. Ты можешь почитать об этом [здесь](https://pycai.gitbook.io/welcome/api/values) или [здесь](https://github.com/kramcat/CharacterAI/tree/main#-get-token)
 - ElevenLABS API-ключ, ты можешь найти его на их [сайте](https://elevenlabs.io/subscription)
 - Установленная библиотека Character AI: ```pip install characterai``` После этого запусти эту команду: `python -m playwright install`
