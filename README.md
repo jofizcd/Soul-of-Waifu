@@ -11,12 +11,12 @@
   🤝 Теперь у тебя есть возможность "оживить" своего любимого персонажа из аниме или манги. Подпишись на мои ютуб и телеграм каналы и поставь этому проекту звезду. Насладись общением с усовершенствованным персонажем :3
 
  ## 🧠 Features | Функции
- - If the other projects don't start, you can try my project specifically
- - If you're sick of texting your "girlfriend", try talking to a "live" girl, using voice and animations
- - You can use any pictures of your waifu without having to make complicated models for VTube Studio
+ - Now you can talk to your favorite character with a realistic voice.
+ - If you're sick of texting your "AI Girlfriend", try talking with her, using voice and animations.
+ - You can use any pictures of your waifu without having to make complicated models for VTube Studio.
  
  ## 👨🏻‍💻 How to run | Как запускать
- There's nothing complicated about it, just follow my instructions:
+ There's nothing complicated about it, just follow my instructions (Просто следуй инструкции):
 
 📌 Requirements | Требования:
 - Character AI API key, you can read about it in [here](https://pycai.gitbook.io/welcome/api/values) or [here](https://github.com/kramcat/CharacterAI/tree/main#-get-token)
@@ -25,12 +25,21 @@
 - Install the `keyboard` `pip install keyboard`
 - Install the Whisper Mic ```pip install whisper-mic```
 - Install the ElevenLabs ```pip install elevenlabs```
-- You need to download this repository, [download](https://github.com/jofizcd/your-ai-waifu/archive/refs/heads/main.zip)
 - Change some values in the code to match your values
-- Now you can launch `ai-waifu.py`
+- Now you can launch `ai_waifu.py`
+  </p>
+- Character AI API-ключ. Ты можешь почитать об этом [здесь](https://pycai.gitbook.io/welcome/api/values) или [здесь](https://github.com/kramcat/CharacterAI/tree/main#-get-token)
+- ElevenLABS API-ключ, ты можешь найти его на их [сайте](https://elevenlabs.io/subscription)
+- Установленная библиотека Character AI: ```pip install characterai``` После этого запусти эту команду: `python -m playwright install`
+- Установленная библиотека `keyboard` `pip install keyboard`
+- Установленная библиотека Whisper Mic ```pip install whisper-mic```
+- Установленная библиотека ElevenLabs ```pip install elevenlabs```
+- Теперь ты можешь запустить файл `ai_waifu.py`
 
 📌 Optional | Дополнительно:
 - You can [download](https://olmewe.itch.io/veadotube-mini) a program to make a vtuber model for your AI character
+- Ты можешь [скачать](https://olmewe.itch.io/veadotube-mini) программу, чтобы сделать PNGTuber модель для своего персонажа
 
 ## 👀 What next? | Что дальше?
 </p> If you have any questions, feel free to go to my discord server where myself and the server members can help you. Link: https://discord.gg/6UvYzBKCZK
+</p> Если есть какие-нибудь вопросы, тогда переходи в мой дискорд сервер и попроси о помощи. Ссылка: https://discord.gg/6UvYzBKCZK
