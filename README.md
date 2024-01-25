@@ -47,5 +47,4 @@
 
 ## 👀 What next? | Что дальше?
 </p> If you have any questions, feel free to go to my discord server where myself and the server members can help you. Link: https://discord.gg/6UvYzBKCZK
-------------------------------------------------------------------------------------------
 </p> Если есть какие-нибудь вопросы, тогда переходи в мой дискорд сервер и попроси о помощи. Ссылка: https://discord.gg/6UvYzBKCZK
