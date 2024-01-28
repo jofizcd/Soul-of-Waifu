@@ -27,6 +27,9 @@
 - ElevenLABS API key, you can find it on their [site](https://elevenlabs.io/subscription)
 - Install the CharacterAI library: ```pip install characterai``` After this need to launch this command: `python -m playwright install`
 - Install the keyboard `pip install keyboard`
+- Install the PyTorch 2.0+: `pip3 install torch torchvision torchaudio`
+- Install the sounddevice: `pip install sounddevice`
+- Install 
 - Install the Whisper Mic `pip install whisper-mic`
 - Install the ElevenLabs `pip install elevenlabs`
 - Now you can launch `ai_waifu.py`
