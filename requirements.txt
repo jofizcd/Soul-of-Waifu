@@ -1,4 +1,7 @@
+torch
 characterai
 elevenlabs
 keyboard
 whisper_mic
+sounddevice
+gpytranslate
