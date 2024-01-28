@@ -1,4 +1,4 @@
-# Your AI WAIFU
+# Soul of Waifu
 <div>
   <img width="220" align="left" src="423fabce-b698-426f-acb5-dae5a612a80c.jpg"/>
   <br>
