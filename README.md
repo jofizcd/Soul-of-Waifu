@@ -1,6 +1,6 @@
 # Soul of Waifu
 <div>
-  <img width="220" align="left" src="423fabce-b698-426f-acb5-dae5a612a80c.jpg"/>
+  <img width="220" align="left" src="preview1.jpg"/>
   <br>
   <h1>Wanted an AI waifu but don't know how to create one?</h1>
   </p>
