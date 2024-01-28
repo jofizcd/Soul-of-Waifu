@@ -10,6 +10,8 @@
   </p>
   🤝 Теперь у тебя есть возможность "оживить" своего любимого персонажа из аниме или манги. Подпишись на мои ютуб и телеграм каналы и поставь этому проекту звезду. Насладись общением с усовершенствованным персонажем :3
 
+<img width="500" align="center" src="cmnd.png"/>
+
  ## 🧠 Features | Функции
  - Now you can talk to your favorite character with a realistic voice.
  - This program uses TTS from ElevenLabs, and also, if necessary, you can choose SIlero TTS mode, then you can run the program without Text-To-Speech limitations locally on your computer.
