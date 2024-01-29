@@ -33,7 +33,7 @@
 📌 Requirements | Требования:
 - Character AI API key, you can read about it in [here](https://pycai.gitbook.io/welcome/api/values) or [here](https://github.com/kramcat/CharacterAI/tree/main#-get-token)
 - ElevenLABS API key, you can find it on their [site](https://elevenlabs.io/subscription)
-- Install the CharacterAI library: `pip install characterai` After this need to launch this command: `python -m playwright install`
+- Install the CharacterAI library: `pip install characterai`.
 - Install the keyboard: `pip install keyboard`
 - Install the PyTorch 2.0+: `pip3 install torch torchvision torchaudio`
 - Install the sounddevice: `pip install sounddevice`
@@ -46,7 +46,7 @@
 -----------------------------------------------------------------------------------------
 - Character AI API-ключ. Ты можешь почитать об этом [здесь](https://pycai.gitbook.io/welcome/api/values) или [здесь](https://github.com/kramcat/CharacterAI/tree/main#-get-token)
 - ElevenLABS API-ключ, ты можешь найти его на их [сайте](https://elevenlabs.io/subscription)
-- Установленная библиотека Character AI: `pip install characterai`. После того, как установил Character AI, введи эту команду в терминале: `python -m playwright install`
+- Установленная библиотека Character AI: `pip install characterai`.
 - Установленная библиотека keyboard `pip install keyboard`
 - Установленная PyTorch 2.0+: `pip3 install torch torchvision torchaudio`
 - Установленная sounddevice: `pip install sounddevice`
