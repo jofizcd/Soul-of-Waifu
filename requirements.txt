@@ -2,6 +2,9 @@ torch
 characterai
 elevenlabs
 keyboard
-whisper_mic
+whisper-mic
 sounddevice
 gpytranslate
+colorama
+windows-curses
+pyfiglet
