@@ -1,87 +1,134 @@
-# 🌟 Soul of Waifu
+<p align="center">
+  <img src="https://i.ibb.co/B5gzhj1h/logotitle.png" alt="Logotype"/>
+</p>
 
-<div>
+<br>
+
+<p align="center">
+  <b>🌟 Bring your Waifu to life with <a href="https://github.com/jofizcd/Soul-of-Waifu">Soul of Waifu</a> 🌟</b><br>
+  <i>Experience the magic of AI-powered companions with emotions, voice, and personality.</i>
+</p>
+
+<br>
+
+<p align="center">
+  <a href="https://www.youtube.com/@jofizcd"><img alt="YouTube" src="https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white"></a>
+  <a href="https://t.me/+UOWReJ5WlTAwOTk6"><img alt="Telegram" src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white"></a>
+  <a href="https://discord.com/invite/6vFtQGVfxM"><img alt="Discord" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://github.com/jofizcd"><img alt="GitHub" src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white"></a>
+</p>
+
+## 💫 | About app
+
+<p align="justify">
+  <b>Soul of Waifu lets you bring your favorite characters to life using AI technology.</b><br><br>
+  <i>
+    Chat with them 💬, interact via Speech-To-Text technology 🎤, customize their voices 🎶, and view them as avatar images or fully animated Live2D models 🎭 — all directly within the app!
+  </i>
+  <br><br>
+  <div align="center"><img src="https://i.ibb.co/27ZXXhwD/Prev.png" alt="Preview" style="width:85%;"/></div>
+  <br>
+  If you enjoyed the project, please give it a star! If you encounter any issues or have ideas for improving the program, feel free to share them with me on my Discord server or directly on GitHub. I look forward to hearing from you! Enjoy using it!
+</p>
+
+## 🧠 | Features
+
+### 💬 Interaction with characters
+- **Text chat**:  
+  Use the chat to interact with your character. Messages appear organic and are beautifully designed, thanks to Markdown integration.
+- **Voice interaction**:  
+  Use Speech-to-Speech technology to interact live with characters from Character AI, or create your own characters using special character cards.
+- **Three ways to communicate**: <br>
+  You can choose from several options for interacting with characters: Character AI, Mistral AI, and Local LLM.
+
+### 🎤 Enjoy crystal-clear Text-to-Speech functionality
+Support for three voice synthesis engines:
+
+- **Character AI**: <br>
+  Character voice synthesis with unique voices from Character AI.
+- **ElevenLabs**: <br>
+  High-quality speech synthesis supporting multiple languages with emotional intonation.
+- **XTTSv2**: <br>
+  High-quality local voice synthesis with RVC support.
+
+### 🛠 Character customization
+- **Image-avatar**: <br>
+  Use emotion kits to display your character's emotions through a collection of static images.
+- **Live2D-models**:  <br>
+  Take a look at your character by integrating an animated Live2D model and enjoy immersive, visually engaging communication.
+
+### 🔮 Local large language models support
+- **Privacy-Focused**: <br>
+  All data processing happens locally on your device, ensuring complete privacy and security. No need to worry about sensitive information being sent to external servers.
+- **Offline Access**: <br>
+  Use large language models without an internet connection.
+- **High Performance**: <br>
+  Optimized for local execution, these models deliver fast and reliable responses without compromising on quality.
+- **No censorship in chats**: <br>
+  No more restrictions in your conversations — unlock the full potential of language models.
+
+### 🖥 Modern Interface
+- **Intuitive GUI**:  <br>
+  Effortless control via tool panels, with quick access to settings and chats.
+- **A visually appealing design**:  <br>
+  The program features a sleek design in classic dark colors, easy on the eyes and visually appealing.
+- **Characters**: <br>
+  Create characters or download their cards directly within the app.
+
+## ⚠️ | Requirements
+  - **Python 3.11**
+  - **API-keys**: <br>
+    * From [Character AI](https://character.ai/) (For Character AI conversation method) <br>
+    * From [Mistral AI](https://mistral.ai/) (For Mistral AI conversation method) <br>
+    * From [ElevenLabs](https://elevenlabs.io/) (for ElevenLabs TTS) <br>
+  - **Installing Dependencies**
+
+## 💾 | Installation
+### 1) Downloading the program
+  Go to the **[Releases](https://github.com/jofizcd/Soul-of-Waifu/releases)** section and download the *Soul-Of-Waifu.zip* archive from the latest version.
+### 2) Extracting files
+  Extract the contents of the archive into any convenient folder.
+### 3) Dependencies installation
+  Run the *installer.bat* file to install all the project dependencies.
+### 4) Launching the program
+  Use *Soul-of-Waifu.exe* or *start.bat* to launch the program.
+
+## 🧿 | Feedback
+<p align="center">
+  <b>The Soul of Waifu project is constantly evolving and expanding, with many exciting updates and features planned for the future!</b><br>
   
-  ## Make your dream a reality and talk with your waifu!
+  - 🌟 Support Development <br>
+  If you enjoy the program and want to help accelerate new releases, give the project a star. Your support helps spread the word and keeps the project growing!
   
-  <img align="left" src="https://github.com/jofizcd/Soul-of-Waifu/blob/main/banner.jpg" alt="Banner" style="width:479px;"/>
+  - 🛠 Need Help or Have Ideas? <br>
+  Join our Discord community, where AI enthusiasts like you collaborate, share feedback, and help shape the future of Soul of Waifu. <br>
   
+  <div align="center"><a href="https://discord.com/invite/6vFtQGVfxM"><img src="https://discordapp.com/api/guilds/925841922264801311/widget.png?style=banner2"/></a></div><br>
+  
+  
+  <div align="center"> Thank you for being part of this journey and using Soul of Waifu! Together, we’re making AI interactions more immersive and creative. </div>
+</p>
+
+### 🤝 Support
+- [**Donation Link**](https://www.donationalerts.com/r/jofizcd) — Donate in the name of neural networks! 🤖
+
+### 📊 Stats <br>
+
+<div align="center"><img src="https://api.star-history.com/svg?repos=jofizcd/Soul-of-Waifu&type=Date"/></div><br>
+
+## 👾 | Developer
+
+<div align="center">
+  <img src="https://i.ibb.co/bgx4T3Dd/Av.jpg" width="150" style="border-radius: 50%; margin: 10px 0;" />
+  <h3>Jofi</h3>
+  <p>I focus on things that I find interesting, and in particular, I’m passionate about the field of artificial intelligence. 🧠✨</p>
+  <a href="https://www.youtube.com/@jofizcd"><img alt="YouTube" src="https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white"></a>
+  <a href="https://discord.com/invite/6vFtQGVfxM"><img alt="Discord" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://github.com/jofizcd"><img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white"/></a>
 </div>
 
-<p align="justify">
-👉 Soul of Waifu allows you to create your own AI Waifu and communicate with it using your voice. The program features the following Text-To-Speech technologies: CharacterAI, SileroTTS and ElevenLabs. Give the project a star if you liked it and if there are any problems or have any ideas to add to the program, I look forward to seeing you on my Discord server. Enjoy using it!
-</p>
+---
 
------------------------------------------------------
-<p align="justify">
-👉 Soul of Waifu позволяет создать свою ИИ-Вайфу и общаться с ней с помощью голоса, взаимодействуя через современный GUI. В программе представлены следующие технологии Text-To-Speech: CharacterAI, SileroTTS и ElevenLabs. Ставь проекту звезду, если понравилось и если возникли какие-либо проблемы или есть какие-либо идеи, которые могли бы дополнить программу, то жду вас в своем Discord-сервере. Приятного пользования!
-</p>
-  
-## 🧠 | Features / Функции
-
-<div align="center"><img src="https://github.com/jofizcd/Soul-of-Waifu/blob/main/preview.jpg" style="width: 450px;"/></div>
-
-<p align="justify">
-  
- - Soul of Waifu allows you to communicate with your character from the Character AI website using Speech-To-Speech technology, but there is a text-based option in the program as well.
- - There are three Text-To-Speech variants available in the program: From Character AI website, voicing from SileroTTS and ElevenLabs.
- - It is possible to connect your live2d model and communicate with your character's avatar.
- - Modern GUI allows you to use the program much easier and more comfortable.
-</p>
-
------------------------------------------------------
-<p align="justify">
-  
-- Soul of Waifu позволяет общаться с персонажем с сайта Character AI с помощью технологии Speech-To-Speech, но и текстовый вариант в программе присутствует.
-- В программе доступно три варианта озвучки Text-To-Speech: с сайта Character AI, от SileroTTS и ElevenLabs.
-- Есть возможность подключить свою live2d модель и общаться уже с аватаром вашего персонажа.
-- Современный GUI позволяет пользоваться программой намного проще и комфортнее.
-</p>
-
-## 👨🏻‍💻 | How to run / Как запустить
-<p align="justify">
-  
-1) Go to "Releases" and under the latest version of the program click on "Soul-Of-Waifu.zip" to start downloading the program;
-2) Unzip the folder from the archive to any convenient place for you;
-3) Make sure you have Python 3.10+ version installed;
-4) In the folder, run the installer file. Choose depending on your operating system. On Windows systems the file is "installer.bat" and on Linux "installer.sh". Subsequently, run the program through the file named "start".
-5) In the settings tab you will need to insert the API Token from the Character AI website. To do this, select "Get API-Token from Character AI" in the top menu and enter your email in the input field, after which an email will be sent to your mail. Copy the link from there and paste it into the input field in the program. Next, you will see your API Token, which you can save and paste into the special token entry field in the settings.
-
-📌 Requirements:
-- Python 3.10+
-- Run the installer to load all the necessary libraries for the program to work;
-- Character AI API key;
-- ElevenLabs API key.
-
-❗️ Optional:
-- You can go [here](https://github.com/pkhungurn/talking-head-anime-3-demo) and make a character model so you can talk to her later;
-- You can [download](https://olmewe.itch.io/veadotube-mini) a program to make a vtuber model for your AI character.
-</p>
-
------------------------------------------------------
-<p align="justify">
-
-  1) Зайти в "Releases" и под последней версией программы нажать на "Soul-Of-Waifu.zip", чтобы начать загрузку программы;
-  2) Распаковать папку с архива в любое удобное для вас место;
-  3) Убедитесь, что у вас установлен Python 3.10+ версии;
-  4) В папке запустить файл installer. Выбирайте в зависимости от вашей операционной системы. На системах Windows файл "installer.bat", а на Linux "installer.sh". В последующем запускайте программу через файл с названием "start".
-  5) Во вкладке настроек вам нужно будет вставить API-Токен от сайта Character AI. Для этого в верхнем меню выберите "Получить API-токен с Character AI" и вводите в поле для ввода вашу электронную почту, после чего на почту придет письмо. Скопируйте ссылку оттуда и вставьте в поле ввода в программе. Далее, вы увидите ваш API-Токен, который вы можете сохранить и вставить в специальное поле для ввода токена в настройках.
-
-📌 Требования:
-- Python 3.10+
-- Запустить файл установщика, чтобы установить все необходимые библиотеки для стабильной работы программы;
-- API-токен Character AI;
-- API-ключ ElevenLabs;
-
-❗️ Дополнительно:
-- Ты можешь перейти [сюда](https://github.com/pkhungurn/talking-head-anime-3-demo) создать картинку персонажа для общения;
-- Ты можешь [скачать](https://olmewe.itch.io/veadotube-mini) программу, чтобы создать анимированную модель для персонажа из созданной ранее картинки.
-</p>
-
-## 👀 | Help with program / Помощь с программой
-<p align="justify">If you liked Soul of Waifu and want to support the author of the project, please give this repository a star. I will be very grateful to you. Also, if you have any problems with the program or have ideas and suggestions that you can try to implement in Soul of Waifu, I am waiting for you in my Discord-server, where there are as many fans of artificial intelligence as you! Link: https://discord.gg/waytojofistar</p>
-
----------------------------------------------------
-<p align="justify">Если вам понравилась программа Soul of Waifu и вы хотите поддержать автора проекта, то прошу вас поставить звезду данному репозиторию. Я буду вам очень признателен. Также, если у вас возникли какие-либо проблемы в работе программы или же у вас есть идеи и предложения, которые можно попробовать реализовать в Soul of Waifu, то я жду вас в своём Discord-сервере, на котором находятся такие же любители искусственного интеллекта как и вы! Ссылка: https://discord.gg/waytojofistar</p>
-
-
+## 📃 | License
+This project is distributed under the GPL v3 License. <br><br>
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
