@@ -1,0 +1,67 @@
+{
+	"Type": "Live2D Expression",
+	"FadeInTime": 0.5,
+	"FadeOutTime": 0.5,
+	"Parameters": [
+		{
+			"Id": "ParamEyeLOpen",
+			"Value": 1.5,
+			"Blend": "Multiply"
+		},
+		{
+			"Id": "ParamEyeROpen",
+			"Value": 1.5,
+			"Blend": "Multiply"
+		},
+		{
+			"Id": "ParamBrowLForm",
+			"Value": 1,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamBrowRForm",
+			"Value": 1,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamMouthOpenY",
+			"Value": 1,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamBreath",
+			"Value": 0.5,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamAngleX",
+			"Value": 15.699,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamAngleY",
+			"Value": 26.58,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamAngleZ",
+			"Value": -8.238,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamBodyAngleX",
+			"Value": 6.684,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamBodyAngleY",
+			"Value": 8.342,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamBodyAngleZ",
+			"Value": -6.062,
+			"Blend": "Add"
+		}
+	]
+}
