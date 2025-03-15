@@ -1,0 +1,29 @@
+{
+    "main_settings": {
+        "conversation_method": "Character AI",
+        "stt_method": 0,
+        "sow_system_status": false,
+        "program_language": 0,
+        "input_device": 0,
+        "output_device": 0,
+        "translator": 0,
+        "target_language": 0,
+        "translator_mode": 0,
+        "live2d_mode": 0,
+        "local_llm": "",
+        "llm_device": 0,
+        "gpu_layers": 10,
+        "mlock_status": false,
+        "context_size": 512,
+        "temperature": 0.5,
+        "top_p": 0.6,
+        "repeat_penalty": 1.1,
+        "max_tokens": 100
+    },
+    "user_data": {
+        "user_name": "",
+        "user_description": "",
+        "user_avatar": "",
+        "current_character_image":
+    }
+}
