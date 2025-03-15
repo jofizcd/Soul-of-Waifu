@@ -18,6 +18,14 @@
   <a href="https://github.com/jofizcd"><img alt="GitHub" src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white"></a>
 </p>
 
+<p align="center">
+  <img alt="Stars" src="https://img.shields.io/github/stars/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
+  <img alt="Forks" src="https://img.shields.io/github/forks/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
+  <img alt="Issues" src="https://img.shields.io/github/issues/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
+  <img alt="Discord" src="https://img.shields.io/discord/925841922264801311?style=for-the-badge&logo=discord&label=Chat">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/jofizcd/Soul-of-Waifu/total?style=for-the-badge&logo=github&label=Downloads">
+</p>
+
 ## 💫 | About app
 
 <p align="justify">
