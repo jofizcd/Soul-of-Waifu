@@ -82,10 +82,11 @@ Support for three voice synthesis engines:
     * From [Mistral AI](https://mistral.ai/) (For Mistral AI conversation method) <br>
     * From [ElevenLabs](https://elevenlabs.io/) (for ElevenLabs TTS) <br>
   - **Installing Dependencies**
+  - **FFMPEG**
 
 ## 💾 | Installation
 ### 1) Downloading the program
-  Go to the **[Releases](https://github.com/jofizcd/Soul-of-Waifu/releases)** section and download the *Soul-Of-Waifu.zip* archive from the latest version.
+  Go to the **[Releases](https://github.com/jofizcd/Soul-of-Waifu/releases)** section and download the *Soul-of-Waifu-v2.0.0.rar* archive from the latest version.
 ### 2) Extracting files
   Extract the contents of the archive into any convenient folder.
 ### 3) Dependencies installation
