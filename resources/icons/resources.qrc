@@ -1,0 +1,36 @@
+<RCC>
+  <qresource prefix="sowInterface">
+    <file>person.png</file>
+    <file>faq.png</file>
+    <file>addCharacter2.png</file>
+    <file>addImage.png</file>
+    <file>import.png</file>
+    <file>addCharacter.png</file>
+    <file>addCharacter_dark.png</file>
+    <file>characterai.png</file>
+    <file>discordDark.png</file>
+    <file>discord.png</file>
+    <file>gateway.png</file>
+    <file>githubDark.png</file>
+    <file>github.png</file>
+    <file>hangUp.png</file>
+    <file>home.png</file>
+    <file>homeDark.png</file>
+    <file>information.png</file>
+    <file>janitorai.png</file>
+    <file>logotitle.png</file>
+    <file>logotype.ico</file>
+    <file>logotype.png</file>
+    <file>loupe.png</file>
+    <file>mistralai.png</file>
+    <file>more.png</file>
+    <file>options.png</file>
+    <file>optionsDark.png</file>
+    <file>phone.png</file>
+    <file>screen.jpg</file>
+    <file>send.png</file>
+    <file>checked.png</file>
+    <file>youtube.png</file>
+    <file>arrowDown.png</file>
+  </qresource>
+</RCC>
