@@ -84,7 +84,7 @@ Support for three voice synthesis engines:
   Create characters or download their cards directly within the app.
 
 ## ⚠️ | Requirements
-  - **Python 3.11**
+  - **Python 3.11.9**
   - **API-keys**: <br>
     * From [Character AI](https://character.ai/) (For Character AI conversation method) <br>
     * From [Mistral AI](https://mistral.ai/) (For Mistral AI conversation method) <br>
