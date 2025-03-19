@@ -1,12 +1,4 @@
 @echo off
-color 0A
-
-cls
-echo ===========================================
-echo = Welcome to the installer of Soul of Waifu =
-echo ===========================================
-
-@echo off
 setlocal enabledelayedexpansion
 
 cd /D "%~dp0"
@@ -100,79 +92,7 @@ set "CUDA_HOME=%CUDA_PATH%"
 call "%CONDA_ROOT_PREFIX%\condabin\conda.bat" activate "%INSTALL_ENV_DIR%" || ( echo. && echo Miniconda hook not found. && goto end )
 
 @rem setup installer env
-
-cls
-echo ===========================================
-echo =         Installing dependencies         =
-echo ===========================================
-echo Installing dependencies... Please wait.
-
-python -m pip install --upgrade pip
-pip install av
-pip install pyworld
-pip install tensorboardX
-pip install requests
-pip install qasync
-pip install PyQt6
-pip install PyOpenGL
-pip install onnxruntime
-pip install live2d-py
-pip install transformers
-pip install psutil
-pip install git+https://github.com/kramcat/CharacterAI.git
-
-cls
-echo    ==============================================================
-echo    Please select an installation option:
-echo.
-echo      [1] Install PyTorch with CUDA support (for GPU acceleration)
-echo      [2] Install PyTorch for CPU only (no GPU required)
-echo.
-echo    ==============================================================
-echo.
-set /p choice="Enter your choice (1 or 2): "
-
-if "%choice%"=="1" (
-    echo ^| Installing PyTorch with CUDA support...                     ^|
-    echo. 
-    pip install torch==2.5.1 torchvision torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
-) else if "%choice%"=="2" (
-    echo ^| Installing PyTorch for CPU...                               ^|
-    echo.
-    pip install torch==2.5.1 torchvision torchaudio==2.5.1
-) else (
-    echo ^| Invalid choice. Please restart the installer and try again. ^|
-    pause
-    exit /b
-)
-
-pip install torchcrepe
-pip install openai-whisper
-pip install sounddevice
-pip install soundfile
-pip install SpeechRecognition
-pip install coqui-tts
-pip install pydub
-pip install elevenlabs
-pip install git+https://github.com/JarodMica/rvc-python
-pip install PyCharacterAI
-pip install aiohttp
-pip install mistralai
-pip install sentencepiece==0.2.0
-pip install sacremoses
-pip install translators
-pip install vosk
-pip install pyaudio
-pip install numpy==1.25.2
-pip install resources\data\fairseq-0.12.3-cp311-cp311-win_amd64.whl
-
-cls
-echo =====================================================
-echo = The installation has been completed successfully! =
-echo =           Now you can start the program           =
-echo =====================================================
-@rem deactivate existing conda envs as needed to avoid conflicts
-(call conda deactivate && call conda deactivate && call conda deactivate) 2>nul
+call Soul-of-Waifu.exe %*
 
 @rem below are functions for the script   next line skips these during normal execution
 goto end
