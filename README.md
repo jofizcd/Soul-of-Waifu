@@ -18,6 +18,10 @@
   <a href="https://github.com/jofizcd"><img alt="GitHub" src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white"></a>
 </p>
 
+<div align="center">
+    <img src="https://count.getloli.com/get/@Soul-of-Waifu?theme=rule34" /><br>
+</div>
+
 <p align="center">
   <img alt="Stars" src="https://img.shields.io/github/stars/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
   <img alt="Forks" src="https://img.shields.io/github/forks/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
