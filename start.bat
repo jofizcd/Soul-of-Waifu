@@ -2,7 +2,7 @@
 @echo off
 
 cd /d %~dp0
-set FFMPEG_PATH=%cd%\resources\data\ffmpeg
+set FFMPEG_PATH=%cd%\resources\data\ffmpeg\bin
 set PATH=%FFMPEG_PATH%;%PATH%
 
 echo Checking FFmpeg...
