@@ -38,7 +38,7 @@
     Chat with them 💬, interact via Speech-To-Text technology 🎤, customize their voices 🎶, and view them as avatar images or fully animated Live2D models 🎭 — all directly within the app!
   </i>
   <br><br>
-  <div align="center"><img src="https://i.ibb.co/27ZXXhwD/Prev.png" alt="Preview" style="width:85%;"/></div>
+  <div align="center"><img src="https://i.ibb.co/GQw5ppGS/pre.png" alt="Preview" style="width:85%;"/></div>
   <br>
   If you enjoyed the project, please give it a star! If you encounter any issues or have ideas for improving the program, feel free to share them with me on my Discord server or directly on GitHub. I look forward to hearing from you! Enjoy using it!
 </p>
@@ -51,7 +51,7 @@
 - **Voice interaction**:  
   Use Speech-to-Speech technology to interact live with characters from Character AI, or create your own characters using special character cards.
 - **Three ways to communicate**: <br>
-  You can choose from several options for interacting with characters: Character AI, Mistral AI, and Local LLM.
+  You can choose from several options for interacting with characters: Character AI, Mistral AI, OpenRouter, OpenAI and Local LLM.
 
 ### 🎤 Enjoy crystal-clear Text-to-Speech functionality
 Support for three voice synthesis engines:
@@ -62,6 +62,8 @@ Support for three voice synthesis engines:
   High-quality speech synthesis supporting multiple languages with emotional intonation.
 - **XTTSv2**: <br>
   High-quality local voice synthesis with RVC support.
+- **Edge TTS**: <br>
+  High-quality voice synthesis with RVC support.
 
 ### 🛠 Character customization
 - **Image-avatar**: <br>
@@ -92,9 +94,9 @@ Support for three voice synthesis engines:
   - **API-keys**: <br>
     * From [Character AI](https://character.ai/) (For Character AI conversation method) <br>
     * From [Mistral AI](https://mistral.ai/) (For Mistral AI conversation method) <br>
+    * From [OpenRouter](https://openrouter.ai/) (For OpenRouter conversation method) <br>
     * From [ElevenLabs](https://elevenlabs.io/) (for ElevenLabs TTS) <br>
   - **Installing Dependencies**
-  - **FFMPEG**
   - **Git** 
 
 ## 💾 | Installation
@@ -105,7 +107,7 @@ Support for three voice synthesis engines:
 ### 3) Dependencies installation
   Run the *installer.bat* file to install all the project dependencies.
 ### 4) Launching the program
-  Use *Soul-of-Waifu.exe* or *start.bat* to launch the program.
+  Use *start.bat* to launch the program.
 
 ## 🧿 | Feedback
 <p align="center">
