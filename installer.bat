@@ -1,25 +1,23 @@
 @echo off
 color 0A
-
-cls
-echo ===========================================
-echo = Welcome to the installer of Soul of Waifu =
-echo ===========================================
-
+					 
+echo Installing Soul of Waifu        
+echo.
 echo Creating virtual environment...
 python -m venv lib
 call lib\Scripts\activate
 
-cls
 echo ===========================================
-echo =         Installing dependencies         =
+echo           Installing dependencies         
 echo ===========================================
 echo Installing dependencies... Please wait.
 
-python -m pip install --upgrade pip
+python -m pip install --upgrade --force-reinstall pip
 pip install av
 pip install pyworld
 pip install tensorboardX
+pip install edge-tts
+pip install openai
 pip install requests
 pip install qasync
 pip install PyQt6
@@ -30,7 +28,6 @@ pip install transformers
 pip install psutil
 pip install git+https://github.com/kramcat/CharacterAI.git
 
-cls
 echo    ==============================================================
 echo    Please select an installation option:
 echo.
@@ -75,11 +72,13 @@ pip install pyaudio
 pip install numpy==1.25.2
 pip install resources\data\fairseq-0.12.3-cp311-cp311-win_amd64.whl
 
-cls
-echo =====================================================
-echo = The installation has been completed successfully! =
-echo =           Now you can start the program           =
-echo =====================================================
+echo ===================================================
+echo.
+echo            The installation is complete!
+echo       You can start the program via start.bat
+echo.
+echo ===================================================
+
 call lib\Scripts\deactivate.bat
 pause
 @echo Press any key to continue. . .
