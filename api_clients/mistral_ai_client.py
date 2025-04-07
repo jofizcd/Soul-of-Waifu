@@ -34,8 +34,7 @@ class MistralAI():
             top_p=top_p,
             max_tokens=max_tokens,
             frequency_penalty=repeat_penalty,
-            presence_penalty=0.7,
-            stop=["\n"]
+            presence_penalty=0.7
         )
 
         async for chunk in response:
