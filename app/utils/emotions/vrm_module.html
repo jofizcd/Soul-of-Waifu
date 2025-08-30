@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html style="width: 100%; height: 100%;">
+	<head>
+		<meta charset="utf-8" />
+		<title>Soul of Waifu VRM</title>
+		<meta name="viewport" />
+		<style>
+			html, body {
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                background-color: rgb(27, 27, 27);
+            }
+            canvas {
+                display: block;
+                width: 100%;
+                height: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+				background-color: rgb(27, 27, 27);
+            }
+			#background {
+				position: absolute;
+				width: 100%;
+				height: 100%;
+				z-index: -1;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="background"></div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./vrm/modules/three.module.js",
+					"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.176.0/examples/jsm/",
+					"@pixiv/three-vrm": "./vrm/modules/three-vrm.module.js",
+					"loadMixamo": "./vrm/modules/loadMixamoAnimation.js"
+				}
+			}
+		</script>
+		<script type="module">
+			import * as THREE from 'three';
+			import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+			import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { VRMLoaderPlugin, VRMUtils, VRMHumanoid, VRMLookAt } from '@pixiv/three-vrm';
+			import { loadMixamoAnimation } from 'loadMixamo';
+
+			const mixamoVRMRigMap = {
+				mixamorigHips: 'hips',
+				mixamorigSpine: 'spine',
+				mixamorigSpine1: 'chest',
+				mixamorigSpine2: 'upperChest',
+				mixamorigNeck: 'neck',
+				mixamorigHead: 'head',
+				mixamorigLeftShoulder: 'leftShoulder',
+				mixamorigLeftArm: 'leftUpperArm',
+				mixamorigLeftForeArm: 'leftLowerArm',
+				mixamorigLeftHand: 'leftHand',
+				mixamorigLeftHandThumb1: 'leftThumbMetacarpal',
+				mixamorigLeftHandThumb2: 'leftThumbProximal',
+				mixamorigLeftHandThumb3: 'leftThumbDistal',
+				mixamorigLeftHandIndex1: 'leftIndexProximal',
+				mixamorigLeftHandIndex2: 'leftIndexIntermediate',
+				mixamorigLeftHandIndex3: 'leftIndexDistal',
+				mixamorigLeftHandMiddle1: 'leftMiddleProximal',
+				mixamorigLeftHandMiddle2: 'leftMiddleIntermediate',
+				mixamorigLeftHandMiddle3: 'leftMiddleDistal',
+				mixamorigLeftHandRing1: 'leftRingProximal',
+				mixamorigLeftHandRing2: 'leftRingIntermediate',
+				mixamorigLeftHandRing3: 'leftRingDistal',
+				mixamorigLeftHandPinky1: 'leftLittleProximal',
+				mixamorigLeftHandPinky2: 'leftLittleIntermediate',
+				mixamorigLeftHandPinky3: 'leftLittleDistal',
+				mixamorigRightShoulder: 'rightShoulder',
+				mixamorigRightArm: 'rightUpperArm',
+				mixamorigRightForeArm: 'rightLowerArm',
+				mixamorigRightHand: 'rightHand',
+				mixamorigRightHandPinky1: 'rightLittleProximal',
+				mixamorigRightHandPinky2: 'rightLittleIntermediate',
+				mixamorigRightHandPinky3: 'rightLittleDistal',
+				mixamorigRightHandRing1: 'rightRingProximal',
+				mixamorigRightHandRing2: 'rightRingIntermediate',
+				mixamorigRightHandRing3: 'rightRingDistal',
+				mixamorigRightHandMiddle1: 'rightMiddleProximal',
+				mixamorigRightHandMiddle2: 'rightMiddleIntermediate',
+				mixamorigRightHandMiddle3: 'rightMiddleDistal',
+				mixamorigRightHandIndex1: 'rightIndexProximal',
+				mixamorigRightHandIndex2: 'rightIndexIntermediate',
+				mixamorigRightHandIndex3: 'rightIndexDistal',
+				mixamorigRightHandThumb1: 'rightThumbMetacarpal',
+				mixamorigRightHandThumb2: 'rightThumbProximal',
+				mixamorigRightHandThumb3: 'rightThumbDistal',
+				mixamorigLeftUpLeg: 'leftUpperLeg',
+				mixamorigLeftLeg: 'leftLowerLeg',
+				mixamorigLeftFoot: 'leftFoot',
+				mixamorigLeftToeBase: 'leftToes',
+				mixamorigRightUpLeg: 'rightUpperLeg',
+				mixamorigRightLeg: 'rightLowerLeg',
+				mixamorigRightFoot: 'rightFoot',
+				mixamorigRightToeBase: 'rightToes'
+			};
+			
+			// vector for calculations
+			const _v3A = new THREE.Vector3();
+
+			// extended vrm lookat
+			class VRMSmoothLookAt extends VRMLookAt {
+				constructor(humanoid, applier) {
+					super(humanoid, applier);
+					this.smoothFactor = 10.0;
+					
+					this.yawLimit = 45.0;
+					this.pitchLimit = 45.0;
+					
+					this._yawDamped = 0.0;
+					this._pitchDamped = 0.0;
+				}
+
+				update(delta) {
+
+					if (this.target && this.autoUpdate) {
+
+						this.lookAt( this.target.getWorldPosition( _v3A ) );
+
+						if (
+							this.yawLimit < Math.abs( this._yaw ) ||
+							this.pitchLimit < Math.abs( this._pitch )
+						) {
+							this._yaw = 0.0;
+							this._pitch = 0.0;
+						}
+
+						const k = 1.0 - Math.exp( - this.smoothFactor * delta );
+
+						this._yawDamped += ( this._yaw - this._yawDamped ) * k;
+						this._pitchDamped += ( this._pitch - this._pitchDamped ) * k;
+
+						this.applier.applyYawPitch( this._yawDamped, this._pitchDamped );
+
+						this._needsUpdate = false;
+
+					}
+
+					if ( this._needsUpdate ) {
+
+						this._needsUpdate = false;
+						this.applier.applyYawPitch( this._yaw, this._pitch );
+
+					}
+				}
+			}
+
+			// init renderer
+			const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+			renderer.setClearColor(0x000000, 0);
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.outputEncoding = THREE.sRGBEncoding;
+			renderer.physicallyCorrectLights = true;
+			renderer.shadowMap.enabled = true;
+			document.body.appendChild(renderer.domElement);
+
+			// init camera
+			const camera = new THREE.PerspectiveCamera(30.0, window.innerWidth / window.innerHeight, 0.1, 1000.0);
+			camera.position.set(0.0, 1.0, 5.0);
+
+			// init camera controls
+			const controls = new OrbitControls(camera, renderer.domElement);
+			controls.screenSpacePanning = true;
+			controls.target.set(0.0, 1.0, 0.0);
+			controls.update();
+
+			// init scene
+			const scene = new THREE.Scene();
+        
+			// init lighting
+			const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+			scene.add(ambientLight);
+			
+			const directionalLight = new THREE.DirectionalLight(0xffffff, Math.PI);
+			directionalLight.position.set(1, 1, 1).normalize();
+			directionalLight.castShadow = true;
+			scene.add(directionalLight);
+
+			// background system
+			let currentBackground = null;
+
+			function setBackground(type, color = null, url = null) {
+				console.log("[DEBUG] setBackground called with:", { type, color, url });
+
+				if (currentBackground) {
+					console.log("[DEBUG] Disposing previous background...");
+
+					if (currentBackground instanceof THREE.Texture) {
+						currentBackground.dispose();
+					}
+
+					scene.background = null;
+
+					const bgElement = document.getElementById('background');
+					if (bgElement) {
+						bgElement.style.background = '';
+					}
+				}
+
+				switch(type) {
+					case 'color':
+						console.log("[DEBUG] Setting solid color background to:", color);
+						scene.background = new THREE.Color(color);
+						break;
+
+					case 'image':
+						if (!url) {
+							console.warn("[DEBUG] Image URL is empty!");
+							return;
+						}
+						console.log("[DEBUG] Loading image from:", url);
+
+						const loader = new THREE.TextureLoader();
+						loader.load(url, (texture) => {
+							texture.encoding = THREE.sRGBEncoding;
+
+							texture.wrapS = THREE.ClampToEdgeWrapping;
+							texture.wrapT = THREE.ClampToEdgeWrapping;
+							texture.minFilter = THREE.LinearFilter;
+							texture.magFilter = THREE.LinearFilter;
+
+							scene.background = texture;
+							currentBackground = texture;
+							
+							console.log("[DEBUG] Background image loaded and applied.");
+						}, undefined, (err) => {
+							console.error("[ERROR] Failed to load background image:", err);
+						});
+						break;
+
+					default:
+						console.log("[DEBUG] Resetting background.");
+						scene.background = null;
+				}
+
+				currentBackground = type;
+			}
+
+			window.setBackground = setBackground;
+
+			// Loaders
+			let currentVrm = undefined;
+			let currentAnimationUrl = undefined;
+			let currentMixer = undefined;
+			let currentAction = undefined;
+			let idleAnimation = null;
+			const idleAnimationUrl = "/app/utils/emotions/vrm/expressions/neutral.fbx";
+			let isPlayingOneShot = undefined;
+			let currentExpression = "neutral";
+    		const availableExpressions = ["angry", "happy", "neutral", "relaxed", "sad", "surprised"];
+
+			window.vrmLoaded = false;
+
+			const loader = new GLTFLoader();
+			loader.register(parser => new VRMLoaderPlugin(parser));
+
+			function setupModelOptimizations(model) {
+				model.traverse((obj) => {
+					obj.frustumCulled = false;
+
+					if (obj.isMesh) {
+						obj.material.depthWrite = true;
+						obj.material.depthTest = true;
+						obj.material.precision = 'highp';
+						obj.material.antialias = true;
+
+						obj.castShadow = true;
+						obj.receiveShadow = true;
+					}
+				});
+			}
+
+            const urlParams = new URLSearchParams(window.location.search);
+            let modelPath = decodeURIComponent(urlParams.get('model'));
+
+            if (!modelPath) {
+				console.error("The 'model' parameter was not found in the URL");
+				alert("The VRM module for display is not specified");
+			} else {
+				console.log("Loading a VRM model from:", modelPath);
+				loader.load(modelPath, gltf => {
+					const vrm = gltf.userData.vrm;
+					
+					VRMUtils.removeUnnecessaryVertices(gltf.scene);
+					VRMUtils.combineSkeletons(gltf.scene);
+					VRMUtils.combineMorphs(vrm);
+
+					setupModelOptimizations(gltf.scene);
+					
+					vrm.scene.traverse(obj => obj.frustumCulled = false);
+					currentVrm = vrm;
+
+					const smoothLookAt = new VRMSmoothLookAt( vrm.humanoid, vrm.lookAt.applier );
+					smoothLookAt.copy( vrm.lookAt );
+					vrm.lookAt = smoothLookAt;
+					
+					scene.add(vrm.scene);
+					console.log("VRM model loaded successfully");
+					window.vrmLoaded = true; 
+					
+					if (window.onVrmLoaded) {
+						
+						window.onVrmLoaded();
+					
+					}
+
+					vrm.lookAt.target = camera;
+					
+					currentMixer = new THREE.AnimationMixer( currentVrm.scene );
+					
+					blink();
+
+					loadFBX(idleAnimationUrl).then(() => {
+						console.log("Idle animation is loaded and ready to use");
+					}).catch(error => {
+						console.error("Error loading idle animation:", error);
+					});
+
+					vrm.scene.traverse( ( obj ) => {
+
+						obj.frustumCulled = false;
+
+					} );
+
+					VRMUtils.rotateVRM0( vrm );
+					console.log( vrm );
+					
+					animate();
+				}, progress => {
+					const percent = Math.round(progress.loaded / progress.total * 100);
+					console.log(`Loading the model... ${percent}%`);
+				}, error => {
+					console.error("Error loading the VRM:", error);
+					alert("Couldn't load the model. Check the file path or format");
+				});
+			}
+
+			function blink() {
+				var blinktimeout = Math.floor(Math.random() * 250) + 50;
+				setTimeout(() => {
+					currentVrm.expressionManager.setValue("blink",0);
+				}, blinktimeout);
+
+				currentVrm.expressionManager.setValue("blink",1.0);
+
+				var rand = Math.round(Math.random() * 10000) + 1000;
+				setTimeout(function () {
+						blink();
+				}, rand);
+			}
+
+			async function setExpression(expression, duration = 0.3) {
+				if (!currentVrm || !currentVrm.expressionManager) {
+					console.error("The VRM model or expression manager is not loaded");
+					return { success: false, error: "The model is not ready" };
+				}
+
+				expression = expression.toLowerCase();
+				
+				if (!availableExpressions.includes(expression)) {
+					console.error("Unknown expression:", expression);
+					return { success: false, error: "Unknown expression" };
+				}
+
+				console.log("Changing the expression from", currentExpression, "to", expression);
+
+				if (duration <= 0) {
+					for (const expr in currentVrm.expressionManager.expressionMap) {
+						currentVrm.expressionManager.setValue(expr, 0.0);
+					}
+					currentVrm.expressionManager.setValue(expression, 1.0);
+				} else {
+					const startTime = performance.now();
+					const startValues = {};
+					
+					for (const expr in currentVrm.expressionManager.expressionMap) {
+						startValues[expr] = currentVrm.expressionManager.getValue(expr);
+					}
+					
+					const animateTransition = (currentTime) => {
+						const elapsed = (currentTime - startTime) / 1000;
+						const progress = Math.min(elapsed / duration, 1.0);
+						
+						for (const expr in currentVrm.expressionManager.expressionMap) {
+							const targetValue = expr === expression ? 1.0 : 0.0;
+							const newValue = startValues[expr] + (targetValue - startValues[expr]) * progress;
+							currentVrm.expressionManager.setValue(expr, newValue);
+						}
+						
+						if (progress < 1.0) {
+							requestAnimationFrame(animateTransition);
+						}
+					};
+					
+					requestAnimationFrame(animateTransition);
+				}
+				
+				currentExpression = expression;
+				return { success: true };
+			}
+
+			window.setExpression = setExpression;
+
+			async function loadFBX(animationUrl) {
+				console.log("Trying to load an animation:", animationUrl);
+				
+				if (!window.vrmLoaded || !currentMixer) {
+					console.error("The model or mixer is not ready");
+					return { success: false, error: "The system is not ready" };
+				}
+
+				try {
+					if (currentAction && !animationUrl.includes('neutral.fbx')) {
+						currentAction.stop();
+					}
+
+					const clip = await loadMixamoAnimation(animationUrl, currentVrm);
+					const newAction = currentMixer.clipAction(clip);
+
+					newAction.clampWhenFinished = true;
+					newAction.loop = THREE.LoopOnce;
+
+					if (animationUrl === idleAnimationUrl) {
+						idleAnimation = newAction;
+						console.log("Idle animation is ready");
+						newAction.loop = THREE.LoopRepeat;
+					}
+
+					if (animationUrl !== idleAnimationUrl) {
+						const onFinish = () => {
+							if (idleAnimation) {
+								console.log("Return to idle animation");
+								newAction.crossFadeTo(idleAnimation, 0.3, true);
+								idleAnimation.play();
+								currentAction = idleAnimation;
+							}
+							newAction.getMixer().removeEventListener('finished', onFinish);
+						};
+						newAction.getMixer().addEventListener('finished', onFinish);
+					}
+
+					newAction.reset().play();
+					currentAction = newAction;
+					
+					return { success: true };
+				} catch (error) {
+					console.error("Animation loading error:", error);
+					if (idleAnimation) {
+						idleAnimation.reset().play();
+						currentAction = idleAnimation;
+					}
+					return { success: false, error: error.message };
+				}
+			}
+
+			window.loadFBX = loadFBX;
+
+			const clock = new THREE.Clock();
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				const deltaTime = clock.getDelta();
+
+				if ( currentMixer ) {
+
+					currentMixer.update( deltaTime );
+
+				}
+
+				if ( currentVrm ) {
+
+					currentVrm.update( deltaTime );
+
+				}
+
+				renderer.render( scene, camera );
+
+			}
+
+			animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+		</script>
+	</body>
+</html>
