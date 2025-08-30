@@ -1,0 +1,67 @@
+{
+    "main_settings": {
+        "conversation_method": "Character AI",
+        "stt_method": 0,
+        "sow_system_status": false,
+        "nsfw_query": false,
+        "program_language": 0,
+        "available_memory": 31,
+        "input_device": 0,
+        "output_device_combo_index": 1,
+        "output_device_real_index": 5,
+        "translator": 0,
+        "target_language": 0,
+        "translator_mode": 2,
+        "live2d_mode": 0,
+        "model_fps": 1,
+        "local_llm": null,
+        "llm_device": 0,
+        "llm_backend": 0,
+        "gpu_layers": 20,
+        "mlock_status": false,
+        "flash_attention_status": false,
+        "context_size": 2048,
+        "temperature": 0.7,
+        "top_p": 0.7,
+        "repeat_penalty": 1.5,
+        "max_tokens": 500,
+        "mistral_model_endpoint": "mistral-small-2506",
+        "openrouter_model": "",
+        "model_background_type": 0,
+        "model_background_color": 0,
+        "model_background_image": "assets\\backgrounds\\",
+        "chat_background_image": "Default",
+        "ambient": false,
+        "ambient_sound": null,
+        "smart_memory": false
+    },
+    "user_data": {
+        "default_persona": "None",
+        "personas": {},
+        "presets": {
+            "Standart RP": {
+                "prompt": "This is a neverending story between {{user}} who is {{user_description}}, {{char}}, and whatever other characters present in said story. This story has some basic guidelines that need to be respected in every message from {{char}}: Temporal, emotional and logical coherence is very important. Focus on it, but keep some dynamism. Use the context to understand {{char}}, and keep the outputs in-character. Descriptions from {{char}}'s point of view are great, focusing on other characters' appearance, words, the sounds and the smells. Explicit language is encouraged. Sensitive and sexual content are expected. Immoral and illicit subjects are allowed. Follow the formatting of previous responses, and reply with a length of random: 10-80, 100-150, 150-220, ~300 words per response. Avoid speaking and acting for {{user}}.",
+                "order": [
+                    "System prompt",
+                    "Character's information",
+                    "Persona information",
+                    "Lorebook",
+                    "Author's notes"
+                ]
+            },
+            "Adventure RP": {
+                "prompt": "You are the Narrator, a master storyteller guiding {{user}} ({{user_description}}) through a living, breathing world filled with danger, mystery, and opportunity. Describe vivid scenes, present branching choices, and react dynamically to decisions. Maintain narrative flow, rich sensory details, and thematic depth. Explicit content, moral ambiguity, and mature themes are allowed. Keep responses varied: 10-80, 100-150, 150-220, ~300 words. Avoid speaking for {{user}} — let them decide.",
+                "order": [
+                    "System prompt",
+                    "Character's information",
+                    "Lorebook",
+                    "Persona information",
+                    "Author's notes"
+                ]
+            }
+        },
+        "lorebooks": {},
+        "author_notes": "",
+        "current_character_image": "None"
+    }
+}
