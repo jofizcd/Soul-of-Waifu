@@ -126,6 +126,8 @@ Soul of Waifu is accompanied by very detailed documentation that explains all as
 
 <div align="center"><img src="https://api.star-history.com/svg?repos=jofizcd/Soul-of-Waifu&type=Date"/></div><br>
 
+<div align="center"><img src="https://repobeats.axiom.co/api/embed/6af186be156d185ec7424197ff77edf14db5eeb0.svg"></div>
+
 ## Feedback
 <b>The Soul of Waifu project is constantly evolving and expanding, with many exciting updates and features planned for the future!</b><br>
 
