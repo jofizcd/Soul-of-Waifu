@@ -1,0 +1,8 @@
+{
+    "CHARACTER_AI_API_TOKEN": "",
+    "MISTRAL_AI_API_TOKEN": "",
+    "OPEN_AI_API_TOKEN": "",
+    "OPENROUTER_API_TOKEN": "",
+    "CUSTOM_ENDPOINT_URL": "http://localhost:1234/v1",
+    "ELEVENLABS_API_TOKEN": ""
+}
