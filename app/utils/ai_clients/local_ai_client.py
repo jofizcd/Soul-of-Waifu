@@ -7,6 +7,7 @@ import asyncio
 import numpy as np
 import subprocess
 import socket
+import httpx
 
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
@@ -597,27 +598,28 @@ class LocalAI:
 
         logger.info(messages)
 
-        client = AsyncOpenAI(
-            base_url=f"http://localhost:{self.SERVER_PORT}/v1",
-            api_key="no-key-required"
-        )
-        
-        completion = await client.chat.completions.create(
-            model="openai/gpt-4o",
-            messages=messages,
-            stream=True,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            frequency_penalty=repeat_penalty,
-            presence_penalty=0.7,
-            stop=["<|im_end|>"]
-        )
-
         try:
-            async for chunk in completion:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+            async with AsyncOpenAI(
+                base_url=f"http://localhost:{self.SERVER_PORT}/v1",
+                api_key="no-key-required",
+                http_client=httpx.AsyncClient(timeout=60.0)
+            ) as client:
+                
+                completion = await client.chat.completions.create(
+                    model="openai/gpt-4o",
+                    messages=messages,
+                    stream=True,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    frequency_penalty=repeat_penalty,
+                    presence_penalty=0.7,
+                    stop=["<|im_end|>"]
+                )
+
+                async for chunk in completion:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
 
         except Exception as e:
             logger.error(f"Request error: {e}")
@@ -660,4 +662,5 @@ class LocalAI:
         asyncio.create_task(self.shutdown_server_and_model())
     
     def on_start_server_button_clicked(self):
+
         asyncio.create_task(self.ensure_server_running())
