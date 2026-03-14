@@ -1,163 +1,249 @@
 <p align="center">
-  <img src="https://i.ibb.co/p6JhN0xR/logotitle.png" alt="Logotype"/>
+  <img src="https://i.ibb.co/gbtcySY2/logotitle.png" alt="logotitle" border="0">
 </p>
 
-<br>
+<h3 align="center">🌠 Experience the next level of AI Companionship 🌠</h3>
 
 <p align="center">
-  <b>🌟 Don't miss the opportunity to breathe the soul into your characters along with <a href="https://jofizcd.github.io/soul-of-waifu-site/">Soul of Waifu</a> 🌟</b><br>
-  <i>Experience the magic of conversing with AI-powered characters, complete with lifelike emotions, beautiful avatars, long-term memory, and a captivating voice.</i>
+  <b>Talk to your characters. Hear their voice. Watch how they gain a soul and come to life.</b><br>
+  <i>Soul of Waifu is your ultimate offline, uncensored desktop engine for AI roleplay that transforms characters into living beings with voice, emotions, and long-term memory.</i>
 </p>
 
 ---
-
-<p align="center">
-  <a href="https://www.youtube.com/@jofizcd"><img alt="YouTube" src="https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white"></a>
-  <a href="https://t.me/+UOWReJ5WlTAwOTk6"><img alt="Telegram" src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white"></a>
-  <a href="https://discord.com/invite/6vFtQGVfxM"><img alt="Discord" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white"></a>
-  <a href="https://github.com/jofizcd"><img alt="GitHub" src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white"></a>
-</p>
 
 <div align="center">
     <img src="https://count.getloli.com/get/@Soul-of-Waifu?theme=rule34" /><br>
 </div>
 
-<p align="center">
+<div align="center">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/jofizcd/Soul-of-Waifu/total?style=for-the-badge&logo=github&label=Downloads">
   <img alt="Stars" src="https://img.shields.io/github/stars/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
+  <img alt="Discord" src="https://img.shields.io/discord/925841922264801311?style=for-the-badge&logo=discord&label=Community&color=5865F2" alt="Discord">
+</div>
+
+<div align="center">
   <img alt="Forks" src="https://img.shields.io/github/forks/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
   <img alt="Issues" src="https://img.shields.io/github/issues/jofizcd/Soul-of-Waifu?style=for-the-badge&logo=github">
-  <img alt="Discord" src="https://img.shields.io/discord/925841922264801311?style=for-the-badge&logo=discord&label=Chat">
-  <img alt="Downloads" src="https://img.shields.io/github/downloads/jofizcd/Soul-of-Waifu/total?style=for-the-badge&logo=github&label=Downloads">
+</div><br>
+
+<p align="center">
+  📚 <a href="https://jofizcd.github.io/soul-of-waifu-site/docs/overview/overview.html"><b>Documentation</b></a> •
+  🗨️ <a href="https://discord.com/invite/6vFtQGVfxM"><b>Join Discord</b></a> •
+  🌐 <a href="https://jofizcd.github.io/soul-of-waifu-site/"><b>Website</b></a>
 </p>
 
 <p align="center">
-  📚 <a href="https://jofizcd.github.io/soul-of-waifu-site/docs/overview/overview.html">Documentation</a> •
-  🪙 <a href="https://boosty.to/jofizcd">Boosty</a> •
-  🌐 <a href="https://jofizcd.github.io/soul-of-waifu-site/">Site
+  <a href="https://github.com/jofizcd/Soul-of-Waifu/releases/latest">
+    <img src="https://img.shields.io/badge/DOWNLOAD_LATEST_VERSION-2EA043?style=for-the-badge&logo=windows" alt="Download Latest">
+  </a>
 </p>
 
 ---
 
-<p align="justify">
-  <b>Soul of Waifu</b> lets you bring your favorite characters to life using AI technology. Chat with them, interact via Speech-To-Text and Text-To-Speech technologies, view them as avatar images or fully animated Live2D or VRM 3D models - all directly within the app! For even deeper immersion into AI-powered roleplaying, you can use lorebooks, multiple custom user personas, write your own system prompts, create character cards in V2 specification as PNG images, and much, much more. And all of this is already waiting for you in Soul of Waifu!
-<br><br>
-
-<div align="center"><img src="https://i.ibb.co/8nXLncQp/example-main.png" alt="Preview" style="width:85%;"></div>
-
-<br>
 <p align="center">
-⭐️ If you enjoyed the project, please give it a star! If you encounter any issues or have ideas for improving the program, feel free to share them with me on my Discord server or directly on GitHub. I look forward to hearing from you and thank you for using program!
+  <img style="width:90%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" alt="Soul of Waifu Interface" src="https://files.catbox.moe/na575i.gif">
 </p>
 
-## Why do you need to choose Soul of Waifu?
+<p align="center">
+  Tired of corporate censorship, monthly subscriptions, and characters that forget everything after 10 messages? <br><b>Soul of Waifu</b> gives you total control. Run powerful Local LLMs directly on your PC, import Live2D/VRM avatars, and create deep, uncensored roleplay stories.
+</p>
 
-### 🌞 Convenience and Comfort
-Soul of Waifu offers a beautiful, intuitive desktop interface with a clean sidebar navigation and responsive design. Everything is in one place: your characters, models, settings, and tools. Whether you're creating a new character or managing your local LLMs, the process is smooth, organized, and user-friendly - no need to juggle multiple applications or complex setups.
-<div align="center"><img src="https://i.ibb.co/B2Z6x2HP/screenshot-list.jpg" alt="Character List" style="width:70%;"></div>
+<hr>
 
-### ✨ The Magic of Roleplay
-Immerse yourself in AI-powered roleplaying with characters that feel alive. Soul of Waifu brings together chat, voice, avatars, high-quality memory, and emotion in a single, seamless experience. Start a conversation, call your character, hear their voice, see their emotions change in real-time - all without leaving the app.
-<div align="center"><img src="https://i.ibb.co/4wBZq0hh/example-megumin.png" alt="Megumin Chat" style="width:70%;"></div>
+## ⚡ Core Features
 
-### 🎭 Deep Character Creation
-Create rich, dynamic characters with full control over their personality, backstory, and behavior. Import or export character cards in v2 spec (PNG), set custom greetings, define world lore, and fine-tune their responses. You can even assign specific personas to yourself, shaping how the AI perceives and interacts with you.
-<div align="center"><img src="https://i.ibb.co/Gfj6y8jw/quickstart-character-creator.png" alt="Character Editor" style="width:70%;"></div>
+### 1. Soul of Waifu System: Real-Time Voice & Desktop Mode 🔮
+Forget typing. The **Soul of Waifu System** module turns text chatting into a fully immersive voice call. 
+*   **Full Duplex & Interruption:** Just like in a real phone call, you don't have to wait for the AI to finish. You can interrupt your character mid-sentence, and they will stop talking and listen to you.
+*   **LipSync Technology:** Your Live2D or VRM avatar doesn't just stand there anymore. Their mouth movements accurately synchronize with the generated voice, creating an unprecedented level of immersion.
+*   **Desktop Companion Mode:** Want to work or play games while talking to your waifu? Switch to Desktop Mode. The avatar will appear directly on your computer screen, keeping you company outside the application window.
+<p align="center">
+    <img style="width:85%; border-radius: 8px;" alt="Soul of Waifu System Demo" src="https://i.ibb.co/PsDCHChd/SOWS.png"><br><br>
+    <img style="width:85%; border-radius: 8px;" alt="Soul of System Desktop Demo" src="https://i.ibb.co/hxV8s91v/SOWS2.jpg">
+</p>
 
-### ☁️ Support for Multiple AI Services
-Soul of Waifu gives you the freedom to connect to a wide range of AI providers. Seamlessly switch between different backends depending on your needs, privacy preferences, and performance requirements. There are several provider to choose from: Character AI, Mistral AI, Open AI and OpenAI-compatible APIs, OpenRouter. This flexibility ensures you're never locked into a single provider. You can experiment with different models, compare responses, and find the perfect fit for each character.
-<div align="center"><img src="https://i.ibb.co/p6ytZFYV/cloud-services.png" alt="Cloud Services" style="width:40%;"></div>
+### 2. The Magic of Roleplay: Living Avatars and more... 📜
+Soul of Waifu provides everything you need to make the chat feel alive and dynamic. You aren't limited to plain text. 
+*  **Living Avatars:** Choose how you want to see your character — from high-quality Static Images to fully animated Live2D and 3D VRM models. They react with 28 different emotions based on the context of your conversation.
+*  **It's your story:** Change Chat Backgrounds to match the current scene, shifting from a cozy cafe to a dark cyberpunk street in seconds. If the AI loses the plot, use Author's Notes to secretly guide their behavior. Use Message Regeneration and editing tools to perfect every line. For long, epic campaigns, the Auto-Summarization feature acts as your personal chronicler — compressing thousands of past messages so the AI never forgets the overarching plot.
+<p align="center">
+  <img style="width:75%; border-radius: 8px;" alt="Emotion Preview" src="https://i.ibb.co/cSjRpPrY/Chat.jpg">
+</p>
 
-### 💾 Download and Run Local LLMs Directly in the App
+### 3. Stunning Customizable Interface 🪄
+Soul of Waifu features a modern, intuitive interface with smooth animations that bring a premium feel to every menu and panel.
+*  **Interactive Character Hub:** Your characters are displayed as gorgeous, large cards rather than boring lists. Hover over a card to instantly expand it and reveal a quick-access panel — launch a voice call, swap avatar models, switch the TTS, view and change the character information or jump into chat in one click.
+*  **Total Visual Control:** Make the interface truly yours. Switch between Interface Themes to match your mood. Deeply customize Message Bubbles — adjust font colors, change transparency, and tweak styles to create the perfect look for your dialogue.
+*  **Effortless Navigation:** The clean Sidebar keeps everything organized. Managing local models, tweaking system prompts, and browsing the Characters Gateway has never been easier or more satisfying.
+<p align="center">
+  <img style="width:70%; border-radius: 8px;" alt="Emotion Preview" src="https://i.ibb.co/WvXbbZSz/Main.png">
+</p>
+
+### 4. Characters Gateway 📚
+Skip the manual setup and jump straight into the action. The Characters Gateway is your built-in portal to a vast universe of characters, accessible directly within the app.
+*   **Soul Gateway (Official):** Explore a curated list of high-quality characters selected by the developer. This collection is community-driven — submit your own creations on Discord, and the best ones get featured for all users to see.
+*   **Third-Party Integration:** Browse massive libraries like Character AI and Chub AI directly inside the interface. No need to open a browser.
+*   **One-Click Import:** Add characters to your roster instantly. Bypass the editor entirely and start chatting in seconds.
+*   **Smart Data Import:** Lorebooks and character data are detected automatically. If a character comes with a world lore, it integrates seamlessly into your library.
+<p align="center">
+  <img style="width:70%; border-radius: 8px;" alt="Emotion Preview" src="https://i.ibb.co/zTzdRthx/Gateway.png">
+</p>
+
+###  5. Deep Character Creation 🎭
+Create rich, dynamic characters with full control over their personality, backstory, and behavior. The editor is designed to give you total freedom in defining your companions.
+*   **Flexible AI Backend:** Assign the best "brain" for each character. Switch between Character AI, Mistral AI, Open AI, OpenRouter or Local Models.
+*   **Detailed Personality:** Script everything from names and backstories to complex dialogue scenarios and example messages to shape their exact behavior.
+*   **User Personas:** Define who you are. Select a specific persona for your current roleplay, shaping how the character perceives and interacts with you.
+*   **V2 Spec Support:** Fully compatible with the modern character standard. Import and export characters as PNG images (with embedded data) or JSON files.
+<p align="center">
+  <img src="https://i.ibb.co/67nCRkxw/Creator.png" alt="Character Editor" style="width:70%;">
+</p>
+
+### 6. Deep Roleplay Tools 🛠️
+Go beyond basic prompts with professional-level narrative control. These advanced settings allow you to shape the AI's logic, memory, and world-building capabilities exactly the way you want.
+*   **Advanced Lorebooks:** Create dynamic worlds. Trigger events by keywords, add *Cooldowns*, set *Durations*, or use *Logic Exclusions* to prevent the AI from confusing contexts. You can even set *scenario triggers* based on the message count.
+*   **Smart Vector Memory (RAG):** The AI searches through thousands of past messages to recall tiny details without destroying your context window.
+*   **Atmospheric Ambience:** Immerse yourself fully. Use the built-in Ambient Module to play background audio loops directly inside the chat. Set the perfect tone for every scene — from the sound of rain to a bustling tavern — enhancing the atmosphere without needing external players.
+<p align="center">
+  <img style="width:75%; border-radius: 8px;" alt="Model Hub Interface" src="https://i.ibb.co/Q00nq56/Editors.png">
+</p>
+
+### 7. Privacy & Local AI (Zero Setup) ⚔️
 No more manual model hunting or complex setups. Soul of Waifu integrates with Hugging Face, letting you search, preview, and download local language models (GGUF format) directly within the app. Powered by Llama CPP, it supports GPU acceleration (CUDA/Vulkan), memory locking (MLock), and Flash Attention - all configurable with a few clicks.
-<div align="center"><img src="https://i.ibb.co/2YCLrYVw/Models-Hub.png" alt="Models Hub" style="width:70%;"></div>
+*   **One-Click Downloads:** Search and download GGUF models directly inside the app. The system tells you what runs best on your hardware.
+*   **Curated RP Recommendations:** Don't know which model to choose? Visit the Recommendations Tab — a hand-picked list of the best models specifically for Roleplay. The system automatically checks your PC's specs to show compatibility, ensuring you download a model that runs perfectly on your hardware.
+*   **100% Private:** When running local models, your chats never leave your PC. No corporate surveillance.
+*   **Cloud Support:** Prefer APIs? Connect to Character AI, Mistral, OpenAI, or OpenRouter with a single click.
+<p align="center">
+  <img style="width:75%; border-radius: 8px;" alt="Model Hub Interface" src="https://i.ibb.co/Lz7gj4Cd/Models-Hub.png">
+</p>
 
-### 🔮 Voice & Avatars
-Make your characters truly come alive. Choose from images, Live2D or VRM 3D models that react with 28 different emotions based on the conversation. Use advanced Text-to-Speech engines like Kokoro 82M, ElevenLabs, XTTSv2, or Edge TTS with support for Russian, English, Japanese, and Chinese voices. You can also use RVC models to change your character's voice. Enable Speech-to-Text (Vosk, Whisper) to talk to your character in real-time with Soul of Waifu System module.
-<div align="center"><img src="https://i.ibb.co/VY4Q7YnL/Megumin-Angry.png" alt="Megumin-Angry" style="width:70%;"></div>
+<hr>
 
-### 📔 Lorebooks, System Prompts, User Personas & More
-Go beyond basic prompts. Use Lorebooks to inject world knowledge via keyword triggers, write custom System Prompts with full control over context order, and manage multiple User Personas for different scenarios. Enable Smart Memory to keep context relevant and efficient — only the most important messages are included in the prompt.
-<div align="center"><img src="https://i.ibb.co/pHjMB9Z/System-Prompt.png" alt="System-Prompt" style="width:70%;"></div>
+## 📥 Installation (No Coding Required)
 
-### 🎆 Soul of Waifu System
-Take your interactions to the next level with the Soul of Waifu System - a powerful module that enables real-time, speech-to-speech communication with your AI character. Talk naturally using your microphone, hear your character respond instantly in their unique voice, enjoy fully immersive calls where the character’s Live2D/VRM avatar reacts with emotions and animations.
-<div align="center"><img src="https://i.ibb.co/BHCr7xSB/sow-system.jpg" alt="sow-system" style="width:70%;"></div>
+Getting started takes less than a minute. You don't need to know Python.
 
-### 🔑 Privacy First
-Your conversations stay on your machine. When using local language models, no data leaves your computer. Even with API-based services, your interactions remain confidential. You’re in full control - no corporate surveillance, no data harvesting, no censorship. Your waifu and your rules.
+1.  **Download:** Grab the latest `.7z` from the [**Releases Page**](https://github.com/jofizcd/Soul-of-Waifu/releases/latest).
+2.  **Unpack:** Extract the archive to any folder (avoid folders with Cyrillic/spaces in the path).
+3.  **Install:** Double-click `installer.bat` to automatically set up dependencies.
+4.  **Launch:** Run `start.bat` or `Soul of Waifu.exe` and enjoy!
 
-## Requirements
-  - **Windows OS**
-  - **Installing Dependencies**
-  - **API-keys**: <br>
-    * From [Character AI](https://character.ai/) (For Character AI conversation method) <br>
-    * From [Mistral AI](https://mistral.ai/) (For Mistral AI conversation method) <br>
-    * From [Open AI](https://openai.com/) (For Open AI conversation method) <br>
-    * From [OpenRouter](https://openrouter.ai/) (For OpenRouter conversation method) <br>
-    * From [ElevenLabs](https://elevenlabs.io/) (for ElevenLabs TTS) <br>
+<details>
+  <summary><b>📋 System Requirements & API Info</b></summary>
+  <br>
+  <ul>
+    <li><b>OS:</b> Windows 10/11 (64-bit).</li>
+    <li><b>RAM:</b> 8GB minimum (16GB+ recommended for running Local LLMs).</li>
+    <li><b>GPU:</b> NVIDIA (CUDA) or AMD (Vulkan) is highly recommended for speed, but CPU-only generation works too!</li>
+    <li><b>API Keys (Optional):</b> Only required for cloud providers. Local usage is 100% free and requires no keys.
+      <ul>
+        <li><a href="https://character.ai/">Character AI</a></li>
+        <li><a href="https://mistral.ai/">Mistral AI</a></li>
+        <li><a href="https://openai.com/">Open AI</a></li>
+        <li><a href="https://openrouter.ai/">OpenRouter</a></li>
+        <li><a href="https://elevenlabs.io/">ElevenLabs</a></li>
+      </ul>
+    </li>
+  </ul>
+</details>
 
-## Installation
-### 1) Downloading the program
-  Go to the **[Releases](https://github.com/jofizcd/Soul-of-Waifu/releases)** section and download the archive from the latest version.
-### 2) Extracting files
-  Extract the contents of the archive into any convenient folder.
-### 3) Dependencies installation
-  Run the *installer.bat* file to install all the project dependencies.
-### 4) Launching the program
-  Use *start.bat* or *Soul of Waifu.exe* to launch the program.
+<hr>
 
-## Documentation
+## 🆚 Why Soul of Waifu?
+
+| Feature | Soul of Waifu | Typical Web Chatbots (CAI) | Complex Frontends (ST) |
+| :--- | :---: | :---: | :---: |
+| **Censorship / NSFW** | 🟢 None (Local AI) | 🔴 Strict Filters | 🟢 None |
+| **Voice / Calls** | 🟢 Built-in, Async, LipSync | 🟡 Basic / Robotic | 🔴 Requires 3rd-party extensions |
+| **Avatars** | 🟢 Live2D, VRM 3D, Desktop Mode | 🔴 Static Images Only | 🟡 Live2D/VRM only via plugins |
+| **Setup Process** | 🟢 1-Click Installer (`.bat`) | 🟢 Just open website | 🔴 Requires NodeJS |
+| **Memory** | 🟢 Vector RAG + Auto-Summary | 🔴 Forgets after 20 messages | 🟢 Advanced |
+
+<hr>
+
+## 🔥 What's New? (Latest Updates)
+
+Version 2.3.0 brings a massive overhaul to the core engine, UI, and voice capabilities.
+
+*   🖥️ **Desktop Companion Mode:** Your character is no longer trapped in the app window! The Live2D/VRM avatar can now live on your desktop with a transparent background, talking to you while you work or play.
+*   🎙️ **True Real-Time Voice (Full Duplex & LipSync):** The *Soul of Waifu System* voice module is now fully asynchronous. Responses are lightning-fast (powered by Silero VAD & Faster Whisper). **You can now interrupt your character mid-sentence**, and their Live2D/VRM avatar will physically move its lips (LipSync) to match the generated voice!
+*   🎲 **"Game Master" Lorebooks:** Lorebooks are now a full-fledged scenario engine. Added *Durations, Cooldowns, Delays, Probabilities*, and **Logic Exclusions** (e.g., trigger the "Night Forest" description only if the user doesn't say it's daytime).
+*   🧠 **Auto-Summarization & Smart Memory:** The app now automatically creates summaries of your long chats and injects them into the context, saving GPU memory while keeping the character perfectly aware of the past.
+*   💎 **UI Redesign:** A complete aesthetic overhaul. Menus, chat bubbles, settings, and the character creator now feature a stunning, modern Liquid Glass design with smooth token-generation animations.
+*   🎯 **Curated Models Hub:** No more guessing what runs on your PC. The built-in HuggingFace hub now features a hand-picked "Recommendations" tab that automatically detects your hardware and shows only the models your PC can actually handle.
+
+<details>
+<summary><b>🛠️ Click to see the full list of v2.3.0 improvements & fixes</b></summary>
+<br>
+
+*   **UI/UX:** Complete redesign of Character Gateway, Settings, and Model Hub into the new Liquid Glass style.
+*   **Characters:** Redesigned character cards — they are now full-fledged images that expand on hover, revealing a quick control panel.
+*   **Editor:** Redesigned the Persona Editor for much easier user profile management. Moved character info editing to the right column for better ergonomics.
+*   **Lorebooks:** Reworked the prompt building logic. Lorebooks now support "Scenario Mode" based on message counts.
+*   **Optimization:** Updated to PyTorch 12.8 for RTX 50-series support. Fixed Flash Attention. Removed hundreds of redundant lines of code.
+*   **Quality of Life:** Added a "Character typing..." animation indicator. Replaced old popups with modern Toast Notifications.
+*   **Fixes:** Fixed bugs with the Character AI token banner, username display during rerolls, and the installation script (`installer.bat`). Returned built-in ffmpeg support.
+*   **OpenAI:** Added the ability to manually type the specific model name for OpenAI API users.
+*   **Structure:** Added a unified "RP Editors" tab grouping Persona, Lorebook, and System Prompt editors in one place.
+
+</details>
+
+<hr>
+
+## ❤️ Support the Soul of Waifu
+
+**Soul of Waifu** is an open-source passion project developed entirely by one person with the help of the SoW community.
+
+If this software brought your characters to life, gave you a great story, or cured your boredom, consider supporting the development. Thank you for being part of this journey and using Soul of Waifu! Together, we're making AI interactions more immersive, personal, and magical.
+
+*   ⭐ **Star this Repo:** It's free and helps the project grow massively!
+*   🎆 **Be a part of Soul of Waifu Community:** The Soul of Waifu project is constantly evolving and expanding, with many exciting updates and features planned for the future! You can share your experience, help with the development, share character cards, lorebooks, guides and help shape the future of Soul of Waifu.
+*   🗨️ **Join Discord:** Share your character cards, lorebooks, and screenshots. And just come talk about AI RolePlay with the same people who are interested in this. 
+*   ☕ **Donate & Get Perks:**
+    *   [**Boosty**](https://boosty.to/jofizcd) (RU/Global) — Get early access to compiled Beta builds!
+    *   [**Donation Alerts**](https://www.donationalerts.com/r/jofizcd) — Direct tip jar.
+
+<hr>
+
+## 👨‍💻 Developer & License
+
+<div align="center">
+  <a href="https://github.com/jofizcd">
+    <img style="border-radius: 50%;" width="100" src="https://i.ibb.co/bgx4T3Dd/Av.jpg">
+  </a>
+  <br>
+  <b>Jofi</b>
+  <br>
+  <i>"Trying to make life a bit more interesting..."</i>
+  <br><br>
+  <a href="https://www.youtube.com/@jofizcd"><img alt="YouTube" src="https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white"></a>
+  <a href="https://discord.com/invite/6vFtQGVfxM"><img alt="Discord" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://t.me/+UOWReJ5WlTAwOTk6"><img alt="Telegram" src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white"></a>
+  <a href="https://github.com/jofizcd"><img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white"/></a>
+</div>
+
+## 📖 Documentation
 Soul of Waifu is accompanied by very detailed documentation that explains all aspects of the program and some terms, even if this is the first time you have come into contact with language models. Here is the [link](https://jofizcd.github.io/soul-of-waifu-site/docs/overview/overview.html).
 
-## Upcoming Roadmap
+## 📔 Upcoming Roadmap
 <details>
-<summary><b>Version 2.3</b></summary>
+<summary><b>Version 2.4.0</b></summary>
 <ul>
-<li>Mobile application for interacting with a desktop client</li>
-<li>The main focus is on the Soul of Waifu System module</li>
-<li>Creating a service for searching, downloading, and posting character cards (Characters Gateway)</li>
-<li>Game integration module (Minecraft)</li>
+<li>Improving Desktop Companion Mode</li>
 <li>Bug fixes</li>
 <li>And your other requests</li>
 </ul>
 </details>
 
-## Stats <br>
+## 📊 Stats <br>
 
 <div align="center"><img src="https://api.star-history.com/svg?repos=jofizcd/Soul-of-Waifu&type=Date"/></div><br>
 
 <div align="center"><img src="https://repobeats.axiom.co/api/embed/6af186be156d185ec7424197ff77edf14db5eeb0.svg"></div>
 
-## Feedback
-<b>The Soul of Waifu project is constantly evolving and expanding, with many exciting updates and features planned for the future!</b><br>
-
-### How You Can Help
-If you enjoy the program and want to help accelerate new releases, give the project a star ⭐. Your support helps spread the word and keeps the project growing!
-
-### Join the Community
-Join our Discord community, where AI enthusiasts like you collaborate. You can share your experience, help with the development, share character cards, lorebooks, guides and help shape the future of Soul of Waifu.
-<div align="left"><a href="https://discord.com/invite/6vFtQGVfxM"><img src="https://discordapp.com/api/guilds/925841922264801311/widget.png?style=banner2"/></a></div><br>
-
-Thank you for being part of this journey and using Soul of Waifu! Together, we're making AI interactions more immersive, personal, and magical.
 </p>
-
----
-
-## Developer
-<div align="center">
-  <img src="https://i.ibb.co/bgx4T3Dd/Av.jpg" width="150" style="border-radius: 50%; margin: 10px 0;" />
-  <h3>Jofi</h3>
-  <p>Trying to make life a bit more interesting...</p>
-  <a href="https://www.youtube.com/@jofizcd"><img alt="YouTube" src="https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white"></a>
-  <a href="https://discord.com/invite/6vFtQGVfxM"><img alt="Discord" src="https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white"></a>
-  <a href="https://github.com/jofizcd"><img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white"/></a>
-</div>
-
-## Support Author
-- [**Donation Link**](https://www.donationalerts.com/r/jofizcd) - Donate in the name of neural networks!
-- [**Boosty**](https://boosty.to/jofizcd) - Ну ты знаешь, что делать. Про все бонусы узнаешь на сайте, спасибо тебе за поддержку.
-
----
+<br>
 
 ## License
 This project is distributed under the GPL v3 License. <br><br>
