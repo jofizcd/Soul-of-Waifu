@@ -41,7 +41,7 @@
 ---
 
 <p align="center">
-  <img style="width:90%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" alt="Soul of Waifu Interface" src="https://files.catbox.moe/na575i.gif">
+  <img style="width:90%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" alt="Soul of Waifu Interface" src="assets/readme/Demo.gif">
 </p>
 
 <p align="center">
@@ -58,8 +58,8 @@ Forget typing. The **Soul of Waifu System** module turns text chatting into a fu
 *   **LipSync Technology:** Your Live2D or VRM avatar doesn't just stand there anymore. Their mouth movements accurately synchronize with the generated voice, creating an unprecedented level of immersion.
 *   **Desktop Companion Mode:** Want to work or play games while talking to your waifu? Switch to Desktop Mode. The avatar will appear directly on your computer screen, keeping you company outside the application window.
 <p align="center">
-    <img style="width:85%; border-radius: 8px;" alt="Soul of Waifu System Demo" src="https://i.ibb.co/PsDCHChd/SOWS.png"><br><br>
-    <img style="width:85%; border-radius: 8px;" alt="Soul of System Desktop Demo" src="https://i.ibb.co/hxV8s91v/SOWS2.jpg">
+    <img style="width:75%; border-radius: 8px;" alt="Soul of System Desktop Demo" src="assets/readme/SOWS2.jpg">
+    <img style="width:75%; border-radius: 8px;" alt="Soul of Waifu System Demo" src="assets/readme/SOWS.png"><br><br>
 </p>
 
 ### 2. The Magic of Roleplay: Living Avatars and more... 📜
@@ -67,7 +67,7 @@ Soul of Waifu provides everything you need to make the chat feel alive and dynam
 *  **Living Avatars:** Choose how you want to see your character — from high-quality Static Images to fully animated Live2D and 3D VRM models. They react with 28 different emotions based on the context of your conversation.
 *  **It's your story:** Change Chat Backgrounds to match the current scene, shifting from a cozy cafe to a dark cyberpunk street in seconds. If the AI loses the plot, use Author's Notes to secretly guide their behavior. Use Message Regeneration and editing tools to perfect every line. For long, epic campaigns, the Auto-Summarization feature acts as your personal chronicler — compressing thousands of past messages so the AI never forgets the overarching plot.
 <p align="center">
-  <img style="width:75%; border-radius: 8px;" alt="Emotion Preview" src="https://i.ibb.co/cSjRpPrY/Chat.jpg">
+  <img style="width:75%; border-radius: 8px;" alt="Emotion Preview" src="assets/readme/Chat.jpg">
 </p>
 
 ### 3. Stunning Customizable Interface 🪄
@@ -76,7 +76,7 @@ Soul of Waifu features a modern, intuitive interface with smooth animations that
 *  **Total Visual Control:** Make the interface truly yours. Switch between Interface Themes to match your mood. Deeply customize Message Bubbles — adjust font colors, change transparency, and tweak styles to create the perfect look for your dialogue.
 *  **Effortless Navigation:** The clean Sidebar keeps everything organized. Managing local models, tweaking system prompts, and browsing the Characters Gateway has never been easier or more satisfying.
 <p align="center">
-  <img style="width:70%; border-radius: 8px;" alt="Emotion Preview" src="https://i.ibb.co/WvXbbZSz/Main.png">
+  <img style="width:70%; border-radius: 8px;" alt="Emotion Preview" src="assets/readme/Main.png">
 </p>
 
 ### 4. Characters Gateway 📚
@@ -86,7 +86,7 @@ Skip the manual setup and jump straight into the action. The Characters Gateway 
 *   **One-Click Import:** Add characters to your roster instantly. Bypass the editor entirely and start chatting in seconds.
 *   **Smart Data Import:** Lorebooks and character data are detected automatically. If a character comes with a world lore, it integrates seamlessly into your library.
 <p align="center">
-  <img style="width:70%; border-radius: 8px;" alt="Emotion Preview" src="https://i.ibb.co/zTzdRthx/Gateway.png">
+  <img style="width:70%; border-radius: 8px;" alt="Emotion Preview" src="assets/readme/Gateway.png">
 </p>
 
 ###  5. Deep Character Creation 🎭
@@ -96,7 +96,7 @@ Create rich, dynamic characters with full control over their personality, backst
 *   **User Personas:** Define who you are. Select a specific persona for your current roleplay, shaping how the character perceives and interacts with you.
 *   **V2 Spec Support:** Fully compatible with the modern character standard. Import and export characters as PNG images (with embedded data) or JSON files.
 <p align="center">
-  <img src="https://i.ibb.co/67nCRkxw/Creator.png" alt="Character Editor" style="width:70%;">
+  <img src="assets/readme/Creator.png" alt="Character Editor" style="width:70%;">
 </p>
 
 ### 6. Deep Roleplay Tools 🛠️
@@ -105,7 +105,7 @@ Go beyond basic prompts with professional-level narrative control. These advance
 *   **Smart Vector Memory (RAG):** The AI searches through thousands of past messages to recall tiny details without destroying your context window.
 *   **Atmospheric Ambience:** Immerse yourself fully. Use the built-in Ambient Module to play background audio loops directly inside the chat. Set the perfect tone for every scene — from the sound of rain to a bustling tavern — enhancing the atmosphere without needing external players.
 <p align="center">
-  <img style="width:75%; border-radius: 8px;" alt="Model Hub Interface" src="https://i.ibb.co/Q00nq56/Editors.png">
+  <img style="width:75%; border-radius: 8px;" alt="Model Hub Interface" src="assets/readme/Editors.png">
 </p>
 
 ### 7. Privacy & Local AI (Zero Setup) ⚔️
@@ -115,7 +115,7 @@ No more manual model hunting or complex setups. Soul of Waifu integrates with Hu
 *   **100% Private:** When running local models, your chats never leave your PC. No corporate surveillance.
 *   **Cloud Support:** Prefer APIs? Connect to Character AI, Mistral, OpenAI, or OpenRouter with a single click.
 <p align="center">
-  <img style="width:75%; border-radius: 8px;" alt="Model Hub Interface" src="https://i.ibb.co/Lz7gj4Cd/Models-Hub.png">
+  <img style="width:75%; border-radius: 8px;" alt="Model Hub Interface" src="assets/readme/ModelsHub.png">
 </p>
 
 <hr>
