@@ -2,11 +2,11 @@
   <img src="https://i.ibb.co/gbtcySY2/logotitle.png" alt="logotitle" border="0">
 </p>
 
-<h3 align="center">🌠 Experience the next level of AI Companionship 🌠</h3>
+<h3 align="center">🌠 Experience the next level of AI RolePlay 🌠</h3>
 
 <p align="center">
-  <b>Talk to your characters. Hear their voice. Watch how they gain a soul and come to life.</b><br>
-  <i>Soul of Waifu is your ultimate offline, uncensored desktop engine for AI roleplay that transforms characters into living beings with voice, emotions, and long-term memory.</i>
+  <b>Tired of corporate censorship, monthly subscriptions, and characters that forget everything after 10 messages?</b><br>
+  <i><b>Soul of Waifu</b> is your ultimate offline, uncensored desktop engine for AI roleplay that transforms characters into living beings with voice, emotions, and long-term memory. Run powerful Local LLMs directly on your PC, import Live2D/VRM avatars, and create deep, uncensored roleplay stories.</i>
 </p>
 
 ---
@@ -42,10 +42,6 @@
 
 <p align="center">
   <img style="width:90%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" alt="Soul of Waifu Interface" src="assets/readme/Demo.gif">
-</p>
-
-<p align="center">
-  Tired of corporate censorship, monthly subscriptions, and characters that forget everything after 10 messages? <br><b>Soul of Waifu</b> gives you total control. Run powerful Local LLMs directly on your PC, import Live2D/VRM avatars, and create deep, uncensored roleplay stories.
 </p>
 
 <hr>
