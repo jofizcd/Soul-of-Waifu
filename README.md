@@ -2,6 +2,10 @@
   <img src="https://i.ibb.co/gbtcySY2/logotitle.png" alt="logotitle" border="0">
 </p>
 
+<p align="center">
+  <a href="README_RU.md"><b>🇷🇺 Читать на русском языке</b></a>
+</p>
+
 <h3 align="center">🌠 Experience the next level of AI RolePlay 🌠</h3>
 
 <p align="center">
@@ -54,7 +58,7 @@ Forget typing. The **Soul of Waifu System** module turns text chatting into a fu
 *   **LipSync Technology:** Your Live2D or VRM avatar doesn't just stand there anymore. Their mouth movements accurately synchronize with the generated voice, creating an unprecedented level of immersion.
 *   **Desktop Companion Mode:** Want to work or play games while talking to your waifu? Switch to Desktop Mode. The avatar will appear directly on your computer screen, keeping you company outside the application window.
 <p align="center">
-    <img style="width:75%; border-radius: 8px;" alt="Soul of System Desktop Demo" src="assets/readme/SOWS2.jpg">
+    <img style="width:75%; border-radius: 8px;" alt="Soul of System Desktop Demo" src="assets/readme/SOWS2.png">
     <img style="width:75%; border-radius: 8px;" alt="Soul of Waifu System Demo" src="assets/readme/SOWS.png"><br><br>
 </p>
 
@@ -187,20 +191,56 @@ Version 2.3.0 brings a massive overhaul to the core engine, UI, and voice capabi
 
 <hr>
 
-## ❤️ Support the Soul of Waifu
+## ❤️ Support the Soul of Waifu Development
 
-**Soul of Waifu** is an open-source passion project developed entirely by one person with the help of the SoW community.
+**Soul of Waifu** is an open-source passion project developed entirely by one person with the help of the SoW community. I don't hide features behind paywalls, and I don't sell your data. 
 
-If this software brought your characters to life, gave you a great story, or cured your boredom, consider supporting the development. Thank you for being part of this journey and using Soul of Waifu! Together, we're making AI interactions more immersive, personal, and magical.
+If this software brought your characters to life, gave you a great story, or cured your boredom, consider supporting the development. Together, we're making AI interactions more immersive! Thank you for being part of this journey and using Soul of Waifu!
 
-*   ⭐ **Star this Repo:** It's free and helps the project grow massively!
-*   🎆 **Be a part of Soul of Waifu Community:** The Soul of Waifu project is constantly evolving and expanding, with many exciting updates and features planned for the future! You can share your experience, help with the development, share character cards, lorebooks, guides and help shape the future of Soul of Waifu.
-*   🗨️ **Join Discord:** Share your character cards, lorebooks, and screenshots. And just come talk about AI RolePlay with the same people who are interested in this. 
-*   ☕ **Donate & Get Perks:**
-    *   [**Boosty**](https://boosty.to/jofizcd) (RU/Global) — Get early access to compiled Beta builds!
-    *   [**Donation Alerts**](https://www.donationalerts.com/r/jofizcd) — Direct tip jar.
+### ☕ Financial Support
+**Global & Anonymous (Crypto)** — *The best and fastest way to support the project globally.*
+*   **USDT (Network: TRC-20):** `TUD9rrb3h5EPDviorgqXjn5dQVF52DkJek`
+
+**Fiat Options**
+*   [**Boosty**](https://boosty.to/jofizcd) (Global/RU) — Get early access to compiled `.exe` Beta builds!
+*   [**Donation Alerts**](https://www.donationalerts.com/r/jofizcd) — Direct tip jar.
+
+### 🌟 Free ways to help:
+*   **Star this Repo:** It costs nothing but helps the GitHub algorithm push the project to more people!
+*   **Join the Community:** Hop into our [**Discord**](https://discord.com/invite/6vFtQGVfxM), share your character cards, lorebooks, and help new users.
 
 <hr>
+
+## 📖 Documentation
+Soul of Waifu is accompanied by very detailed documentation that explains all aspects of the program and some terms, even if this is the first time you have come into contact with language models. Here is the [link](https://jofizcd.github.io/soul-of-waifu-site/docs/overview/overview.html).
+
+## 📔 Upcoming Roadmap
+<details>
+<summary><b>Version 2.4.0</b></summary>
+<ul>
+<li>Improving Desktop Companion Mode</li>
+<li>Bug fixes</li>
+<li>Group chats with RPG elements</li>
+<li>And your other requests</li>
+</ul>
+</details>
+<details>
+<summary><b>Future plans</b></summary>
+<ul>
+<li>Image Generation</li>
+<li>Ability to see the screen</li>
+<li>Mobile Version of Soul of Waifu</li>
+</ul>
+</details>
+
+## 📊 Stats <br>
+
+<div align="center"><img src="https://api.star-history.com/svg?repos=jofizcd/Soul-of-Waifu&type=Date"/></div><br>
+
+<div align="center"><img src="https://repobeats.axiom.co/api/embed/6af186be156d185ec7424197ff77edf14db5eeb0.svg"></div>
+
+</p>
+<br>
 
 ## 👨‍💻 Developer & License
 
@@ -218,28 +258,6 @@ If this software brought your characters to life, gave you a great story, or cur
   <a href="https://t.me/+UOWReJ5WlTAwOTk6"><img alt="Telegram" src="https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white"></a>
   <a href="https://github.com/jofizcd"><img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white"/></a>
 </div>
-
-## 📖 Documentation
-Soul of Waifu is accompanied by very detailed documentation that explains all aspects of the program and some terms, even if this is the first time you have come into contact with language models. Here is the [link](https://jofizcd.github.io/soul-of-waifu-site/docs/overview/overview.html).
-
-## 📔 Upcoming Roadmap
-<details>
-<summary><b>Version 2.4.0</b></summary>
-<ul>
-<li>Improving Desktop Companion Mode</li>
-<li>Bug fixes</li>
-<li>And your other requests</li>
-</ul>
-</details>
-
-## 📊 Stats <br>
-
-<div align="center"><img src="https://api.star-history.com/svg?repos=jofizcd/Soul-of-Waifu&type=Date"/></div><br>
-
-<div align="center"><img src="https://repobeats.axiom.co/api/embed/6af186be156d185ec7424197ff77edf14db5eeb0.svg"></div>
-
-</p>
-<br>
 
 ## License
 This project is distributed under the GPL v3 License. <br><br>
