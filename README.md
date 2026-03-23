@@ -202,7 +202,7 @@ If this software brought your characters to life, gave you a great story, or cur
 *   **USDT (Network: TRC-20):** `TUD9rrb3h5EPDviorgqXjn5dQVF52DkJek`
 
 **Fiat Options**
-*   [**Boosty**](https://boosty.to/jofizcd) (Global/RU) — Get early access to compiled `.exe` Beta builds!
+*   [**Boosty**](https://boosty.to/jofizcd) (Global/RU) — Get early access to Beta versions of Soul of Waifu!
 *   [**Donation Alerts**](https://www.donationalerts.com/r/jofizcd) — Direct tip jar.
 
 ### 🌟 Free ways to help:
