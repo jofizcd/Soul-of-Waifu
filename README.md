@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="README_RU.md"><b>🇷🇺 Читать на русском языке</b></a>
+  <a href="README_RU.md"><b>Читать на русском языке</b></a>
 </p>
 
 <h3 align="center">🌠 Experience the next level of AI RolePlay 🌠</h3>
