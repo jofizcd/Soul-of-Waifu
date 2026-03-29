@@ -527,19 +527,25 @@ class CharacterAI():
             yield message
     
     async def generate_speech(self, chat_id, turn_id, candidate_id, voice_id):
-        await self.get_client()
+        try:
+            await self.get_client()
 
-        speech = await self.client.utils.generate_speech(chat_id, turn_id, candidate_id, voice_id)
-        audio_stream = io.BytesIO(speech)
-        audio = await asyncio.to_thread(AudioSegment.from_file, audio_stream, format="mp3")
+            speech = await self.client.utils.generate_speech(chat_id, turn_id, candidate_id, voice_id)
+            
+            voice_cache_dir = os.path.join(CACHE_DIR, "cai_voices")
+            os.makedirs(voice_cache_dir, exist_ok=True)
+            
+            unique_id = str(uuid.uuid4())
+            file_path = os.path.join(voice_cache_dir, f"cai_speech_{unique_id}.wav")
+            
+            audio_stream = io.BytesIO(speech)
+            audio = await asyncio.to_thread(AudioSegment.from_file, audio_stream, format="mp3")
+            audio = audio.set_frame_rate(44100).set_channels(1)
+            
+            await asyncio.to_thread(audio.export, file_path, format="wav")
+            
+            return file_path
 
-        wav_stream = io.BytesIO()
-        await asyncio.to_thread(audio.export, wav_stream, format="wav")
-        wav_stream.seek(0)
-        wav_audio = await asyncio.to_thread(AudioSegment.from_file, wav_stream, format="wav")
-
-        raw_data = np.array(wav_audio.get_array_of_samples())
-        sample_rate = wav_audio.frame_rate
-
-        await asyncio.to_thread(sd.play, raw_data, samplerate=sample_rate)
-        await asyncio.to_thread(sd.wait)
+        except Exception as e:
+            logger.error(f"Error generating CAI speech: {e}")
+            return None
