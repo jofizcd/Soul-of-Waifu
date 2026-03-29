@@ -1,9 +1,13 @@
 import logging
+import os
+import json
+import base64
+from PIL import Image
 from playwright.async_api import async_playwright
 
 from app.configuration import configuration
 
-logger = logging.getLogger("Characters Card Client")
+logger = logging.getLogger("Characters Card Client") 
 
 class CharactersCard():
     def __init__(self):
@@ -155,3 +159,21 @@ class CharactersCard():
             'No scenario',            # character_scenario
             []                        # alternate_greetings
         )
+    
+class SoulGateway():
+    def __init__(self):
+        super().__init__()
+        self.configuration_settings = configuration.ConfigurationSettings()
+        self.configuration_characters = configuration.ConfigurationCharacters()
+    
+    def read_v2_card(self, path):
+        try:
+            image = Image.open(path)
+            user_comment = image.text.get('chara', None)
+            if user_comment is None:
+                return None
+            json_bytes = base64.b64decode(user_comment)
+            return json.loads(json_bytes.decode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error decoding V2 card: {e}")
+            return None
