@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
         self.interface_signals.initialize_top_p_horizontalSlider()
         self.interface_signals.initialize_repeat_penalty_horizontalSlider()
         self.interface_signals.initialize_max_tokens_horizontalSlider()
+        self.interface_signals.initialize_interval_summary()
 
         asyncio.ensure_future(self.interface_signals.set_main_tab())
 
@@ -122,8 +123,9 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_create_character.setText(self.translations.get("create_character_button", " Create Character"))
         self.ui.pushButton_characters_gateway.setText(self.translations.get("characters_gateway_button", " Characters Gateway"))
         self.ui.pushButton_models_hub.setText(self.translations.get("models_hub_button", " Models Hub"))
+        self.ui.pushButton_rp_editors.setText(self.translations.get("rp_editors_button", " RP Editors"))
         self.ui.pushButton_options.setText(self.translations.get("options_button", " Options"))
-        self.ui.version_label.setText(self.translations.get("version_label", "v2.2.0"))
+        self.ui.version_label.setText(self.translations.get("version_label", "v2.3.0"))
         
         # Main Tab Without Characters
         self.ui.main_no_characters_advice_label.setText(self.translations.get("no_characters_advice", "You haven\'t added any characters. Click on the button and create it"))
@@ -143,7 +145,10 @@ class MainWindow(QMainWindow):
         
         # Character Creation
         self.ui.pushButton_import_character_card.setText(self.translations.get("import_character_card_button", " Import Character Card"))
-        self.ui.character_building_label.setText(self.translations.get("character_building_label", "Character Creation"))
+        self.ui.pushButton_export_character_card.setText(self.translations.get("export_character_card_button", " Export Character Card"))
+        self.ui.pushButton_clean_character_card.setText(self.translations.get("clean_character_card_button", " Clear All Fields"))
+        self.ui.pushButton_preview_prompt.setText(self.translations.get("preview_prompt_button", "Preview Raw"))
+
         self.ui.character_image_building_label.setText(self.translations.get("character_image_building_label", "Character\'s Image"))
         self.ui.character_name_building_label.setText(self.translations.get("character_name_building_label", "Character\'s Name"))
         self.ui.lineEdit_character_name_building.setPlaceholderText(self.translations.get("placeholder_character_name", "The name of your character"))
@@ -168,6 +173,12 @@ class MainWindow(QMainWindow):
         self.ui.lorebook_building_label.setText(self.translations.get("lorebook_building_label", "Lorebook"))
         self.ui.pushButton_create_character_3.setText(self.translations.get("create_character_button_3", "Create Character"))
         self.ui.total_tokens_building_label.setText(self.translations.get("total_tokens_label", "Total Tokens: 0"))
+
+        self.ui.item_general_info.setText(self.translations.get("character_creator_item_general_info", "General Information"))
+        self.ui.item_personality.setText(self.translations.get("character_creator_item_personality", "Personality & Scenario"))
+        self.ui.item_dialogues.setText(self.translations.get("character_creator_item_dialogues", "Dialogues"))
+        self.ui.item_advanced.setText(self.translations.get("character_creator_item_advanced", "Advanced & Lore"))
+        self.ui.item_export.setText(self.translations.get("character_creator_item_export", "Export / Utils"))
         
         # Models Hub
         self.ui.lineEdit_search_model.setPlaceholderText(self.translations.get("search_placeholder", "Search"))
@@ -176,107 +187,88 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_models_hub_recommendations.setText(self.translations.get("models_hub_recommendations", "Recommendations"))
 
         # Options
+        self.ui.label_base_url.setText(self.translations.get("label_base_url", "Base URL"))
+        self.ui.label_mistral_model.setText(self.translations.get("label_mistral_model", "Mistral Model"))
+        self.ui.label_bg_color.setText(self.translations.get("model_background_1", "Color"))
+        self.ui.label_bg_image.setText(self.translations.get("model_background_2", "Image"))
+
         self.ui.lineEdit_search_character.setPlaceholderText(self.translations.get("search_placeholder", "Search"))
-        self.ui.conversation_method_title_label.setText(self.translations.get("conversation_method_title", "Conversation Method"))
-        self.ui.conversation_method_token_title_label.setText(self.translations.get("api_label", "API:"))
+        self.ui.conversation_method_token_title_label.setText(self.translations.get("api_label", "API"))
         self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_api_value", "Write your API value here"))
         self.ui.lineEdit_mistral_model.setPlaceholderText(self.translations.get("placeholder_mistral_model_endpoint", "Enter the API endpoint of the mistral model here"))
-        self.ui.sow_system_title_label.setText(self.translations.get("sow_system_title", "Soul of Waifu System"))
         self.ui.checkBox_enable_sow_system.setText(self.translations.get("enable_sow_system_checkbox", "Enable Soul of Waifu System"))
-        self.ui.choose_model_fps.setText(self.translations.get("choose_model_fps", "Choose model FPS"))
+        self.ui.label_model_fps.setText(self.translations.get("choose_model_fps", "Model FPS"))
         self.ui.comboBox_model_fps.setItemText(0, self.translations.get("model_fps_30", "30 FPS"))
         self.ui.comboBox_model_fps.setItemText(1, self.translations.get("model_fps_60", "60 FPS"))
         self.ui.comboBox_model_fps.setItemText(2, self.translations.get("model_fps_120", "120 FPS"))
-        self.ui.choose_model_background.setText(self.translations.get("choose_model_background", "Choose model background"))
+        self.ui.label_model_background.setText(self.translations.get("choose_model_background", "Model background"))
+
         self.ui.comboBox_model_background.setItemText(0, self.translations.get("model_background_1", "Color"))
         self.ui.comboBox_model_background.setItemText(1, self.translations.get("model_background_2", "Custom Image"))
-        self.ui.choose_model_bg_color.setText(self.translations.get("choose_model_background_color", "Choose background color"))
-        self.ui.comboBox_model_bg_color.setItemText(0, self.translations.get("model_background_color_1", "Black"))
-        self.ui.comboBox_model_bg_color.setItemText(1, self.translations.get("model_background_color_2", "Deep Blue"))
-        self.ui.comboBox_model_bg_color.setItemText(2, self.translations.get("model_background_color_3", "Vinous"))
-        self.ui.comboBox_model_bg_color.setItemText(3, self.translations.get("model_background_color_4", "Dark Green"))
-        self.ui.comboBox_model_bg_color.setItemText(4, self.translations.get("model_background_color_5", "Soft Purple"))
-        self.ui.comboBox_model_bg_color.setItemText(5, self.translations.get("model_background_color_6", "Warm Coal Grey"))
-        self.ui.choose_model_bg_image.setText(self.translations.get("choose_model_background_image", "Choose background image"))
-        self.ui.checkBox_enable_ambient.setText(self.translations.get("enable_ambient_checkbox", "Enable Ambient Sound"))
-        self.ui.checkBox_enable_memory.setText(self.translations.get("enable_enhanced_memory", "Enable Smart Memory"))
-        self.ui.sow_system_modules_title_label.setText(self.translations.get("sow_system_modules_title", "Modules"))
-        self.ui.conversation_method_options_label.setText(self.translations.get("conversation_method_label", "Conversation method:"))
+        self.ui.checkBox_enable_ambient.setText(self.translations.get("enable_ambient_checkbox", "Ambient Sound"))
+        self.ui.checkBox_enable_memory.setText(self.translations.get("enable_enhanced_memory", "Smart Memory"))
+        self.ui.checkBox_enable_summary.setText(self.translations.get("enable_summary_checkbox", "Auto-Summarization"))
+        self.ui.label_summary_interval.setText(self.translations.get("settings_summary_interval", "Interval (messages):"))
+        self.ui.conversation_method_options_label.setText(self.translations.get("conversation_method_label", "Conversation method"))
         self.ui.comboBox_conversation_method.setItemText(0, self.translations.get("conversation_method_item_cai", "Character AI"))
         self.ui.comboBox_conversation_method.setItemText(1, self.translations.get("conversation_method_item_mistralai", "Mistral AI"))
         self.ui.comboBox_conversation_method.setItemText(2, self.translations.get("conversation_method_item_openai", "Open AI"))
         self.ui.comboBox_conversation_method.setItemText(3, self.translations.get("conversation_method_item_openrouter", "OpenRouter"))
-        self.ui.speech_to_text_method_label.setText(self.translations.get("speech_to_text_method_label", "Speech-To-Text method:"))
-        self.ui.comboBox_speech_to_text_method.setItemText(0, self.translations.get("speech_to_text_method_vosk_en", "Vosk English"))
-        self.ui.comboBox_speech_to_text_method.setItemText(1, self.translations.get("speech_to_text_method_vosk_ru", "Vosk Russian"))
-        self.ui.comboBox_speech_to_text_method.setItemText(2, self.translations.get("speech_to_text_method_whisper", "Local Whisper"))
-        self.ui.user_building_title_label.setText(self.translations.get("user_building_title", "User Persona"))
-        self.ui.personas_button.setText(self.translations.get("personas_button", " Open Personas Editor"))
-        self.ui.openrouter_models_options_label.setText(self.translations.get("openrouter_models_label", "Model:"))
+
+        self.ui.openrouter_models_options_label.setText(self.translations.get("openrouter_models_label", "Model"))
         self.ui.lineEdit_search_openrouter_models.setPlaceholderText(self.translations.get("search_placeholder", "Search"))
         self.ui.lineEdit_base_url_options.setPlaceholderText(self.translations.get("placeholder_base_url", "Write your custom endpoint url here (Optional)"))
-        self.ui.tabWidget_options.setTabText(self.ui.tabWidget_options.indexOf(self.ui.configuration_tab), self.translations.get("configuration_tab", "Configuration"))
+        
         self.ui.tabWidget_characters_gateway.setTabText(self.ui.tabWidget_characters_gateway.indexOf(self.ui.tab_character_ai), "Character AI")
         self.ui.tabWidget_characters_gateway.setTabText(self.ui.tabWidget_characters_gateway.indexOf(self.ui.tab_character_cards), "Character Card")
-        self.ui.language_title_label.setText(self.translations.get("language_title", "Language"))
+        
         self.ui.comboBox_program_language.setItemText(0, self.translations.get("program_language_item_en", "English"))
         self.ui.comboBox_program_language.setItemText(1, self.translations.get("program_language_item_ru", "Russian"))
-        self.ui.devices_title_label.setText(self.translations.get("devices_title", "Devices"))
-        self.ui.input_device_label.setText(self.translations.get("input_device_label", "Input device:"))
-        self.ui.output_device_label.setText(self.translations.get("output_device_label", "Output device:"))
-        self.ui.program_language_label.setText(self.translations.get("program_language_label", "Program language:"))
-        self.ui.translator_title_label.setText(self.translations.get("translator_title", "Translator"))
-        self.ui.choose_translator_label.setText(self.translations.get("choose_translator_label", "Choose translator:"))
+        self.ui.input_device_label.setText(self.translations.get("input_device_label", "Input device"))
+        self.ui.output_device_label.setText(self.translations.get("output_device_label", "Output device"))
+        self.ui.program_language_label.setText(self.translations.get("program_language_label", "App Language"))
+        self.ui.choose_translator_label.setText(self.translations.get("choose_translator_label", "Translator"))
         self.ui.comboBox_translator.setItemText(0, self.translations.get("translator_item_none", "None"))
         self.ui.comboBox_translator.setItemText(1, self.translations.get("translator_item_google", "Google"))
         self.ui.comboBox_translator.setItemText(2, self.translations.get("translator_item_yandex", "Yandex"))
-        self.ui.comboBox_translator.setItemText(3, self.translations.get("translator_item_local", "Local Translator"))
-        self.ui.target_language_translator_label.setText(self.translations.get("target_language_label", "Target Language:"))
+        self.ui.target_language_translator_label.setText(self.translations.get("target_language_label", "Target Language"))
         self.ui.comboBox_target_language_translator.setItemText(0, self.translations.get("target_language_item_ru", "Russian"))
         self.ui.comboBox_mode_translator.setItemText(0, self.translations.get("translator_mode_item_both", "Both"))
         self.ui.comboBox_mode_translator.setItemText(1, self.translations.get("translator_mode_item_user", "User Message"))
         self.ui.comboBox_mode_translator.setItemText(2, self.translations.get("translator_mode_item_character", "Character Message"))
-        self.ui.computer_specs_title_label.setText(self.translations.get("computer_specs_title", "Computer Specs"))
-        self.ui.mode_translator_label.setText(self.translations.get("mode_translator_label", "Mode:"))
-        self.ui.tabWidget_options.setTabText(self.ui.tabWidget_options.indexOf(self.ui.system_tab), self.translations.get("system_tab", "System"))
-        self.ui.tabWidget_options.setTabText(self.ui.tabWidget_options.indexOf(self.ui.llm_tab), self.translations.get("local_llm_tab", "LLM Settings"))
-        self.ui.tabWidget_options.setTabText(self.ui.tabWidget_options.indexOf(self.ui.sow_system_tab), self.translations.get("sow_system_tab", "Soul of Waifu Modules"))
+        self.ui.mode_translator_label.setText(self.translations.get("mode_translator_label", "Mode"))
+
+        if hasattr(self.ui, 'options_menu'):
+            item0 = self.ui.options_menu.item(0)
+            if item0: item0.setText(self.translations.get("configuration_tab", "API & Providers"))
+            
+            item1 = self.ui.options_menu.item(1)
+            if item1: item1.setText(self.translations.get("system_tab", "System & UI"))
+            
+            item2 = self.ui.options_menu.item(2)
+            if item2: item2.setText(self.translations.get("local_llm_tab", "Local LLM"))
+            
+            item3 = self.ui.options_menu.item(3)
+            if item3: item3.setText(self.translations.get("sow_system_tab", "SoW Modules"))
         
         # Chat
         self.ui.character_name_chat.setText(self.translations.get("character_name_chat", "Character name"))
         self.ui.textEdit_write_user_message.setPlaceholderText(self.translations.get("write_user_message_placeholder", "Write your message to character..."))
         
         # LLM Options
-        self.ui.choose_live2d_mode_label.setText(self.translations.get("live2d_mode_label", "Choose mode:"))
+        self.ui.label_live2d_mode.setText(self.translations.get("live2d_mode_label", "Mode:"))
         self.ui.comboBox_live2d_mode.setItemText(0, self.translations.get("live2d_mode_with_gui", "With GUI"))
         self.ui.comboBox_live2d_mode.setItemText(1, self.translations.get("live2d_mode_without_gui", "Without GUI"))
-        self.ui.llm_options_label.setText(self.translations.get("llm_options_label", "Local Model:"))
-        self.ui.llm_title_label.setText(self.translations.get("llm_title", "Local LLM Settings"))
-        self.ui.choose_llm_device_label.setText(self.translations.get("choose_llm_device_label", "Choose device:"))
-        self.ui.choose_llm_gpu_device_label.setText(self.translations.get("choose_llm_gpu_device_label", "Choose backend:"))
+        self.ui.llm_options_label.setText(self.translations.get("llm_options_label", "Server Endpoint"))
+        self.ui.choose_llm_device_label.setText(self.translations.get("choose_llm_device_label", "Device"))
+        self.ui.choose_llm_gpu_device_label.setText(self.translations.get("choose_llm_gpu_device_label", "GPU Backend"))
         self.ui.comboBox_llm_devices.setItemText(0, "CPU")
         self.ui.comboBox_llm_devices.setItemText(1, "GPU")
         self.ui.comboBox_llm_gpu_devices.setItemText(0, "Vulkan")
         self.ui.comboBox_llm_gpu_devices.setItemText(1, "CUDA")
-        self.ui.gpu_layers_label.setText(self.translations.get("gpu_layers_label", "GPU Layers:"))
         self.ui.checkBox_enable_mlock.setText(self.translations.get("enable_mlock_checkbox", "Enable MLock"))
         self.ui.checkBox_enable_flash_attention.setText(self.translations.get("enable_flash_attention_checkbox", "Enable Flash Attention"))
-        self.ui.context_size_label.setText(self.translations.get("context_size_label", "Context Size:"))
-        self.ui.llm_title_label_2.setText(self.translations.get("llm_title_label_settings", "Local LLM Conversation Settings:"))
-        self.ui.reapet_penalty_label.setText(self.translations.get("repeat_penalty_label", "Repeat Penalty:"))
-        self.ui.temperature_label.setText(self.translations.get("temperature_label", "Temperature:"))
-        self.ui.temperature_value_label.setText(self.translations.get("temperature_value", "Value: "))
-        self.ui.top_p_label.setText(self.translations.get("top_p_label", "Top P:"))
-        self.ui.top_p_value_label.setText(self.translations.get("top_p_value", "Value: "))
-        self.ui.max_tokens_label.setText(self.translations.get("max_tokens_label", "Max Tokens:"))
-        self.ui.repeat_penalty_value_label.setText(self.translations.get("repeat_penalty_value", "Value: "))
-        self.ui.max_tokens_value_label.setText(self.translations.get("max_tokens_value", "Value: "))
-        self.ui.context_size_value_label.setText(self.translations.get("context_size_value", "Value: "))
-        self.ui.gpu_layers_value_label.setText(self.translations.get("gpu_layers_value", "Value: "))
-        self.ui.system_prompt_button.setText(self.translations.get("system_prompt_button", " System Prompt Editor"))
-        self.ui.lorebook_editor_button.setText(self.translations.get("lorebook_editor_button", " Lorebook Editor"))
         self.ui.checkBox_enable_nsfw.setText(self.translations.get("nsfw_checkbox", "NSFW"))
-        self.ui.pushButton_turn_off_llm.setText(self.translations.get("turn_off_llm", "Shutdown Model"))
         self.ui.lineEdit_server.setText("http://localhost:8080/v1")
 
         # Tooltips
@@ -291,9 +283,6 @@ class MainWindow(QMainWindow):
         self.ui.top_p_horizontalSlider.setToolTip(self.translations.get("top_p_tooltip", "Top P"))
         self.ui.repeat_penalty_horizontalSlider.setToolTip(self.translations.get("repeat_penalty_tooltip", "Repeat Penalty"))
         self.ui.max_tokens_horizontalSlider.setToolTip(self.translations.get("max_tokens_tooltip", "Max Tokens"))
-        self.ui.personas_button.setToolTip(self.translations.get("personas_button_tooltip", "Open personas editor"))
-        self.ui.system_prompt_button.setToolTip(self.translations.get("system_prompt_button_tooltip", "Open system prompt editor"))
-        self.ui.lorebook_editor_button.setToolTip(self.translations.get("lorebook_editor_button_tooltip", "Open lorebooks editor"))
 
     def on_comboBox_program_language_changed(self, index):
         """
@@ -350,7 +339,8 @@ class MainWindow(QMainWindow):
         reply = msg_box.exec()
 
         if reply == QMessageBox.StandardButton.Yes:
-            QApplication.quit()
+            QtCore.QProcess.startDetached(sys.executable, sys.argv)
+            QtCore.QCoreApplication.quit()
 
     def setup_interface_signals(self):
         """
@@ -364,6 +354,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_characters_gateway.clicked.connect(self._on_characters_gateway_clicked)
         self.ui.pushButton_models_hub.clicked.connect(self.interface_signals.on_pushButton_models_hub_clicked)
         self.ui.pushButton_options.clicked.connect(self.interface_signals.on_pushButton_options_clicked)
+        self.ui.pushButton_rp_editors.clicked.connect(self.on_rp_editors_clicked)
         self.ui.about_btn.clicked.connect(self.interface_signals.set_about_program_button)
         self.ui.pushButton_youtube.clicked.connect(self.interface_signals.on_youtube)
         self.ui.pushButton_discord.clicked.connect(self.interface_signals.on_discord)
@@ -371,6 +362,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_add_character.clicked.connect(self.interface_signals.add_character_sync)
         self.ui.pushButton_import_character_card.clicked.connect(self.interface_signals.import_character_card)
         self.ui.pushButton_export_character_card.clicked.connect(self.interface_signals.export_character_card)
+        self.ui.pushButton_clean_character_card.clicked.connect(self.interface_signals.clean_character_card)
         self.ui.pushButton_import_character_image.clicked.connect(self.interface_signals.import_character_avatar)
         self.ui.pushButton_search_character.clicked.connect(self._on_search_characters_gateway_clicked)
         self.ui.pushButton_search_model.clicked.connect(self.interface_signals.start_search)
@@ -382,23 +374,19 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_reload_ambient.clicked.connect(self.interface_signals.load_ambient_sound_to_comboBox)
         self.ui.lineEdit_search_character.returnPressed.connect(self._on_search_characters_gateway_clicked)
         self.ui.lineEdit_search_model.returnPressed.connect(self.interface_signals.start_search)
-        self.ui.personas_button.clicked.connect(self.interface_signals.open_personas_editor)
-        self.ui.system_prompt_button.clicked.connect(self.interface_signals.open_system_prompt_editor)
-        self.ui.lorebook_editor_button.clicked.connect(self.interface_signals.open_lorebook_editor)
         self.ui.pushButton_author_notes.clicked.connect(self.interface_signals.open_author_notes_editor)
         self.ui.pushButton_change_chat_background.clicked.connect(self.interface_signals.open_chat_background_changer)
-        self.ui.pushButton_turn_off_llm.hide()
+        self.ui.btn_open_personas.clicked.connect(self.interface_signals.open_personas_editor)
+        self.ui.btn_open_lorebook.clicked.connect(self.interface_signals.open_lorebook_editor)
+        self.ui.btn_open_prompts.clicked.connect(self.interface_signals.open_system_prompt_editor)
 
         # ComboBoxes
         self.ui.comboBox_conversation_method.currentTextChanged.connect(self.interface_signals.on_comboBox_conversation_method_changed)
-        self.ui.comboBox_speech_to_text_method.currentIndexChanged.connect(self.interface_signals.on_comboBox_speech_to_text_method_changed)
         self.ui.comboBox_program_language.currentIndexChanged.connect(self.on_comboBox_program_language_changed)
         self.ui.comboBox_input_devices.currentIndexChanged.connect(self.interface_signals.on_comboBox_input_devices_changed)
         self.ui.comboBox_output_devices.currentIndexChanged.connect(self.interface_signals.on_comboBox_output_devices_changed)
         self.ui.comboBox_translator.currentIndexChanged.connect(self.interface_signals.on_comboBox_translator_changed)
         self.ui.comboBox_target_language_translator.currentIndexChanged.connect(self.interface_signals.on_comboBox_target_language_translator_changed)
-        self.ui.checkBox_enable_sow_system.stateChanged.connect(self.interface_signals.on_checkBox_enable_sow_system_stateChanged)
-        self.ui.checkBox_enable_memory.stateChanged.connect(self.interface_signals.on_checkBox_enable_memory_stateChanged)
         self.ui.comboBox_conversation_method.currentIndexChanged.connect(self.interface_signals.update_api_token)
         self.ui.comboBox_live2d_mode.currentIndexChanged.connect(self.interface_signals.on_comboBox_live2d_mode_changed)
         self.ui.comboBox_model_fps.currentIndexChanged.connect(self.interface_signals.on_comboBox_model_fps_changed)
@@ -413,6 +401,7 @@ class MainWindow(QMainWindow):
         # LineEdits
         self.ui.lineEdit_api_token_options.textChanged.connect(self.interface_signals.save_api_token_in_real_time)
         self.ui.lineEdit_base_url_options.textChanged.connect(self.interface_signals.save_custom_url_in_real_time)
+        self.ui.lineEdit_openai_model.textChanged.connect(self.interface_signals.save_openai_model_in_real_time)
         self.ui.lineEdit_mistral_model.textChanged.connect(self.interface_signals.save_mistral_model_endpoint_in_real_time)
         self.ui.lineEdit_character_name_building.textChanged.connect(self.interface_signals.update_token_count)
         self.ui.textEdit_character_description_building.textChanged.connect(self.interface_signals.update_token_count)
@@ -435,6 +424,7 @@ class MainWindow(QMainWindow):
         self.ui.top_p_horizontalSlider.valueChanged.connect(self.interface_signals.save_top_p_in_real_time)
         self.ui.repeat_penalty_horizontalSlider.valueChanged.connect(self.interface_signals.save_repeat_penalty_in_real_time)
         self.ui.max_tokens_horizontalSlider.valueChanged.connect(self.interface_signals.save_max_tokens_in_real_time)
+        self.ui.spinBox_summary_interval.valueChanged.connect(self.interface_signals.save_interval_summary_in_real_time)
         
         # CheckBox
         self.ui.checkBox_enable_mlock.stateChanged.connect(self.interface_signals.on_checkBox_enable_mlock_stateChanged)
@@ -442,6 +432,20 @@ class MainWindow(QMainWindow):
         self.ui.stackedWidget.currentChanged.connect(self.interface_signals.on_stacked_widget_changed)
         self.ui.checkBox_enable_nsfw.stateChanged.connect(self.interface_signals.on_checkBox_enable_nsfw_stateChanged)
         self.ui.checkBox_enable_ambient.stateChanged.connect(self.interface_signals.on_checkBox_enable_ambient_stateChanged)
+        self.ui.checkBox_enable_sow_system.stateChanged.connect(self.interface_signals.on_checkBox_enable_sow_system_stateChanged)
+        self.ui.checkBox_enable_memory.stateChanged.connect(self.interface_signals.on_checkBox_enable_memory_stateChanged)
+        self.ui.checkBox_enable_summary.stateChanged.connect(self.interface_signals.on_checkBox_enable_summary_stateChanged)
+
+        self.ui.anchor_menu_building.currentRowChanged.connect(self.interface_signals._scroll_character_creation)
+        self.ui.scrollArea_character_building.verticalScrollBar().valueChanged.connect(self.interface_signals._update_anchor_menu_from_scroll)
+        if hasattr(self.ui, 'pushButton_preview_prompt'):
+            self.ui.pushButton_preview_prompt.clicked.connect(self.interface_signals._show_raw_prompt_preview)
+
+    @asyncSlot()
+    async def on_rp_editors_clicked(self):
+        self.ui.pushButton_rp_editors.setChecked(True)
+        index = self.ui.stackedWidget.indexOf(self.ui.rp_editors_page)
+        self.ui.stackedWidget.setCurrentIndex(index)
 
     @asyncSlot()
     async def _on_characters_gateway_clicked(self):
@@ -498,7 +502,7 @@ class MainWindow(QMainWindow):
     def check_for_updates(self, current_version):
         try:
             repo_url = "https://api.github.com/repos/jofizcd/Soul-of-Waifu/releases/latest"
-            response = requests.get(repo_url)
+            response = requests.get(repo_url, timeout=10)
             response.raise_for_status()
             latest_release = response.json()
             latest_version = latest_release["tag_name"]
@@ -520,129 +524,125 @@ class MainWindow(QMainWindow):
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle(self.translations.get("update_available_title", "Update Available"))
         dialog.setWindowIcon(QtGui.QIcon("app/gui/icons/logotype.ico"))
-        dialog.setFixedSize(450, 420)
+        dialog.setFixedSize(400, 450)
 
         dialog.setStyleSheet("""
             QDialog {
-                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                                stop:0 #2e2e2e, stop:1 #1e1e1e);
-                border-radius: 16px;
+                background-color: rgb(27,27,27);
+                border-radius: 20px;
             }
             QLabel#titleLabel {
-                font-size: 20px;
-                font-weight: bold;
+                font-size: 22px;
+                font-weight: 800;
                 color: #ffffff;
+                margin-top: 10px;
             }
             QLabel#infoLabel {
                 font-size: 14px;
-                color: #d0d0d0;
+                color: #9CA3AF;
+                line-height: 1.5;
             }
             QLabel#version_label {
-                font-size: 14px;
-                color: #aaaaaa;
-            }
-            QLabel#logo_text {
-                font-size: 16px;
+                font-size: 12px;
                 font-weight: bold;
-                color: #ffffff;
+                color: #6B7280;
+                background-color: #1F1F23;
+                padding: 4px 12px;
+                border-radius: 10px;
             }
             QPushButton {
-                padding: 10px 20px;
-                font-size: 14px;
+                padding: 12px 24px;
+                font-size: 13px;
                 font-weight: bold;
-                border-radius: 8px;
-                min-width: 110px;
+                border-radius: 12px;
             }
             QPushButton#github_button {
-                background-color: #28a745;
+                background-color: #777778;
                 color: white;
                 border: none;
             }
             QPushButton#github_button:hover {
-                background-color: #218c3e;
+                background-color: #828282;
+            }
+            QPushButton#github_button:pressed {
+                background-color: #909091;
             }
             QPushButton#close_button {
-                background-color: #4a4a4a;
-                color: white;
-                border: none;
+                background-color: transparent;
+                color: #9CA3AF;
+                border: 1px solid #374151;
             }
             QPushButton#close_button:hover {
-                background-color: #5a5a5a;
-            }
-            QPushButton:focus {
-                outline: none;
-                border: 2px solid #6a6a6a;
+                background-color: #1F1F23;
+                color: white;
             }
         """)
 
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        font = QtGui.QFont("Inter Tight Medium", 10)
         dialog.setFont(font)
 
         main_layout = QtWidgets.QVBoxLayout(dialog)
-        main_layout.setContentsMargins(20, 0, 20, 20)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(30, 30, 30, 30)
+        main_layout.setSpacing(10)
 
         icon_label = QtWidgets.QLabel()
         icon_pixmap = QtGui.QPixmap("app/gui/icons/reload.png").scaled(
-            120, 120, QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            100, 100, QtCore.Qt.AspectRatioMode.KeepAspectRatio,
             QtCore.Qt.TransformationMode.SmoothTransformation
         )
         icon_label.setPixmap(icon_pixmap)
         icon_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("border-radius: 40px; background: transparent; padding: 10px;")
 
         title_label = QtWidgets.QLabel(
-            self.translations.get("update_available_body", "A new version is available: ") + latest_version
+            self.translations.get("update_available_body", "New Update!")
         )
         title_label.setObjectName("titleLabel")
         title_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
+        version_box = QtWidgets.QHBoxLayout()
+        v_text = f"{current_version}  →  {latest_version}"
+        version_label = QtWidgets.QLabel(v_text)
+        version_label.setObjectName("version_label")
+        version_box.addStretch()
+        version_box.addWidget(version_label)
+        version_box.addStretch()
+
         info_label = QtWidgets.QLabel(
-            self.translations.get("update_available_info", "Would you like to update the program?")
+            self.translations.get("update_available_info", 
+            "A newer version of Soul of Waifu is ready. Update now to get the latest features and fixes.")
         )
         info_label.setObjectName("infoLabel")
         info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         info_label.setWordWrap(True)
 
-        version_label = QtWidgets.QLabel(
-            self.translations.get("update_current_version", "Current version: v2.2.0")
-        )
-        version_label.setObjectName("version_label")
-        version_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-
-        button_layout = QtWidgets.QHBoxLayout()
-        button_layout.setSpacing(20)
-
-        close_button = QtWidgets.QPushButton(
-            self.translations.get("update_available_close", "Close")
-        )
-        close_button.setObjectName("close_button")
-        close_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        close_button.clicked.connect(dialog.reject)
+        button_layout = QtWidgets.QVBoxLayout()
+        button_layout.setSpacing(10)
+        button_layout.setContentsMargins(0, 20, 0, 0)
 
         github_button = QtWidgets.QPushButton(
-            self.translations.get("update_available_link", "Go to GitHub")
+            self.translations.get("update_available_link", "Update Now")
         )
         github_button.setObjectName("github_button")
         github_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         github_button.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl(github_url)))
 
-        button_layout.addStretch()
-        button_layout.addWidget(close_button)
-        button_layout.addWidget(github_button)
-        button_layout.addStretch()
+        close_button = QtWidgets.QPushButton(
+            self.translations.get("update_available_close", "Later")
+        )
+        close_button.setObjectName("close_button")
+        close_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        close_button.clicked.connect(dialog.reject)
 
-        main_layout.addStretch(1)
-        main_layout.addWidget(icon_label, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        main_layout.addSpacing(10)
+        button_layout.addWidget(github_button)
+        button_layout.addWidget(close_button)
+
+        main_layout.addWidget(icon_label)
         main_layout.addWidget(title_label)
+        main_layout.addLayout(version_box)
+        main_layout.addSpacing(5)
         main_layout.addWidget(info_label)
-        main_layout.addWidget(version_label)
-        main_layout.addStretch(1)
+        main_layout.addStretch()
         main_layout.addLayout(button_layout)
-        main_layout.addSpacing(10)
 
         dialog.exec()
 
@@ -762,9 +762,13 @@ if __name__ == "__main__":
 
     main_window.show()    
 
-    current_version = "v2.2.0"
-    latest_version, github_url = main_window.check_for_updates(current_version)
-    if latest_version:
-        main_window.show_update_dialog(latest_version, github_url)     
+    current_version = "v2.3.0"
+
+    def deferred_update_check():
+        latest_version, github_url = main_window.check_for_updates(current_version)
+        if latest_version:
+            main_window.show_update_dialog(latest_version, github_url)
+
+    QtCore.QTimer.singleShot(0, deferred_update_check)  
 
     loop.run_forever()
