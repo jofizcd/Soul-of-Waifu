@@ -3,178 +3,270 @@ import io
 import sys
 import json
 import torch
+import time
+import pyaudio
 import audioop
 import asyncio
-import whisper
 import logging
+import wave
 import numpy as np
 import soundfile as sf
-import speech_recognition as sr
+
+from PyQt6.QtCore import QThread, pyqtSignal
+from faster_whisper import WhisperModel
+from io import BytesIO
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from io import BytesIO
-from vosk import Model, KaldiRecognizer
 
 from app.configuration.configuration import ConfigurationAPI, ConfigurationCharacters, ConfigurationSettings
 
 logger = logging.getLogger("Speech-To-Text Module")
 
-class Speech_To_Text:
-    """
-    A class for speech recognition using two variants (Vosk and Whisper).
-    """
-    def __init__(self):
-        self.configuration_settings = ConfigurationSettings()
-        self.configuration_api = ConfigurationAPI()
-        self.configuration_characters = ConfigurationCharacters()
+class AudioInputWorker(QThread):
+    voice_detected_signal = pyqtSignal()
+    volume_signal = pyqtSignal(float)
+    silence_detected_signal = pyqtSignal()
+    audio_packet_ready = pyqtSignal(bytes)
 
-        self.recognizer = sr.Recognizer()
-        self.input_device_index = self.configuration_settings.get_main_setting("input_device")
-        self.current_speech_to_text = self.configuration_settings.get_main_setting("stt_method")
-
-    async def record_microphone(self, silence_timeout=2, chunk_duration=0.1):
-        """
-        Record audio from the microphone.
-        """
-        index = self.input_device_index + 1
+    def __init__(self, input_device_index=None):
+        super().__init__()
+        self.input_device_index = input_device_index
+        self.is_running = True
         
-        return await asyncio.to_thread(
-            self.record_microphone_blocking,
-            index,
-            silence_timeout,
-            chunk_duration
-        )
+        self.SAMPLE_RATE = 16000
+        self.CHUNK_SIZE = 512
+        
+        logger.info("⏳ Loading Silero VAD model...")
+        try:
+            silero_local_path = os.path.join(os.getcwd(), "app", "utils", "speech-to-text", "silero-vad")
 
-    def record_microphone_blocking(self, index, silence_timeout, chunk_duration):
-        with sr.Microphone(device_index=index, sample_rate=16000) as source:
-            logger.info("Start recording...")
-            self.recognizer.adjust_for_ambient_noise(source)
-            audio_chunks = []
-            silence_counter = 0
-            samples_per_chunk = int(16000 * chunk_duration)
-            silence_threshold = self.recognizer.energy_threshold + 300
+            if os.path.exists(silero_local_path):
+                self.model, utils = torch.hub.load(repo_or_dir=silero_local_path,
+                                                   model='silero_vad',
+                                                   source='local',
+                                                   force_reload=False)
+            else:
+                self.model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
+                                                   model='silero_vad',
+                                                   force_reload=False,
+                                                   trust_repo=True)
+            self.get_speech_timestamps, _, _, _, _ = utils
+            logger.info("✅ Silero VAD Loaded successfully!")
+        except Exception as e:
+            logger.error(f"❌ Error loading Silero VAD: {e}")
+            self.model = None
 
-            while True:
-                buffer = source.stream.read(samples_per_chunk)
-                audio_chunks.append(buffer)
+        self.frames = []
+        self.silence_threshold = 45
+        self.voice_threshold = 0.5
 
-                energy = audioop.rms(buffer, source.SAMPLE_WIDTH)
-                if energy < silence_threshold:
-                    silence_counter += chunk_duration
-                    if silence_counter >= silence_timeout:
-                        break
-                else:
-                    silence_counter = 0
+    def run(self):
+        logger.info("🚀 Audio Worker Thread Started")
+        p = pyaudio.PyAudio()
 
-            logger.info("Finish recording...")
+        info = p.get_host_api_info_by_index(0)
+        numdevices = info.get('deviceCount')
+        logger.info(f"🎧 Found {numdevices} audio devices:")
+        found_device = False
+        
+        for i in range(0, numdevices):
+            if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+                name = p.get_device_info_by_host_api_device_index(0, i).get('name')
+                logger.info(f"   Device ID {i}: {name}")
+                if self.input_device_index == i:
+                    found_device = True
 
-            final_audio = b''.join(audio_chunks)
-            return sr.AudioData(final_audio, 16000, source.SAMPLE_WIDTH)
-    
-    def vosk_transcribe(self, audio_data):
-        """
-        Using one of the Vosk models for speech recognition from a microphone.
-        """
-        match self.current_speech_to_text:
-            case 0:
-                model_us = Model("app/utils/speech-to-text/vosk-model-en-us-0.22-lgraph")
-                recognizer = KaldiRecognizer(model_us, 16000)
+        if self.input_device_index is not None and not found_device:
+            logger.warning(f"⚠️ Device ID {self.input_device_index} not found. Using Default.")
+            self.input_device_index = None
 
-                wav_data = audio_data.get_wav_data(convert_rate=16000, convert_width=2)
-                audio_stream = io.BytesIO(wav_data)
-                while True:
-                    chunk = audio_stream.read(4000)
-                    if not chunk:
-                        break
-                    recognizer.AcceptWaveform(chunk)
+        stream = None
+        try:
+            stream = p.open(format=pyaudio.paInt16,
+                            channels=1,
+                            rate=self.SAMPLE_RATE,
+                            input=True,
+                            input_device_index=self.input_device_index,
+                            frames_per_buffer=self.CHUNK_SIZE)
+            logger.info("🎙️ Microphone stream opened successfully!")
+        except Exception as e:
+            logger.error(f"❌ Failed to open microphone: {e}")
+            return
 
-                result = recognizer.Result()
-                result_dict = json.loads(result)
-                
-                return result_dict.get("text", "")
+        speaking = False
+        silence_chunks = 0
 
-            case 1:
-                model_ru = Model("app/utils/speech-to-text/vosk-model-small-ru-0.22")
-                recognizer = KaldiRecognizer(model_ru, 16000)
-
-                wav_data = audio_data.get_wav_data(convert_rate=16000, convert_width=2)
-                audio_stream = io.BytesIO(wav_data)
-                while True:
-                    chunk = audio_stream.read(4000)
-                    if not chunk:
-                        break
-                    recognizer.AcceptWaveform(chunk)
-
-                result = recognizer.Result()
-                result_dict = json.loads(result)
-                
-                return result_dict.get("text", "")
-
-    async def speech_recognition_vosk(self):
-        """
-        A method for speech recognition using Vosk.
-        """
-        user_audio = None
-        user_text = None
-
-        while True:
+        while self.is_running:
             try:
-                user_audio = await self.record_microphone()
-                user_text = await asyncio.to_thread(self.vosk_transcribe, user_audio)
-                if user_text is None or user_text.strip() == "" or user_text["text"].strip().lower() == "you" or user_text["text"].strip().lower() == "the":
-                    logger.info("An empty result or only 'you', 'the' is recognized, repeat recognition...")
+                if not self.model:
+                    time.sleep(1)
                     continue
 
-                logger.info("You said: %s", user_text)
-                break
+                data = stream.read(self.CHUNK_SIZE, exception_on_overflow=False)
+                
+                audio_int16 = np.frombuffer(data, np.int16)
+                audio_float32 = audio_int16.astype(np.float32) / 32768.0
+                tensor = torch.from_numpy(audio_float32)
+
+                speech_prob = self.model(tensor, self.SAMPLE_RATE).item()
+                rms = float(np.sqrt(np.mean(audio_float32 ** 2)))
+                volume = min(1.0, rms * 22.0)
+                self.volume_signal.emit(volume)
+
+                if speech_prob > self.voice_threshold:
+                    if not speaking:
+                        speaking = True
+                        self.voice_detected_signal.emit()
+                        logger.info("🗣️ User started speaking")
+                    
+                    silence_chunks = 0
+                    self.frames.append(data)
+                
+                else:
+                    if speaking:
+                        self.frames.append(data)
+                        silence_chunks += 1
+                        
+                        if silence_chunks > self.silence_threshold:
+                            speaking = False
+                            self.silence_detected_signal.emit()
+                            logger.info(f"🤫 User stopped. Sending {len(self.frames)} frames.")
+                            
+                            full_audio = b''.join(self.frames)
+                            self.audio_packet_ready.emit(full_audio)
+                            
+                            self.frames = []
+                            silence_chunks = 0
+            
             except Exception as e:
-                logger.error(f"Error: {e}")
+                logger.error(f"⚠️ Error in audio loop: {e}")
                 break
 
-        return user_text
+        logger.info("🛑 Stopping Audio Stream...")
+        if stream:
+            stream.stop_stream()
+            stream.close()
+        p.terminate()
+        logger.info("✅ Audio Worker Stopped cleanly")
 
-    def whisper_transcribe(self, audio_data):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = whisper.load_model(name="base", device=device, download_root="app/utils/speech-to-text/whisper-small", in_memory=True)
+    def stop(self):
+        self.is_running = False
+        self.wait()
 
-        wav_data = audio_data.get_wav_data(convert_rate=16000, convert_width=2)
+class STTWorker(QThread):
+    text_ready_signal = pyqtSignal(str)
+    status_signal = pyqtSignal(str)
 
-        audio_np, samplerate = sf.read(BytesIO(wav_data))
-        audio_np = audio_np.astype(np.float32)
+    def __init__(self, model_size="small", device="cuda", compute_type="float16"):
+        super().__init__()
+        self.queue = []
+        self.is_running = True
+        
+        self.model_size = model_size
+        self.device = device
+        self.compute_type = compute_type
+        
+        self.model = None 
 
-        user_text = model.transcribe(audio_np)
-        logger.info("You said: %s", user_text["text"])
+    def load_model(self):
+        if self.model is None:
+            logger.info(f"⏳ Loading Faster-Whisper ({self.model_size}) on {self.device}...")
 
-        return user_text
-
-    async def speech_recognition_whisper(self):
-        """
-        Using the Whisper model for speech transcription.
-        """
-        user_audio = None
-        user_text = None
-
-        while True:
             try:
-                user_audio = await self.record_microphone()
-                user_text = await asyncio.to_thread(self.whisper_transcribe, user_audio)
+                self.model = WhisperModel(self.model_size, device=self.device, compute_type=self.compute_type)
 
-                if user_text["text"] is None or user_text["text"].strip() == "" or user_text["text"].strip().lower() == "you" or user_text["text"].strip().lower() == "the":
-                    logger.info("An empty result or only 'you', 'the' is recognized, repeat recognition...")
-                    continue 
-
-                break
+                logger.info("✅ Faster-Whisper Loaded!")
+                self.status_signal.emit("Model Loaded")
             except Exception as e:
-                logger.error(f"Error: {e}")
-                break
+                logger.error(f"❌ Error loading Whisper (Switching to CPU): {e}")
+                self.device = "cpu"
+                self.compute_type = "int8"
+                
+                self.model = WhisperModel(self.model_size, device="cpu", compute_type="int8")
+                    
+                logger.info("✅ Faster-Whisper Loaded on CPU!")
 
-        return user_text["text"]
-    
-    async def speech_recognition(self):
-        if self.current_speech_to_text in (0, 1):                  # Vosk
-            user_text = await self.speech_recognition_vosk()
-        else:                                                      # Whisper
-            user_text = await self.speech_recognition_whisper()
+    def add_audio(self, audio_bytes):
+        self.queue.append(audio_bytes)
 
-        return user_text
+    def run(self):
+        self.load_model()
+        
+        logger.info("🚀 STT Loop Started")
+        
+        while self.is_running:
+            if len(self.queue) > 0:
+                audio_bytes = self.queue.pop(0)
+                
+                try:
+                    audio_np = np.frombuffer(audio_bytes, np.int16).flatten().astype(np.float32) / 32768.0
+                    segments, info = self.model.transcribe(audio_np, beam_size=5)
+                    
+                    full_text = ""
+                    for segment in segments:
+                        full_text += segment.text
+                    
+                    full_text = full_text.strip()
+                    hallucinations = [
+                        "субтитры создавал", "редактор субтитров", "спасибо за просмотр", 
+                        "подписывайтесь на канал", "продолжение следует", 
+                        "субтитры", "а. семенов", "перевод", "озвучка",
+                        
+                        "ВЕСЕЛАЯ МУЗЫКА", "СПОКОЙНАЯ МУЗЫКА", "ГРУСТНАЯ МЕЛОДИЯ", 
+                        "ЛИРИЧЕСКАЯ МУЗЫКА", "ДИНАМИЧНАЯ МУЗЫКА", "ТАИНСТВЕННАЯ МУЗЫКА", 
+                        "ТОРЖЕСТВЕННАЯ МУЗЫКА", "ИНТРИГУЮЩАЯ МУЗЫКА", "НАПРЯЖЕННАЯ МУЗЫКА", 
+                        "ПЕЧАЛЬНАЯ МУЗЫКА", "ТРЕВОЖНАЯ МУЗЫКА", "МУЗЫКАЛЬНАЯ ЗАСТАВКА",
+                        
+                        "ПЕРЕСТРЕЛКА", "ГУДОК ПОЕЗДА", "РЁВ МОТОРА", "ШУМ ДВИГАТЕЛЯ", 
+                        "СИГНАЛ АВТОМОБИЛЯ", "ЛАЙ СОБАК", "ПЕС ЛАЕТ", "КАШЕЛЬ", "ВЫСТРЕЛЫ", 
+                        "ШУМ ДОЖДЯ", "ПЕСНЯ", "ПО ГРОМКОГОВОРИЧЕСКОМ ЯЗЫКЕ", "ПО ГРОМКОГОВОРИТЕЛЮ", 
+                        "ВЗРЫВ", "ШУМ МОТОРА", "ПЛЕСК ВОДЫ", "ГУДОК АВТОМОБИЛЯ", "ЛАЙ СОБАКИ", 
+                        "ПО ТВ.", "АПЛОДИСМЕНТЫ", "ГОРОДСКОЙ ШУМ", "ПОЛИЦИЯ", "ГОРОДСКОЙ ГУДОК", 
+                        "СИГНАЛ МАШИНЫ", "СМЕХ", "СТУК В ДВЕРЬ", "ААААААААААААААААААААА", 
+                        "ПОЛИЦЕЙСКАЯ СИРЕНА", "ЗВОНОК В ДВЕРЬ",
+                        
+                        "Спасибо за субтитры!", "Субтитры добавил DimaTorzok", 
+                        "Субтитры подогнал «Симон»!", 
+                        "Редактор субтитров М.Лосева Корректор А.Егорова",
+                        "Редактор субтитров А.Синецкая Корректор А.Егорова",
+                        "Редактор субтитров Т.Горелова Корректор А.Егорова",
+                        "Редактор субтитров Е.Жукова Корректор А.Егорова",
+                        "Редактор субтитров А.Семкин Корректор А.Егорова",
+                        "Редактор субтитров А.Захарова Корректор А.Егорова",
+                        
+                        "Смотрите продолжение во второй части видео.", 
+                        "Смотрите продолжение в следующей части.", 
+                        "Смотрите продолжение в следующей части видео.", 
+                        "Смотрите продолжение в 4 части видео.", 
+                        "Смотрите продолжение в следующей серии...", 
+                        "Смотрите продолжение во второй части.", 
+                        "Продолжение следует...",
+                        
+                        "ПОДПИШИСЬ НА КАНАЛ", "ПОДПИШИСЬ!", "ПОДПИШИСЬ",
+                        
+                        "🦜", "💥", "😎", "🤨", "🤔", "Поехали!", "Поехали.", 
+                        "Девушки отдыхают..."
+                    ]
+
+                    is_hallucination = any(h in full_text.lower() for h in hallucinations)
+
+                    if full_text and not is_hallucination and len(full_text) > 2:
+                        logger.info(f"📝 Text Recognized: {full_text}")
+                        self.text_ready_signal.emit(full_text)
+                    else:
+                        logger.info("Empty audio fragment or hallucination ignored.")
+                        
+                except Exception as e:
+                    logger.error(f"⚠️ STT Error: {e}")
+            
+            else:
+                self.msleep(50) 
+        
+        logger.info("🛑 STT Worker Stopped")
+
+    def stop(self):
+        logger.info("Signaling Audio Worker to stop...")
+        self.is_running = False
+        self.queue.append(b'')
+        self.quit()
+        self.wait()
