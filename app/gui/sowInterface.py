@@ -1,9 +1,37 @@
+import os
+import yaml
+
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QLabel, QGraphicsDropShadowEffect, QListWidget
-from PyQt6.QtCore import Qt, QPointF, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QColor, QPainter, QRadialGradient, QCursor, QFont, QPixmap
+from PyQt6.QtCore import Qt, QPointF, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty, QRectF, QPoint
+from PyQt6.QtGui import QColor, QPainter, QRadialGradient, QCursor, QFont, QPixmap, QPen, QBrush
+
+from app.configuration import configuration
 
 class Ui_MainWindow(object):
+    def __init__(self):
+        self.translations = {}
+        
+        self.configuration = configuration.ConfigurationSettings()
+        selected_language = self.configuration.get_main_setting("program_language")
+
+        match selected_language:
+            case 0:
+                self.load_translation("en")
+            case 1:
+                self.load_translation("ru")
+    
+    def load_translation(self, language):
+        """
+        Loads translation strings from a YAML file based on the program language.
+        """
+        file_path = f"app/translations/{language}.yaml"
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as file:
+                self.translations = yaml.safe_load(file)
+        else:
+            self.translations = {}
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1350, 734)
@@ -82,6 +110,26 @@ class Ui_MainWindow(object):
         self.horizontalLayout_7.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_7.setSpacing(0)
         self.horizontalLayout_7.setObjectName("horizontalLayout_7")
+
+        self.toggle_sidebar_btn = QtWidgets.QPushButton(parent=self.menu_bar)
+        self.toggle_sidebar_btn.setMinimumSize(QtCore.QSize(40, 25))
+        self.toggle_sidebar_btn.setMaximumSize(QtCore.QSize(40, 25))
+        self.toggle_sidebar_btn.setText("≡")
+        font_toggle = QtGui.QFont()
+        font_toggle.setPointSize(14)
+        self.toggle_sidebar_btn.setFont(font_toggle)
+        self.toggle_sidebar_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.toggle_sidebar_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.toggle_sidebar_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: transparent; 
+                color: rgb(190, 190, 190);
+                border: none; 
+            }
+            QPushButton:hover { background-color: rgb(50, 50, 50); color: white; }
+            QPushButton:pressed { background-color: rgb(30, 30, 30); }
+        """)
+        self.horizontalLayout_7.addWidget(self.toggle_sidebar_btn)
         
         self.frame_version = QtWidgets.QFrame(parent=self.menu_bar)
         self.frame_version.setMinimumSize(QtCore.QSize(1000, 0))
@@ -230,7 +278,7 @@ class Ui_MainWindow(object):
         self.gridLayout_7.setObjectName("gridLayout_7")
         self.frame_main_button = QtWidgets.QFrame(parent=self.main_no_characters_page)
         self.frame_main_button.setMinimumSize(QtCore.QSize(500, 65))
-        self.frame_main_button.setStyleSheet("background-color: rgb(27, 27, 27);\n"
+        self.frame_main_button.setStyleSheet("background-color: transparent;\n"
 "color: rgb(227, 227, 227);\n"
 "border: none;")
         self.frame_main_button.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
@@ -260,40 +308,25 @@ class Ui_MainWindow(object):
         self.pushButton_create_character_2.setFont(font)
         self.pushButton_create_character_2.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.pushButton_create_character_2.setMouseTracking(False)
-        self.pushButton_create_character_2.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
+        self.pushButton_create_character_2.setStyleSheet("""
+            QPushButton {
+                background-color: #2D2D2D;
+                color: #BBBBBB;
+                border-radius: 25px;
+                border: 1px solid #383838;
+                padding: 0;
+            }
+
+            QPushButton:hover {
+                background-color: #333333;
+                border: 1px solid #404040;
+            }
+
+            QPushButton:pressed {
+                background-color: #202020;
+                color: #999999;
+            }
+        """)
         self.pushButton_create_character_2.setIconSize(QtCore.QSize(25, 25))
         self.pushButton_create_character_2.setCheckable(False)
         self.pushButton_create_character_2.setChecked(False)
@@ -318,7 +351,7 @@ class Ui_MainWindow(object):
         font.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferDefault)
         self.main_no_characters_description_label.setFont(font)
         self.main_no_characters_description_label.setAcceptDrops(False)
-        self.main_no_characters_description_label.setStyleSheet("background-color: rgb(27, 27, 27);\n"
+        self.main_no_characters_description_label.setStyleSheet("background-color: transparent;\n"
 "color: rgb(227, 227, 227);\n"
 "border: none;")
         self.main_no_characters_description_label.setScaledContents(False)
@@ -337,7 +370,7 @@ class Ui_MainWindow(object):
         font.setWeight(50)
         font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
         self.main_no_characters_advice_label.setFont(font)
-        self.main_no_characters_advice_label.setStyleSheet("background-color: rgb(27, 27, 27);\n"
+        self.main_no_characters_advice_label.setStyleSheet("background-color: transparent;\n"
 "color: rgb(227, 227, 227);\n"
 "border: none;")
         self.main_no_characters_advice_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -359,7 +392,7 @@ class Ui_MainWindow(object):
         self.scrollArea_characters_list = QtWidgets.QScrollArea(parent=self.main_characters_page)
         self.scrollArea_characters_list.setStyleSheet("""
 			QScrollArea {
-				background-color: rgb(27,27,27);
+				background-color: transparent;
 				color: rgb(227, 227, 227);
 				border: none;
 				padding-left: 25px;
@@ -413,34 +446,15 @@ class Ui_MainWindow(object):
         self.gridLayout_6.addWidget(self.welcome_label_2, 0, 2, 1, 1)
         spacerItem7 = QtWidgets.QSpacerItem(5, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum)
         self.gridLayout_6.addItem(spacerItem7, 0, 1, 1, 1)
-        self.lineEdit_search_character_menu = QtWidgets.QLineEdit(parent=self.frame_welcome_to)
-        self.lineEdit_search_character_menu.setMinimumSize(QtCore.QSize(250, 33))
-        self.lineEdit_search_character_menu.setMaximumSize(QtCore.QSize(250, 33))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_search_character_menu.setFont(font)
-        self.lineEdit_search_character_menu.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.lineEdit_search_character_menu.setObjectName("lineEdit_search_character_menu")
-        self.gridLayout_6.addWidget(self.lineEdit_search_character_menu, 0, 4, 1, 1)
+
+        self.search_bar_menu = ModernSearchBar(parent=self.frame_welcome_to)
+        self.search_bar_menu.setMinimumSize(QtCore.QSize(250, 45))
+        self.search_bar_menu.setMaximumSize(QtCore.QSize(300, 45))
+        
+        self.lineEdit_search_character_menu = self.search_bar_menu.line_edit
+        self.lineEdit_search_character_menu.setPlaceholderText("Search character...")
+        
+        self.gridLayout_6.addWidget(self.search_bar_menu, 0, 4, 1, 1)
         self.gridLayout_9.addWidget(self.frame_welcome_to, 0, 0, 1, 1)
         self.stackedWidget.addWidget(self.main_characters_page)
         self.create_character_page = QtWidgets.QWidget()
@@ -494,40 +508,25 @@ class Ui_MainWindow(object):
         font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
         self.pushButton_add_character.setFont(font)
         self.pushButton_add_character.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_add_character.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
+        self.pushButton_add_character.setStyleSheet("""
+            QPushButton {
+                background-color: #2D2D2D;
+                color: #BBBBBB;
+                border-radius: 15px;
+                border: 1px solid #383838;
+                padding: 0;
+            }
+
+            QPushButton:hover {
+                background-color: #333333;
+                border: 1px solid #404040;
+            }
+
+            QPushButton:pressed {
+                background-color: #202020;
+                color: #999999;
+            }
+        """)
         self.pushButton_add_character.setIconSize(QtCore.QSize(25, 25))
         self.pushButton_add_character.setAutoExclusive(True)
         self.pushButton_add_character.setObjectName("pushButton_add_character")
@@ -575,5254 +574,1602 @@ class Ui_MainWindow(object):
         self.add_character_title_label.raise_()
         self.stackedWidget.addWidget(self.create_character_page)
         
+
         self.create_character_page_2 = QtWidgets.QWidget()
-        self.create_character_page_2.setStyleSheet("")
         self.create_character_page_2.setObjectName("create_character_page_2")
-        self.gridLayout_17 = QtWidgets.QGridLayout(self.create_character_page_2)
-        self.gridLayout_17.setContentsMargins(0, 0, 5, 0)
-        self.gridLayout_17.setSpacing(0)
-        self.gridLayout_17.setObjectName("gridLayout_17")
-        self.scrollArea_character_building = QtWidgets.QScrollArea(parent=self.create_character_page_2)
-        self.scrollArea_character_building.setStyleSheet("QScrollArea {\n"
-"                border: none;\n"
-"                background-color: rgb(27,27,27);\n"
-"}\n"
-"\n"
-"QScrollBar:vertical {\n"
-"                background-color: #2b2b2b;\n"
-"                width: 12px;\n"
-"                margin: 15px 0px 15px 0px;\n"
-"                border-radius: 5px;\n"
-"}\n"
-"\n"
-"        QScrollBar::handle:vertical {\n"
-"                background-color: #383838;\n"
-"                min-height: 30px;\n"
-"                border-radius: 3px;\n"
-"                margin: 2px;\n"
-"        }\n"
-"\n"
-"        QScrollBar::handle:vertical:hover {\n"
-"                background-color: #454545;\n"
-"        }\n"
-"\n"
-"        QScrollBar::handle:vertical:pressed {\n"
-"                background-color: #424242;\n"
-"        }\n"
-"\n"
-"        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {\n"
-"                border: none;\n"
-"                background: none;\n"
-"        }\n"
-"\n"
-"        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {\n"
-"                background: none;\n"
-"        }")
-        self.scrollArea_character_building.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-        self.scrollArea_character_building.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.create_character_page_2.setStyleSheet("background: transparent;")
+        self.layout_page_2 = QtWidgets.QHBoxLayout(self.create_character_page_2)
+        self.layout_page_2.setContentsMargins(0, 0, 0, 0)
+        self.layout_page_2.setSpacing(0)
+        self.anchor_menu_building = QtWidgets.QListWidget(self.create_character_page_2)
+        self.anchor_menu_building.setObjectName("anchor_menu_building")
+        self.anchor_menu_building.setFixedWidth(220)
+        self.anchor_menu_building.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.anchor_menu_building.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.anchor_menu_building.setStyleSheet("""
+            QListWidget {
+                background-color: rgba(15, 15, 18, 0.4);
+                border: none;
+                border-right: 1px solid rgba(255, 255, 255, 0.05);
+                padding-top: 20px;
+                outline: none;
+            }
+            QListWidget::item {
+                color: rgba(255, 255, 255, 0.5);
+                font-family: 'Inter Tight SemiBold';
+                font-size: 13px;
+                padding: 12px 20px;
+                border-radius: 8px;
+                margin: 4px 12px;
+            }
+            QListWidget::item:hover {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: rgba(255, 255, 255, 0.9);
+            }
+            QListWidget::item:selected {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: white;
+                border-left: 3px solid #d4d4d4;
+                font-weight: bold;
+            }
+        """)
+        
+        self.item_general_info = QtWidgets.QListWidgetItem("General Info")
+        self.item_personality = QtWidgets.QListWidgetItem("Personality & Scenario")
+        self.item_dialogues = QtWidgets.QListWidgetItem("Dialogues")
+        self.item_advanced = QtWidgets.QListWidgetItem("Advanced & Lore")
+        self.item_export = QtWidgets.QListWidgetItem("Export / Utils")
+
+        self.anchor_menu_building.addItem(self.item_general_info)
+        self.anchor_menu_building.addItem(self.item_personality)
+        self.anchor_menu_building.addItem(self.item_dialogues)
+        self.anchor_menu_building.addItem(self.item_advanced)
+        self.anchor_menu_building.addItem(self.item_export)
+            
+        self.layout_page_2.addWidget(self.anchor_menu_building)
+
+        self.right_container = QtWidgets.QWidget(self.create_character_page_2)
+        self.right_layout = QtWidgets.QVBoxLayout(self.right_container)
+        self.right_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_layout.setSpacing(0)
+
+        self.scrollArea_character_building = QtWidgets.QScrollArea(self.right_container)
         self.scrollArea_character_building.setWidgetResizable(True)
-        self.scrollArea_character_building.setObjectName("scrollArea_character_building")
+        self.scrollArea_character_building.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scrollArea_character_building.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical {
+                background-color: transparent; width: 8px; margin: 10px 0px 10px 0px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: rgba(255, 255, 255, 0.1); min-height: 30px; border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover { background-color: rgba(255, 255, 255, 0.2); }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; border: none; }
+        """)
+
         self.scrollAreaWidgetContents_character_building = QtWidgets.QWidget()
-        self.scrollAreaWidgetContents_character_building.setGeometry(QtCore.QRect(0, 0, 1102, 2618))
-        self.scrollAreaWidgetContents_character_building.setStyleSheet("background-color: rgb(27,27,27);\n"
-"")
-        self.scrollAreaWidgetContents_character_building.setObjectName("scrollAreaWidgetContents_character_building")
-        self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.scrollAreaWidgetContents_character_building)
-        self.verticalLayout_5.setObjectName("verticalLayout_5")
-        self.frame_character_building = QtWidgets.QFrame(parent=self.scrollAreaWidgetContents_character_building)
-        self.frame_character_building.setMinimumSize(QtCore.QSize(0, 3000))
-        self.frame_character_building.setStyleSheet("background-color: rgb(27,27,27);")
-        self.frame_character_building.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building.setObjectName("frame_character_building")
-        self.verticalLayout_7 = QtWidgets.QVBoxLayout(self.frame_character_building)
-        self.verticalLayout_7.setObjectName("verticalLayout_7")
-        self.frame_character_building_title = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_title.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_title.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_title.setStyleSheet("border: none;")
-        self.frame_character_building_title.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_title.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_title.setObjectName("frame_character_building_title")
-        self.gridLayout_4 = QtWidgets.QGridLayout(self.frame_character_building_title)
-        self.gridLayout_4.setObjectName("gridLayout_4")
-        self.character_building_label = QtWidgets.QLabel(parent=self.frame_character_building_title)
-        self.character_building_label.setMinimumSize(QtCore.QSize(211, 31))
-        self.character_building_label.setMaximumSize(QtCore.QSize(211, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(16)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.character_building_label.setFont(font)
-        self.character_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.character_building_label.setObjectName("character_building_label")
-        self.gridLayout_4.addWidget(self.character_building_label, 0, 0, 1, 1)
-        spacerItem15 = QtWidgets.QSpacerItem(572, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_4.addItem(spacerItem15, 0, 1, 1, 1)
-        self.pushButton_import_character_card = QtWidgets.QPushButton(parent=self.frame_character_building_title)
-        self.pushButton_import_character_card.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_import_character_card.setMinimumSize(QtCore.QSize(161, 35))
-        self.pushButton_import_character_card.setMaximumSize(QtCore.QSize(161, 35))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_import_character_card.setFont(font)
-        self.pushButton_import_character_card.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_import_character_card.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
-        icon6 = QtGui.QIcon()
-        icon6.addPixmap(QtGui.QPixmap(":/sowInterface/import.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_import_character_card.setIcon(icon6)
-        self.pushButton_import_character_card.setObjectName("pushButton_import_character_card")
-        self.gridLayout_4.addWidget(self.pushButton_import_character_card, 0, 2, 1, 1)
-        self.pushButton_export_character_card = QtWidgets.QPushButton(parent=self.frame_character_building_title)
-        self.pushButton_export_character_card.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_export_character_card.setMinimumSize(QtCore.QSize(35, 35))
-        self.pushButton_export_character_card.setMaximumSize(QtCore.QSize(35, 35))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_export_character_card.setFont(font)
-        self.pushButton_export_character_card.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_export_character_card.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
-        self.pushButton_export_character_card.setText("")
-        icon7 = QtGui.QIcon()
-        icon7.addPixmap(QtGui.QPixmap("../../../../Soul-of-Waifu-v2.2.0/app/gui/icons/export.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_export_character_card.setIcon(icon7)
-        self.pushButton_export_character_card.setObjectName("pushButton_export_character_card")
-        self.gridLayout_4.addWidget(self.pushButton_export_character_card, 0, 3, 1, 1)
-        self.verticalLayout_7.addWidget(self.frame_character_building_title)
-        self.frame_character_building_imahe = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_imahe.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_imahe.setMaximumSize(QtCore.QSize(16777215, 100))
-        self.frame_character_building_imahe.setStyleSheet("border: none;")
-        self.frame_character_building_imahe.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_imahe.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_imahe.setObjectName("frame_character_building_imahe")
-        self.gridLayout_11 = QtWidgets.QGridLayout(self.frame_character_building_imahe)
-        self.gridLayout_11.setObjectName("gridLayout_11")
-        self.character_image_building_label = QtWidgets.QLabel(parent=self.frame_character_building_imahe)
-        self.character_image_building_label.setMinimumSize(QtCore.QSize(151, 51))
-        self.character_image_building_label.setMaximumSize(QtCore.QSize(151, 51))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.character_image_building_label.setFont(font)
-        self.character_image_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.character_image_building_label.setObjectName("character_image_building_label")
-        self.gridLayout_11.addWidget(self.character_image_building_label, 0, 0, 1, 1)
-        self.pushButton_import_character_image = QtWidgets.QPushButton(parent=self.frame_character_building_imahe)
-        self.pushButton_import_character_image.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_import_character_image.setMinimumSize(QtCore.QSize(81, 81))
-        self.pushButton_import_character_image.setMaximumSize(QtCore.QSize(81, 81))
-        font = QtGui.QFont()
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_import_character_image.setFont(font)
+        self.scrollAreaWidgetContents_character_building.setStyleSheet("background: transparent;")
+        
+        self.cards_layout = QtWidgets.QVBoxLayout(self.scrollAreaWidgetContents_character_building)
+        self.cards_layout.setContentsMargins(40, 40, 40, 80)
+        self.cards_layout.setSpacing(25)
+
+        def create_glass_card_building(title_text):
+            card = QtWidgets.QFrame()
+            card.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(25, 25, 30, 0.4);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 12px;
+                }
+            """)
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(25)
+            shadow.setColor(QColor(0, 0, 0, 80))
+            shadow.setOffset(0, 5)
+            card.setGraphicsEffect(shadow)
+            
+            layout = QtWidgets.QVBoxLayout(card)
+            layout.setContentsMargins(25, 25, 25, 25)
+            layout.setSpacing(15)
+            
+            title = QtWidgets.QLabel(title_text)
+            title.setStyleSheet("font-family: 'Inter Tight SemiBold'; font-size: 18px; color: rgba(255, 255, 255, 0.9); border: none; background: transparent;")
+            layout.addWidget(title)
+            
+            return card, layout
+
+        font_label = QtGui.QFont("Inter Tight Medium", 11)
+        font_label.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        font_input = QtGui.QFont("Inter Tight Medium", 10)
+        font_input.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+
+        input_style = """
+            QLineEdit, QTextEdit {
+                background-color: rgba(15, 15, 18, 0.6);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+                padding: 10px;
+                selection-background-color: rgba(255, 255, 255, 0.2);
+            }
+            QLineEdit:focus, QTextEdit:focus {
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                background-color: rgba(25, 25, 30, 0.8);
+            }
+        """
+        self.general_info_text = self.translations.get("character_creator_title_general_info", "General Information")
+        self.card_general, layout_gen = create_glass_card_building(self.general_info_text)
+        
+        row_avatar_name = QtWidgets.QHBoxLayout()
+        row_avatar_name.setSpacing(20)
+        
+        self.character_image_building_label = QtWidgets.QLabel("Avatar")
+        self.pushButton_import_character_image = QtWidgets.QPushButton()
+        self.pushButton_import_character_image.setFixedSize(100, 100)
         self.pushButton_import_character_image.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_import_character_image.setStyleSheet("QPushButton {\n"
-"    background-color: #1E1E1E;\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 10px;\n"
-"}\n"
-"QPushButton:hover {\n"
-"    background-color: #2C2C2C;\n"
-"    border: 2px solid #505050;\n"
-"}\n"
-"QPushButton:pressed {\n"
-"    background-color: #424242;\n"
-"    border: 2px solid #707070;\n"
-"}")
-        self.pushButton_import_character_image.setText("")
+        self.pushButton_import_character_image.setStyleSheet("""
+            QPushButton { background-color: rgba(0,0,0,0.4); border: 2px dashed rgba(255,255,255,0.15); border-radius: 12px; }
+            QPushButton:hover { border: 2px dashed rgba(255, 255, 255, 0.5); background-color: rgba(255, 255, 255, 0.05); }
+        """)
         icon_image_import = QtGui.QIcon()
         icon_image_import.addPixmap(QtGui.QPixmap("app/gui/icons/import_image.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
         self.pushButton_import_character_image.setIcon(icon_image_import)
         self.pushButton_import_character_image.setIconSize(QtCore.QSize(32, 32))
-        self.pushButton_import_character_image.setObjectName("pushButton_import_character_image")
-        self.gridLayout_11.addWidget(self.pushButton_import_character_image, 0, 1, 1, 1)
-        spacerItem16 = QtWidgets.QSpacerItem(712, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_11.addItem(spacerItem16, 0, 2, 1, 1)
-        self.verticalLayout_7.addWidget(self.frame_character_building_imahe)
-        self.frame_character_building_name_description = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_name_description.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_name_description.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_name_description.setStyleSheet("border: none;")
-        self.frame_character_building_name_description.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_name_description.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_name_description.setObjectName("frame_character_building_name_description")
-        self.gridLayout_12 = QtWidgets.QGridLayout(self.frame_character_building_name_description)
-        self.gridLayout_12.setContentsMargins(-1, 0, -1, 0)
-        self.gridLayout_12.setObjectName("gridLayout_12")
-        self.character_name_building_label = QtWidgets.QLabel(parent=self.frame_character_building_name_description)
-        self.character_name_building_label.setMinimumSize(QtCore.QSize(151, 51))
-        self.character_name_building_label.setMaximumSize(QtCore.QSize(151, 51))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.character_name_building_label.setFont(font)
-        self.character_name_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.character_name_building_label.setObjectName("character_name_building_label")
-        self.gridLayout_12.addWidget(self.character_name_building_label, 0, 0, 1, 1)
-        self.lineEdit_character_name_building = QtWidgets.QLineEdit(parent=self.frame_character_building_name_description)
-        self.lineEdit_character_name_building.setMinimumSize(QtCore.QSize(291, 31))
-        self.lineEdit_character_name_building.setMaximumSize(QtCore.QSize(291, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_character_name_building.setFont(font)
-        self.lineEdit_character_name_building.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.lineEdit_character_name_building.setInputMask("")
-        self.lineEdit_character_name_building.setText("")
-        self.lineEdit_character_name_building.setObjectName("lineEdit_character_name_building")
-        self.gridLayout_12.addWidget(self.lineEdit_character_name_building, 0, 1, 1, 1)
-        spacerItem17 = QtWidgets.QSpacerItem(502, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_12.addItem(spacerItem17, 0, 2, 1, 1)
-        spacerItem18 = QtWidgets.QSpacerItem(956, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_12.addItem(spacerItem18, 1, 0, 1, 3)
-        self.character_description_building_label = QtWidgets.QLabel(parent=self.frame_character_building_name_description)
-        self.character_description_building_label.setMinimumSize(QtCore.QSize(181, 40))
-        self.character_description_building_label.setMaximumSize(QtCore.QSize(181, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.character_description_building_label.setFont(font)
-        self.character_description_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.character_description_building_label.setObjectName("character_description_building_label")
-        self.gridLayout_12.addWidget(self.character_description_building_label, 2, 0, 1, 2)
-        self.textEdit_character_description_building = QtWidgets.QTextEdit(parent=self.frame_character_building_name_description)
-        self.textEdit_character_description_building.setMinimumSize(QtCore.QSize(700, 300))
-        self.textEdit_character_description_building.setMaximumSize(QtCore.QSize(16777215, 300))
-        self.textEdit_character_description_building.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_character_description_building.setFont(font)
-        self.textEdit_character_description_building.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-"\n"
-"QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-"")
-        self.textEdit_character_description_building.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.textEdit_character_description_building.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_character_description_building.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_character_description_building.setObjectName("textEdit_character_description_building")
-        self.gridLayout_12.addWidget(self.textEdit_character_description_building, 3, 0, 1, 3)
-        self.verticalLayout_7.addWidget(self.frame_character_building_name_description)
-        self.frame_character_building_personality = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_personality.setMinimumSize(QtCore.QSize(0, 300))
-        self.frame_character_building_personality.setMaximumSize(QtCore.QSize(16777215, 300))
-        self.frame_character_building_personality.setStyleSheet("border: none;")
-        self.frame_character_building_personality.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_personality.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_personality.setObjectName("frame_character_building_personality")
-        self.gridLayout_13 = QtWidgets.QGridLayout(self.frame_character_building_personality)
-        self.gridLayout_13.setContentsMargins(-1, 0, -1, 0)
-        self.gridLayout_13.setObjectName("gridLayout_13")
-        self.character_personality_building_label = QtWidgets.QLabel(parent=self.frame_character_building_personality)
-        self.character_personality_building_label.setMinimumSize(QtCore.QSize(181, 40))
-        self.character_personality_building_label.setMaximumSize(QtCore.QSize(16777215, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.character_personality_building_label.setFont(font)
-        self.character_personality_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.character_personality_building_label.setObjectName("character_personality_building_label")
-        self.gridLayout_13.addWidget(self.character_personality_building_label, 0, 0, 1, 1)
-        spacerItem19 = QtWidgets.QSpacerItem(767, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_13.addItem(spacerItem19, 0, 1, 1, 1)
-        self.textEdit_character_personality_building = QtWidgets.QTextEdit(parent=self.frame_character_building_personality)
-        self.textEdit_character_personality_building.setMinimumSize(QtCore.QSize(951, 250))
-        self.textEdit_character_personality_building.setMaximumSize(QtCore.QSize(16777215, 250))
-        self.textEdit_character_personality_building.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_character_personality_building.setFont(font)
-        self.textEdit_character_personality_building.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-)
-        self.textEdit_character_personality_building.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_character_personality_building.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_character_personality_building.setObjectName("textEdit_character_personality_building")
-        self.gridLayout_13.addWidget(self.textEdit_character_personality_building, 1, 0, 1, 2)
-        self.verticalLayout_7.addWidget(self.frame_character_building_personality)
-        self.frame_character_building_scenario = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_scenario.setMinimumSize(QtCore.QSize(0, 150))
-        self.frame_character_building_scenario.setMaximumSize(QtCore.QSize(16777215, 150))
-        self.frame_character_building_scenario.setStyleSheet("border: none;")
-        self.frame_character_building_scenario.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_scenario.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_scenario.setObjectName("frame_character_building_scenario")
-        self.gridLayout_26 = QtWidgets.QGridLayout(self.frame_character_building_scenario)
-        self.gridLayout_26.setContentsMargins(-1, 0, -1, 0)
-        self.gridLayout_26.setObjectName("gridLayout_26")
-        self.character_scenario_building_label = QtWidgets.QLabel(parent=self.frame_character_building_scenario)
-        self.character_scenario_building_label.setMinimumSize(QtCore.QSize(181, 40))
-        self.character_scenario_building_label.setMaximumSize(QtCore.QSize(16777215, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.character_scenario_building_label.setFont(font)
-        self.character_scenario_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.character_scenario_building_label.setObjectName("character_scenario_building_label")
-        self.gridLayout_26.addWidget(self.character_scenario_building_label, 0, 0, 1, 1)
-        spacerItem20 = QtWidgets.QSpacerItem(767, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_26.addItem(spacerItem20, 0, 1, 1, 1)
-        self.textEdit_scenario = QtWidgets.QTextEdit(parent=self.frame_character_building_scenario)
-        self.textEdit_scenario.setMinimumSize(QtCore.QSize(951, 100))
-        self.textEdit_scenario.setMaximumSize(QtCore.QSize(16777215, 100))
-        self.textEdit_scenario.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_scenario.setFont(font)
-        self.textEdit_scenario.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-)
-        self.textEdit_scenario.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_scenario.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_scenario.setObjectName("textEdit_scenario")
-        self.gridLayout_26.addWidget(self.textEdit_scenario, 1, 0, 1, 2)
-        self.verticalLayout_7.addWidget(self.frame_character_building_scenario)
-        self.frame_character_building_first_message = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_first_message.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_first_message.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_first_message.setStyleSheet("border: none;")
-        self.frame_character_building_first_message.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_first_message.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_first_message.setObjectName("frame_character_building_first_message")
-        self.gridLayout_14 = QtWidgets.QGridLayout(self.frame_character_building_first_message)
-        self.gridLayout_14.setObjectName("gridLayout_14")
-        self.first_message_building_label = QtWidgets.QLabel(parent=self.frame_character_building_first_message)
-        self.first_message_building_label.setMinimumSize(QtCore.QSize(170, 40))
-        self.first_message_building_label.setMaximumSize(QtCore.QSize(170, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.first_message_building_label.setFont(font)
-        self.first_message_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.first_message_building_label.setObjectName("first_message_building_label")
-        self.gridLayout_14.addWidget(self.first_message_building_label, 0, 0, 1, 1)
-        spacerItem21 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_14.addItem(spacerItem21, 0, 1, 1, 1)
-        self.textEdit_first_message_building = QtWidgets.QTextEdit(parent=self.frame_character_building_first_message)
-        self.textEdit_first_message_building.setMinimumSize(QtCore.QSize(951, 300))
-        self.textEdit_first_message_building.setMaximumSize(QtCore.QSize(16777215, 300))
-        self.textEdit_first_message_building.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_first_message_building.setFont(font)
-        self.textEdit_first_message_building.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-)
-        self.textEdit_first_message_building.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_first_message_building.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_first_message_building.setObjectName("textEdit_first_message_building")
-        self.gridLayout_14.addWidget(self.textEdit_first_message_building, 1, 0, 1, 2)
-        self.verticalLayout_7.addWidget(self.frame_character_building_first_message)
-        self.frame_character_building_example_messages = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_example_messages.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_example_messages.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_example_messages.setStyleSheet("border: none;")
-        self.frame_character_building_example_messages.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_example_messages.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_example_messages.setObjectName("frame_character_building_example_messages")
-        self.gridLayout_16 = QtWidgets.QGridLayout(self.frame_character_building_example_messages)
-        self.gridLayout_16.setObjectName("gridLayout_16")
-        self.example_messages_building_label = QtWidgets.QLabel(parent=self.frame_character_building_example_messages)
-        self.example_messages_building_label.setMinimumSize(QtCore.QSize(200, 40))
-        self.example_messages_building_label.setMaximumSize(QtCore.QSize(200, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.example_messages_building_label.setFont(font)
-        self.example_messages_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.example_messages_building_label.setObjectName("example_messages_building_label")
-        self.gridLayout_16.addWidget(self.example_messages_building_label, 0, 0, 1, 1)
-        spacerItem22 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_16.addItem(spacerItem22, 0, 1, 1, 1)
-        self.textEdit_example_messages = QtWidgets.QTextEdit(parent=self.frame_character_building_example_messages)
-        self.textEdit_example_messages.setMinimumSize(QtCore.QSize(951, 300))
-        self.textEdit_example_messages.setMaximumSize(QtCore.QSize(16777215, 300))
-        self.textEdit_example_messages.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_example_messages.setFont(font)
-        self.textEdit_example_messages.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-)
-        self.textEdit_example_messages.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_example_messages.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_example_messages.setObjectName("textEdit_example_messages")
-        self.gridLayout_16.addWidget(self.textEdit_example_messages, 1, 0, 1, 2)
-        self.verticalLayout_7.addWidget(self.frame_character_building_example_messages)
-        self.frame_character_building_alternate_greetings = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_alternate_greetings.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_alternate_greetings.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_alternate_greetings.setStyleSheet("border: none;")
-        self.frame_character_building_alternate_greetings.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_alternate_greetings.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_alternate_greetings.setObjectName("frame_character_building_alternate_greetings")
-        self.gridLayout_27 = QtWidgets.QGridLayout(self.frame_character_building_alternate_greetings)
-        self.gridLayout_27.setObjectName("gridLayout_27")
-        self.alternate_greetings_building_label = QtWidgets.QLabel(parent=self.frame_character_building_alternate_greetings)
-        self.alternate_greetings_building_label.setMinimumSize(QtCore.QSize(220, 40))
-        self.alternate_greetings_building_label.setMaximumSize(QtCore.QSize(220, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.alternate_greetings_building_label.setFont(font)
-        self.alternate_greetings_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.alternate_greetings_building_label.setObjectName("alternate_greetings_building_label")
-        self.gridLayout_27.addWidget(self.alternate_greetings_building_label, 0, 0, 1, 1)
-        spacerItem23 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_27.addItem(spacerItem23, 0, 1, 1, 1)
-        self.textEdit_alternate_greetings = QtWidgets.QTextEdit(parent=self.frame_character_building_alternate_greetings)
-        self.textEdit_alternate_greetings.setMinimumSize(QtCore.QSize(951, 300))
-        self.textEdit_alternate_greetings.setMaximumSize(QtCore.QSize(16777215, 300))
-        self.textEdit_alternate_greetings.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_alternate_greetings.setFont(font)
-        self.textEdit_alternate_greetings.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-)
-        self.textEdit_alternate_greetings.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_alternate_greetings.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_alternate_greetings.setObjectName("textEdit_alternate_greetings")
-        self.gridLayout_27.addWidget(self.textEdit_alternate_greetings, 1, 0, 1, 2)
-        self.verticalLayout_7.addWidget(self.frame_character_building_alternate_greetings)
-        self.frame_character_building_creator_notes = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_creator_notes.setMinimumSize(QtCore.QSize(0, 200))
-        self.frame_character_building_creator_notes.setMaximumSize(QtCore.QSize(16777215, 200))
-        self.frame_character_building_creator_notes.setStyleSheet("border: none;")
-        self.frame_character_building_creator_notes.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_creator_notes.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_creator_notes.setObjectName("frame_character_building_creator_notes")
-        self.gridLayout_28 = QtWidgets.QGridLayout(self.frame_character_building_creator_notes)
-        self.gridLayout_28.setObjectName("gridLayout_28")
-        self.creator_notes_building_label = QtWidgets.QLabel(parent=self.frame_character_building_creator_notes)
-        self.creator_notes_building_label.setMinimumSize(QtCore.QSize(200, 40))
-        self.creator_notes_building_label.setMaximumSize(QtCore.QSize(200, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.creator_notes_building_label.setFont(font)
-        self.creator_notes_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.creator_notes_building_label.setObjectName("creator_notes_building_label")
-        self.gridLayout_28.addWidget(self.creator_notes_building_label, 0, 0, 1, 1)
-        spacerItem24 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_28.addItem(spacerItem24, 0, 1, 1, 1)
-        self.textEdit_creator_notes = QtWidgets.QTextEdit(parent=self.frame_character_building_creator_notes)
-        self.textEdit_creator_notes.setMinimumSize(QtCore.QSize(951, 150))
-        self.textEdit_creator_notes.setMaximumSize(QtCore.QSize(16777215, 150))
-        self.textEdit_creator_notes.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_creator_notes.setFont(font)
-        self.textEdit_creator_notes.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-"\n"
-)
-        self.textEdit_creator_notes.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_creator_notes.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_creator_notes.setObjectName("textEdit_creator_notes")
-        self.gridLayout_28.addWidget(self.textEdit_creator_notes, 1, 0, 1, 2)
-        self.verticalLayout_7.addWidget(self.frame_character_building_creator_notes)
-        self.frame_character_building_character_version = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_character_version.setMinimumSize(QtCore.QSize(0, 112))
-        self.frame_character_building_character_version.setMaximumSize(QtCore.QSize(16777215, 112))
-        self.frame_character_building_character_version.setStyleSheet("border: none;")
-        self.frame_character_building_character_version.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_character_version.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_character_version.setObjectName("frame_character_building_character_version")
-        self.gridLayout_30 = QtWidgets.QGridLayout(self.frame_character_building_character_version)
-        self.gridLayout_30.setObjectName("gridLayout_30")
-        self.character_version_building_label = QtWidgets.QLabel(parent=self.frame_character_building_character_version)
-        self.character_version_building_label.setMinimumSize(QtCore.QSize(220, 40))
-        self.character_version_building_label.setMaximumSize(QtCore.QSize(220, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.character_version_building_label.setFont(font)
-        self.character_version_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.character_version_building_label.setObjectName("character_version_building_label")
-        self.gridLayout_30.addWidget(self.character_version_building_label, 0, 0, 1, 1)
-        spacerItem25 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_30.addItem(spacerItem25, 0, 1, 1, 1)
-        self.textEdit_character_version = QtWidgets.QTextEdit(parent=self.frame_character_building_character_version)
-        self.textEdit_character_version.setMinimumSize(QtCore.QSize(250, 70))
-        self.textEdit_character_version.setMaximumSize(QtCore.QSize(250, 70))
-        self.textEdit_character_version.setAcceptRichText(False)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.textEdit_character_version.setFont(font)
-        self.textEdit_character_version.setStyleSheet("QTextEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QTextEdit:vertical {\n"
-"    width: 10px;\n"
-"    margin: 15px 0 15px 0;\n"
-"}\n"
-"\n"
-"QTextEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}\n"
-)
-        self.textEdit_character_version.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_character_version.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.textEdit_character_version.setObjectName("textEdit_character_version")
-        self.gridLayout_30.addWidget(self.textEdit_character_version, 1, 0, 1, 2)
-        self.verticalLayout_7.addWidget(self.frame_character_building_character_version)
-        self.frame_character_building_user_persona = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_user_persona.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_user_persona.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_user_persona.setStyleSheet("border: none;")
-        self.frame_character_building_user_persona.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_user_persona.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_user_persona.setObjectName("frame_character_building_user_persona")
-        self.gridLayout_31 = QtWidgets.QGridLayout(self.frame_character_building_user_persona)
-        self.gridLayout_31.setObjectName("gridLayout_31")
-        spacerItem26 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_31.addItem(spacerItem26, 0, 1, 1, 1)
-        self.user_persona_building_label = QtWidgets.QLabel(parent=self.frame_character_building_user_persona)
-        self.user_persona_building_label.setMinimumSize(QtCore.QSize(220, 40))
-        self.user_persona_building_label.setMaximumSize(QtCore.QSize(220, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.user_persona_building_label.setFont(font)
-        self.user_persona_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.user_persona_building_label.setObjectName("user_persona_building_label")
-        self.gridLayout_31.addWidget(self.user_persona_building_label, 0, 0, 1, 1)
-        self.comboBox_user_persona_building = QtWidgets.QComboBox(parent=self.frame_character_building_user_persona)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
+        
+        avatar_vbox = QtWidgets.QVBoxLayout()
+        avatar_vbox.addWidget(self.pushButton_import_character_image)
+        avatar_vbox.addStretch()
+        row_avatar_name.addLayout(avatar_vbox)
+
+        vbox_name = QtWidgets.QVBoxLayout()
+        self.character_name_building_label = QtWidgets.QLabel("Character Name")
+        self.character_name_building_label.setFont(font_label)
+        self.character_name_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none;")
+        
+        self.lineEdit_character_name_building = QtWidgets.QLineEdit()
+        self.lineEdit_character_name_building.setFont(font_input)
+        self.lineEdit_character_name_building.setFixedHeight(45)
+        self.lineEdit_character_name_building.setStyleSheet(input_style)
+        
+        vbox_name.addWidget(self.character_name_building_label)
+        vbox_name.addWidget(self.lineEdit_character_name_building)
+        vbox_name.addStretch()
+        row_avatar_name.addLayout(vbox_name)
+        
+        layout_gen.addLayout(row_avatar_name)
+        
+        self.character_description_building_label = QtWidgets.QLabel("Description")
+        self.character_description_building_label.setFont(font_label)
+        self.character_description_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none; margin-top: 10px;")
+        
+        self.textEdit_character_description_building = AutoResizingTextEdit()
+        self.textEdit_character_description_building.setFont(font_input)
+        self.textEdit_character_description_building.setStyleSheet(input_style)
+        
+        layout_gen.addWidget(self.character_description_building_label)
+        layout_gen.addWidget(self.textEdit_character_description_building)
+        self.cards_layout.addWidget(self.card_general)
+
+        self.personality_title = self.translations.get("character_creator_title_personality", "Personality & Scenario")
+        self.card_pers, layout_pers = create_glass_card_building(self.personality_title)
+        
+        self.character_personality_building_label = QtWidgets.QLabel("Personality")
+        self.character_personality_building_label.setFont(font_label)
+        self.character_personality_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none;")
+        self.textEdit_character_personality_building = AutoResizingTextEdit()
+        self.textEdit_character_personality_building.setFont(font_input)
+        self.textEdit_character_personality_building.setStyleSheet(input_style)
+        
+        self.character_scenario_building_label = QtWidgets.QLabel("Scenario")
+        self.character_scenario_building_label.setFont(font_label)
+        self.character_scenario_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none; margin-top: 10px;")
+        self.textEdit_scenario = AutoResizingTextEdit()
+        self.textEdit_scenario.setFont(font_input)
+        self.textEdit_scenario.setStyleSheet(input_style)
+        
+        layout_pers.addWidget(self.character_personality_building_label)
+        layout_pers.addWidget(self.textEdit_character_personality_building)
+        layout_pers.addWidget(self.character_scenario_building_label)
+        layout_pers.addWidget(self.textEdit_scenario)
+        self.cards_layout.addWidget(self.card_pers)
+
+        self.dialogues_title = self.translations.get("character_creator_title_dialogues", "Dialogues & Greetings")
+        self.card_dial, layout_dial = create_glass_card_building(self.dialogues_title)
+        
+        self.first_message_building_label = QtWidgets.QLabel("First Message")
+        self.first_message_building_label.setFont(font_label)
+        self.first_message_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none;")
+        self.textEdit_first_message_building = AutoResizingTextEdit()
+        self.textEdit_first_message_building.setFont(font_input)
+        self.textEdit_first_message_building.setStyleSheet(input_style)
+        
+        self.alternate_greetings_building_label = QtWidgets.QLabel("Alternate Greetings")
+        self.alternate_greetings_building_label.setFont(font_label)
+        self.alternate_greetings_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none; margin-top: 10px;")
+        self.textEdit_alternate_greetings = AutoResizingTextEdit()
+        self.textEdit_alternate_greetings.setFont(font_input)
+        self.textEdit_alternate_greetings.setStyleSheet(input_style)
+        
+        self.example_messages_building_label = QtWidgets.QLabel("Example Messages")
+        self.example_messages_building_label.setFont(font_label)
+        self.example_messages_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none; margin-top: 10px;")
+        self.textEdit_example_messages = AutoResizingTextEdit()
+        self.textEdit_example_messages.setFont(font_input)
+        self.textEdit_example_messages.setStyleSheet(input_style)
+        
+        layout_dial.addWidget(self.first_message_building_label)
+        layout_dial.addWidget(self.textEdit_first_message_building)
+        layout_dial.addWidget(self.alternate_greetings_building_label)
+        layout_dial.addWidget(self.textEdit_alternate_greetings)
+        layout_dial.addWidget(self.example_messages_building_label)
+        layout_dial.addWidget(self.textEdit_example_messages)
+        self.cards_layout.addWidget(self.card_dial)
+
+        self.advanced_settings_title = self.translations.get("character_creator_title_advanced", "Advanced Settings & Lore")
+        self.card_adv, layout_adv = create_glass_card_building(self.advanced_settings_title)
+        
+        row_combos = QtWidgets.QHBoxLayout()
+        row_combos.setSpacing(20)
+        
+        combo_style = """
+            QComboBox {
+                background-color: rgba(15, 15, 18, 0.4);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                padding: 8px 12px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.05),
+                                            stop:1 rgba(0, 0, 0, 0.05));
+            }
+            QComboBox:hover {
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.08),
+                                            stop:1 rgba(0, 0, 0, 0.08));
+            }
+            QComboBox:focus {
+                border: 1px solid rgba(255, 255, 255, 0.6);
+                outline: none;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: url(:/sowInterface/arrowDown.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba(30, 30, 35, 0.8);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+                selection-background-color: rgba(255, 255, 255, 0.15);
+                selection-color: #ffffff;
+                padding: 5px;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 8px 12px;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.1),
+                                            stop:1 rgba(255, 255, 255, 0.05));
+                color: #ffffff;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.15),
+                                            stop:1 rgba(255, 255, 255, 0.05));
+                color: #ffffff;
+            }
+            QScrollBar:vertical {
+                background-color: rgba(30, 30, 35, 0.8);
+                width: 12px;
+                margin: 0px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background-color: rgba(255, 255, 255, 0.2);
+                min-height: 30px;
+                border-radius: 6px;
+                margin: 2px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(255, 255, 255, 0.3);
+            }
+            QScrollBar::handle:vertical:pressed {
+                background-color: rgba(255, 255, 255, 0.25);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """
+
+        vbox_persona = QtWidgets.QVBoxLayout()
+        self.user_persona_building_label = QtWidgets.QLabel("User Persona")
+        self.user_persona_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none;")
+        self.comboBox_user_persona_building = QtWidgets.QComboBox()
+        self.comboBox_user_persona_building.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
         self.comboBox_user_persona_building.setFont(font)
-        self.comboBox_user_persona_building.setStyleSheet("QComboBox {\n"
-"                background-color: #2b2b2b;\n"
-"                color: #e0e0e0;\n"
-"                border: 2px solid #333;\n"
-"                border-radius: 5px;\n"
-"                padding: 5px;\n"
-"                padding-left: 10px;\n"
-"                selection-color: #ffffff;\n"
-"                selection-background-color: #454545;\n"
-"            }\n"
-"\n"
-"            QComboBox:hover {\n"
-"                border: 2px solid #444;\n"
-"            }\n"
-"\n"
-"            QComboBox::drop-down {\n"
-"                subcontrol-origin: padding;\n"
-"                subcontrol-position: top right;\n"
-"                width: 18px;\n"
-"                border-left: 1px solid #333;\n"
-"                background-color: #2b2b2b;\n"
-"                border-top-right-radius: 5px;\n"
-"                border-bottom-right-radius: 5px;\n"
-"            }\n"
-"\n"
-"            QComboBox::down-arrow {\n"
-"                width: 12px;\n"
-"                height: 12px;\n"
-"                image: url(:/sowInterface/arrowDown.png);\n"
-"            }\n"
-"\n"
-"            QComboBox::down-arrow:hover {\n"
-"                width: 12px;\n"
-"                height: 12px;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView {\n"
-"                background-color: #2b2b2b;\n"
-"                color: #e0e0e0;\n"
-"                border: 1px solid rgb(70, 70, 70);\n"
-"                border-radius: 6px;\n"
-"                padding: 5px;\n"
-"                outline: 0px;\n"
-"                selection-color: #ffffff;\n"
-"                selection-background-color: #8f8f8f;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item {\n"
-"                border: none;\n"
-"                height: 20px;\n"
-"                padding: 4px 8px;\n"
-"                border-radius: 4px;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item:hover {\n"
-"                background-color: #5a5a5a;\n"
-"                color: white;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item:selected {\n"
-"                background-color: #454545;\n"
-"                color: white;\n"
-"                border-radius: 4px;\n"
-"            }\n"
-"\n"
-"            QScrollBar:vertical {\n"
-"                background-color: #2b2b2b;\n"
-"                width: 12px;\n"
-"                margin: 0px;\n"
-"                border: none;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical {\n"
-"                background-color: #383838;\n"
-"                min-height: 30px;\n"
-"                border-radius: 3px;\n"
-"                margin: 2px;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical:hover {\n"
-"                background-color: #454545;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical:pressed {\n"
-"                background-color: #424242;\n"
-"            }\n"
-"\n"
-"            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {\n"
-"                border: none;\n"
-"                background: none;\n"
-"            }\n"
-"\n"
-"            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {\n"
-"                background: none;\n"
-"            }")
-        self.comboBox_user_persona_building.setObjectName("comboBox_user_persona_building")
-        self.comboBox_user_persona_building.addItem("None")
-        self.gridLayout_31.addWidget(self.comboBox_user_persona_building, 1, 0, 1, 1)
-        self.verticalLayout_7.addWidget(self.frame_character_building_user_persona)
-        self.frame_character_building_system_prompt = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_system_prompt.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_system_prompt.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_system_prompt.setStyleSheet("border: none;")
-        self.frame_character_building_system_prompt.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_system_prompt.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_system_prompt.setObjectName("frame_character_building_system_prompt")
-        self.gridLayout_32 = QtWidgets.QGridLayout(self.frame_character_building_system_prompt)
-        self.gridLayout_32.setObjectName("gridLayout_32")
-        spacerItem27 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_32.addItem(spacerItem27, 0, 1, 1, 1)
-        self.system_prompt_building_label = QtWidgets.QLabel(parent=self.frame_character_building_system_prompt)
-        self.system_prompt_building_label.setMinimumSize(QtCore.QSize(220, 40))
-        self.system_prompt_building_label.setMaximumSize(QtCore.QSize(220, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.system_prompt_building_label.setFont(font)
-        self.system_prompt_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.system_prompt_building_label.setObjectName("system_prompt_building_label")
-        self.gridLayout_32.addWidget(self.system_prompt_building_label, 0, 0, 1, 1)
-        self.comboBox_system_prompt_building = QtWidgets.QComboBox(parent=self.frame_character_building_system_prompt)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
+        self.comboBox_user_persona_building.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.comboBox_user_persona_building.setFixedHeight(40)
+        self.comboBox_user_persona_building.setStyleSheet(combo_style)
+        vbox_persona.addWidget(self.user_persona_building_label)
+        vbox_persona.addWidget(self.comboBox_user_persona_building)
+        
+        vbox_prompt = QtWidgets.QVBoxLayout()
+        self.system_prompt_building_label = QtWidgets.QLabel("System Prompt")
+        self.system_prompt_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none;")
+        self.comboBox_system_prompt_building = QtWidgets.QComboBox()
+        self.comboBox_system_prompt_building.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
         self.comboBox_system_prompt_building.setFont(font)
-        self.comboBox_system_prompt_building.setStyleSheet("QComboBox {\n"
-"                background-color: #2b2b2b;\n"
-"                color: #e0e0e0;\n"
-"                border: 2px solid #333;\n"
-"                border-radius: 5px;\n"
-"                padding: 5px;\n"
-"                padding-left: 10px;\n"
-"                selection-color: #ffffff;\n"
-"                selection-background-color: #454545;\n"
-"            }\n"
-"\n"
-"            QComboBox:hover {\n"
-"                border: 2px solid #444;\n"
-"            }\n"
-"\n"
-"            QComboBox::drop-down {\n"
-"                subcontrol-origin: padding;\n"
-"                subcontrol-position: top right;\n"
-"                width: 18px;\n"
-"                border-left: 1px solid #333;\n"
-"                background-color: #2b2b2b;\n"
-"                border-top-right-radius: 5px;\n"
-"                border-bottom-right-radius: 5px;\n"
-"            }\n"
-"\n"
-"            QComboBox::down-arrow {\n"
-"                width: 12px;\n"
-"                height: 12px;\n"
-"                image: url(:/sowInterface/arrowDown.png);\n"
-"            }\n"
-"\n"
-"            QComboBox::down-arrow:hover {\n"
-"                width: 12px;\n"
-"                height: 12px;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView {\n"
-"                background-color: #2b2b2b;\n"
-"                color: #e0e0e0;\n"
-"                border: 1px solid rgb(70, 70, 70);\n"
-"                border-radius: 6px;\n"
-"                padding: 5px;\n"
-"                outline: 0px;\n"
-"                selection-color: #ffffff;\n"
-"                selection-background-color: #8f8f8f;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item {\n"
-"                border: none;\n"
-"                height: 20px;\n"
-"                padding: 4px 8px;\n"
-"                border-radius: 4px;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item:hover {\n"
-"                background-color: #5a5a5a;\n"
-"                color: white;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item:selected {\n"
-"                background-color: #454545;\n"
-"                color: white;\n"
-"                border-radius: 4px;\n"
-"            }\n"
-"\n"
-"            QScrollBar:vertical {\n"
-"                background-color: #2b2b2b;\n"
-"                width: 12px;\n"
-"                margin: 0px;\n"
-"                border: none;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical {\n"
-"                background-color: #383838;\n"
-"                min-height: 30px;\n"
-"                border-radius: 3px;\n"
-"                margin: 2px;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical:hover {\n"
-"                background-color: #454545;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical:pressed {\n"
-"                background-color: #424242;\n"
-"            }\n"
-"\n"
-"            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {\n"
-"                border: none;\n"
-"                background: none;\n"
-"            }\n"
-"\n"
-"            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {\n"
-"                background: none;\n"
-"            }")
-        self.comboBox_system_prompt_building.setObjectName("comboBox_system_prompt_building")
-        self.comboBox_system_prompt_building.addItem("By default")
-        self.gridLayout_32.addWidget(self.comboBox_system_prompt_building, 1, 0, 1, 1)
-        self.verticalLayout_7.addWidget(self.frame_character_building_system_prompt)
-        self.frame_character_building_lorebook = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_character_building_lorebook.setMinimumSize(QtCore.QSize(0, 0))
-        self.frame_character_building_lorebook.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_character_building_lorebook.setStyleSheet("border: none;")
-        self.frame_character_building_lorebook.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_character_building_lorebook.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_character_building_lorebook.setObjectName("frame_character_building_lorebook")
-        self.gridLayout_33 = QtWidgets.QGridLayout(self.frame_character_building_lorebook)
-        self.gridLayout_33.setObjectName("gridLayout_33")
-        spacerItem28 = QtWidgets.QSpacerItem(817, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_33.addItem(spacerItem28, 0, 1, 1, 1)
-        self.lorebook_building_label = QtWidgets.QLabel(parent=self.frame_character_building_lorebook)
-        self.lorebook_building_label.setMinimumSize(QtCore.QSize(220, 40))
-        self.lorebook_building_label.setMaximumSize(QtCore.QSize(220, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lorebook_building_label.setFont(font)
-        self.lorebook_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.lorebook_building_label.setObjectName("lorebook_building_label")
-        self.gridLayout_33.addWidget(self.lorebook_building_label, 0, 0, 1, 1)
-        self.comboBox_lorebook_building = QtWidgets.QComboBox(parent=self.frame_character_building_lorebook)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
+        self.comboBox_system_prompt_building.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.comboBox_system_prompt_building.setFixedHeight(40)
+        self.comboBox_system_prompt_building.setStyleSheet(combo_style)
+        vbox_prompt.addWidget(self.system_prompt_building_label)
+        vbox_prompt.addWidget(self.comboBox_system_prompt_building)
+
+        vbox_lore = QtWidgets.QVBoxLayout()
+        self.lorebook_building_label = QtWidgets.QLabel("Lorebook")
+        self.lorebook_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none;")
+        self.comboBox_lorebook_building = QtWidgets.QComboBox()
+        self.comboBox_lorebook_building.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
         self.comboBox_lorebook_building.setFont(font)
-        self.comboBox_lorebook_building.setStyleSheet("QComboBox {\n"
-"                background-color: #2b2b2b;\n"
-"                color: #e0e0e0;\n"
-"                border: 2px solid #333;\n"
-"                border-radius: 5px;\n"
-"                padding: 5px;\n"
-"                padding-left: 10px;\n"
-"                selection-color: #ffffff;\n"
-"                selection-background-color: #454545;\n"
-"            }\n"
-"\n"
-"            QComboBox:hover {\n"
-"                border: 2px solid #444;\n"
-"            }\n"
-"\n"
-"            QComboBox::drop-down {\n"
-"                subcontrol-origin: padding;\n"
-"                subcontrol-position: top right;\n"
-"                width: 18px;\n"
-"                border-left: 1px solid #333;\n"
-"                background-color: #2b2b2b;\n"
-"                border-top-right-radius: 5px;\n"
-"                border-bottom-right-radius: 5px;\n"
-"            }\n"
-"\n"
-"            QComboBox::down-arrow {\n"
-"                width: 12px;\n"
-"                height: 12px;\n"
-"                image: url(:/sowInterface/arrowDown.png);\n"
-"            }\n"
-"\n"
-"            QComboBox::down-arrow:hover {\n"
-"                width: 12px;\n"
-"                height: 12px;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView {\n"
-"                background-color: #2b2b2b;\n"
-"                color: #e0e0e0;\n"
-"                border: 1px solid rgb(70, 70, 70);\n"
-"                border-radius: 6px;\n"
-"                padding: 5px;\n"
-"                outline: 0px;\n"
-"                selection-color: #ffffff;\n"
-"                selection-background-color: #8f8f8f;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item {\n"
-"                border: none;\n"
-"                height: 20px;\n"
-"                padding: 4px 8px;\n"
-"                border-radius: 4px;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item:hover {\n"
-"                background-color: #5a5a5a;\n"
-"                color: white;\n"
-"            }\n"
-"\n"
-"            QComboBox QAbstractItemView::item:selected {\n"
-"                background-color: #454545;\n"
-"                color: white;\n"
-"                border-radius: 4px;\n"
-"            }\n"
-"\n"
-"            QScrollBar:vertical {\n"
-"                background-color: #2b2b2b;\n"
-"                width: 12px;\n"
-"                margin: 0px;\n"
-"                border: none;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical {\n"
-"                background-color: #383838;\n"
-"                min-height: 30px;\n"
-"                border-radius: 3px;\n"
-"                margin: 2px;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical:hover {\n"
-"                background-color: #454545;\n"
-"            }\n"
-"\n"
-"            QScrollBar::handle:vertical:pressed {\n"
-"                background-color: #424242;\n"
-"            }\n"
-"\n"
-"            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {\n"
-"                border: none;\n"
-"                background: none;\n"
-"            }\n"
-"\n"
-"            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {\n"
-"                background: none;\n"
-"            }")
-        self.comboBox_lorebook_building.setObjectName("comboBox_lorebook_building")
-        self.comboBox_lorebook_building.addItem("None")
-        self.gridLayout_33.addWidget(self.comboBox_lorebook_building, 1, 0, 1, 1)
-        self.verticalLayout_7.addWidget(self.frame_character_building_lorebook)
-        self.frame_bottom_character_creation = QtWidgets.QFrame(parent=self.frame_character_building)
-        self.frame_bottom_character_creation.setMaximumSize(QtCore.QSize(16777215, 16777215))
-        self.frame_bottom_character_creation.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_bottom_character_creation.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_bottom_character_creation.setObjectName("frame_bottom_character_creation")
-        self.gridLayout_15 = QtWidgets.QGridLayout(self.frame_bottom_character_creation)
-        self.gridLayout_15.setObjectName("gridLayout_15")
-        spacerItem26 = QtWidgets.QSpacerItem(550, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.gridLayout_15.addItem(spacerItem26, 0, 1, 1, 1)
-        self.pushButton_create_character_3 = QtWidgets.QPushButton(parent=self.frame_bottom_character_creation)
-        self.pushButton_create_character_3.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_create_character_3.setMinimumSize(QtCore.QSize(191, 41))
-        self.pushButton_create_character_3.setMaximumSize(QtCore.QSize(16777215, 41))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(11)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_create_character_3.setFont(font)
-        self.pushButton_create_character_3.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_create_character_3.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
-        self.pushButton_create_character_3.setAutoFillBackground(False)
-        self.pushButton_create_character_3.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
-        self.pushButton_create_character_3.setIconSize(QtCore.QSize(19, 19))
-        self.pushButton_create_character_3.setObjectName("pushButton_create_character_3")
-        self.gridLayout_15.addWidget(self.pushButton_create_character_3, 0, 2, 1, 1)
-        self.total_tokens_building_label = QtWidgets.QLabel(parent=self.frame_bottom_character_creation)
-        self.total_tokens_building_label.setMinimumSize(QtCore.QSize(201, 51))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(12)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.total_tokens_building_label.setFont(font)
-        self.total_tokens_building_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.total_tokens_building_label.setObjectName("total_tokens_building_label")
-        self.gridLayout_15.addWidget(self.total_tokens_building_label, 0, 0, 1, 1)
-        self.verticalLayout_7.addWidget(self.frame_bottom_character_creation)
-        self.frame_bottom_character_creation.raise_()
-        self.frame_character_building_first_message.raise_()
-        self.frame_character_building_name_description.raise_()
-        self.frame_character_building_imahe.raise_()
-        self.frame_character_building_title.raise_()
-        self.frame_character_building_personality.raise_()
-        self.frame_character_building_scenario.raise_()
-        self.frame_character_building_example_messages.raise_()
-        self.frame_character_building_alternate_greetings.raise_()
-        self.frame_character_building_creator_notes.raise_()
-        self.frame_character_building_character_version.raise_()
-        self.verticalLayout_5.addWidget(self.frame_character_building)
-        self.scrollArea_character_building.setWidget(self.scrollAreaWidgetContents_character_building)
-        self.gridLayout_17.addWidget(self.scrollArea_character_building, 0, 0, 1, 1)
-        self.stackedWidget.addWidget(self.create_character_page_2)
+        self.comboBox_lorebook_building.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.comboBox_lorebook_building.setFixedHeight(40)
+        self.comboBox_lorebook_building.setStyleSheet(combo_style)
+        vbox_lore.addWidget(self.lorebook_building_label)
+        vbox_lore.addWidget(self.comboBox_lorebook_building)
         
+        row_combos.addLayout(vbox_persona)
+        row_combos.addLayout(vbox_prompt)
+        row_combos.addLayout(vbox_lore)
+        
+        self.creator_notes_building_label = QtWidgets.QLabel("Creator Notes (Metadata)")
+        self.creator_notes_building_label.setFont(font_label)
+        self.creator_notes_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none; margin-top: 15px;")
+        self.textEdit_creator_notes = AutoResizingTextEdit()
+        self.textEdit_creator_notes.setFont(font_input)
+        self.textEdit_creator_notes.setStyleSheet(input_style)
+        
+        self.character_version_building_label = QtWidgets.QLabel("Card Version")
+        self.character_version_building_label.setFont(font_label)
+        self.character_version_building_label.setStyleSheet("color: #aaaaaa; background: transparent; border: none; margin-top: 15px;")
+        self.textEdit_character_version = QtWidgets.QTextEdit()
+        self.textEdit_character_version.setFixedHeight(45)
+        self.textEdit_character_version.setFont(font_input)
+        self.textEdit_character_version.setStyleSheet(input_style)
+
+        layout_adv.addLayout(row_combos)
+        layout_adv.addWidget(self.creator_notes_building_label)
+        layout_adv.addWidget(self.textEdit_creator_notes)
+        layout_adv.addWidget(self.character_version_building_label)
+        layout_adv.addWidget(self.textEdit_character_version)
+        self.cards_layout.addWidget(self.card_adv)
+
+        self.export_tools_title = self.translations.get("character_creator_title_export", "Export & Tools")
+        self.card_export, layout_export = create_glass_card_building(self.export_tools_title)
+        
+        row_tools = QtWidgets.QHBoxLayout()
+        row_tools.setSpacing(15)
+        
+        btn_style_tools = """
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: rgba(255, 255, 255, 0.8); 
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px; padding: 12px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: white;}
+            QPushButton:pressed { background-color: rgba(0, 0, 0, 0.3); }
+        """
+        
+        self.pushButton_import_character_card = QtWidgets.QPushButton("Import Character Card")
+        self.pushButton_import_character_card.setStyleSheet(btn_style_tools)
+        self.pushButton_import_character_card.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        
+        self.pushButton_export_character_card = QtWidgets.QPushButton("Export Character Card")
+        self.pushButton_export_character_card.setStyleSheet(btn_style_tools)
+        self.pushButton_export_character_card.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        
+        self.pushButton_clean_character_card = QtWidgets.QPushButton("Clear All Fields")
+        self.pushButton_clean_character_card.setStyleSheet(btn_style_tools + "QPushButton:hover { border: 1px solid #d32f2f; color: #ff6b6b; }")
+        self.pushButton_clean_character_card.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        
+        row_tools.addWidget(self.pushButton_import_character_card)
+        row_tools.addWidget(self.pushButton_export_character_card)
+        row_tools.addWidget(self.pushButton_clean_character_card)
+        
+        layout_export.addLayout(row_tools)
+        self.cards_layout.addWidget(self.card_export)
+
+        self.cards_layout.addStretch()
+        
+        self.creation_cards_mapping = {
+            0: self.card_general,
+            1: self.card_pers,
+            2: self.card_dial,
+            3: self.card_adv,
+            4: self.card_export
+        }
+
+        self.scrollArea_character_building.setWidget(self.scrollAreaWidgetContents_character_building)
+        self.right_layout.addWidget(self.scrollArea_character_building)
+        self.frame_bottom_character_creation = QtWidgets.QFrame(self.right_container)
+        self.frame_bottom_character_creation.setFixedHeight(70)
+        self.frame_bottom_character_creation.setStyleSheet("""
+            QFrame {
+                background-color: rgba(15, 15, 18, 0.85);
+                border-top: 1px solid rgba(255, 255, 255, 0.05);
+            }
+        """)
+        shadow_footer = QGraphicsDropShadowEffect()
+        shadow_footer.setBlurRadius(20)
+        shadow_footer.setColor(QColor(0, 0, 0, 150))
+        shadow_footer.setOffset(0, -5)
+        self.frame_bottom_character_creation.setGraphicsEffect(shadow_footer)
+        self.bottom_layout = QtWidgets.QHBoxLayout(self.frame_bottom_character_creation)
+        self.bottom_layout.setContentsMargins(40, 0, 40, 0)
+        self.bottom_layout.setSpacing(15)
+        self.total_tokens_building_label = QtWidgets.QLabel("Total Tokens: 0")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.total_tokens_building_label.setFont(font)
+        self.total_tokens_building_label.setStyleSheet("font-family: 'Inter Tight SemiBold'; font-size: 15px; color: rgba(255,255,255,0.6); border: none; background: transparent;")
+        self.pushButton_preview_prompt = QtWidgets.QPushButton("Preview Raw")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.pushButton_preview_prompt.setFont(font)
+        self.pushButton_preview_prompt.setFixedSize(130, 42)
+        self.pushButton_preview_prompt.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_preview_prompt.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: rgba(255, 255, 255, 0.7);
+                border-radius: 8px;
+                border: 1px dashed rgba(255, 255, 255, 0.2);
+                font-family: 'Inter Tight SemiBold';
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.05); color: white; border-style: solid; }
+        """)
+
+        self.pushButton_create_character_3 = QtWidgets.QPushButton("Create Character")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.pushButton_create_character_3.setFont(font)
+        self.pushButton_create_character_3.setFixedSize(180, 42)
+        self.pushButton_create_character_3.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_create_character_3.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(15, 15, 18, 0.4);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                padding: 8px 12px;
+                font-family: 'Inter Tight SemiBold';
+                font-size: 14px;
+                font-weight: bold;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.05),
+                                            stop:1 rgba(0, 0, 0, 0.05));
+            }
+            QPushButton:hover {
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.08),
+                                            stop:1 rgba(0, 0, 0, 0.08));
+            }
+            QPushButton:pressed {
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(0, 0, 0, 0.05),
+                                            stop:1 rgba(255, 255, 255, 0.05));
+            }
+            QPushButton:focus {
+                border: 1px solid rgba(255, 255, 255, 0.6);
+                outline: none;
+            }
+        """)
+
+        self.bottom_layout.addWidget(self.total_tokens_building_label)
+        self.bottom_layout.addStretch()
+        self.bottom_layout.addWidget(self.pushButton_preview_prompt)
+        self.bottom_layout.addWidget(self.pushButton_create_character_3)
+        self.right_layout.addWidget(self.frame_bottom_character_creation)
+        self.layout_page_2.addWidget(self.right_container)
+        self.stackedWidget.addWidget(self.create_character_page_2)
+
         self.charactersgateway_page = QtWidgets.QWidget()
         self.charactersgateway_page.setObjectName("charactersgateway_page")
         self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.charactersgateway_page)
         self.verticalLayout_3.setObjectName("verticalLayout_3")
-        self.frame_gateway_search = QtWidgets.QFrame(parent=self.charactersgateway_page)
-        self.frame_gateway_search.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.frame_gateway_search.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_gateway_search.setObjectName("frame_gateway_search")
-        self.horizontalLayout_4 = QtWidgets.QHBoxLayout(self.frame_gateway_search)
-        self.horizontalLayout_4.setObjectName("horizontalLayout_4")
-        spacerItem23 = QtWidgets.QSpacerItem(612, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.horizontalLayout_4.addItem(spacerItem23)
-        self.checkBox_enable_nsfw = QtWidgets.QCheckBox(parent=self.frame_gateway_search)
-        self.checkBox_enable_nsfw.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.checkBox_enable_nsfw.setMinimumSize(QtCore.QSize(91, 31))
-        self.checkBox_enable_nsfw.setMaximumSize(QtCore.QSize(91, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight")
-        font.setPointSize(11)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.checkBox_enable_nsfw.setFont(font)
-        self.checkBox_enable_nsfw.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.checkBox_enable_nsfw.setLayoutDirection(QtCore.Qt.LayoutDirection.RightToLeft)
-        self.checkBox_enable_nsfw.setStyleSheet("QCheckBox {\n"
-"    color: #e0e0e0;\n"
-"    spacing: 5px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    border: 2px solid #333;\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"    border-radius: 11px;\n"
-"    background-color: #2b2b2b;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:hover {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #3a3a3a;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #444;\n"
-"    image: url(:/sowInterface/checked.png);\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:disabled {\n"
-"    border: 2px solid #444;\n"
-"    background-color: #555;\n"
-"}\n"
-"\n"
-"QCheckBox:disabled {\n"
-"    color: #888;\n"
-"}")
-        self.checkBox_enable_nsfw.setObjectName("checkBox_enable_nsfw")
-        self.horizontalLayout_4.addWidget(self.checkBox_enable_nsfw)
-        self.lineEdit_search_character = QtWidgets.QLineEdit(parent=self.frame_gateway_search)
-        self.lineEdit_search_character.setMinimumSize(QtCore.QSize(250, 33))
-        self.lineEdit_search_character.setMaximumSize(QtCore.QSize(250, 33))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_search_character.setFont(font)
-        self.lineEdit_search_character.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.lineEdit_search_character.setObjectName("lineEdit_search_character")
-        self.horizontalLayout_4.addWidget(self.lineEdit_search_character)
-        self.pushButton_search_character = QtWidgets.QPushButton(parent=self.frame_gateway_search)
-        self.pushButton_search_character.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_search_character.setMinimumSize(QtCore.QSize(27, 27))
-        self.pushButton_search_character.setMaximumSize(QtCore.QSize(27, 27))
-        self.pushButton_search_character.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_search_character.setStyleSheet("QPushButton { background-color: rgba(255, 255, 255, 0); border: none;  border-radius: 13px; }\n"
-"QPushButton:hover { background-color: rgb(50, 50, 50); border-style: solid; border-radius: 13px; }\n"
-"QPushButton:pressed { background-color: rgb(23, 23, 23); border-style: solid; border-radius: 13px; }\n"
-"")
-        self.pushButton_search_character.setText("")
-        icon8 = QtGui.QIcon()
-        icon8.addPixmap(QtGui.QPixmap("app/gui/icons/search.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_search_character.setIcon(icon8)
-        self.pushButton_search_character.setIconSize(QtCore.QSize(16, 16))
-        self.pushButton_search_character.setFlat(True)
-        self.pushButton_search_character.setObjectName("pushButton_search_character")
-        self.horizontalLayout_4.addWidget(self.pushButton_search_character)
-        self.verticalLayout_3.addWidget(self.frame_gateway_search)
+        self.verticalLayout_3.setContentsMargins(30, 25, 30, 0)
+        self.verticalLayout_3.setSpacing(20)
+        self.header_layout = QtWidgets.QHBoxLayout()
+        self.header_layout.setSpacing(20)
+        self.header_layout.setObjectName("header_layout")
+        self.search_bar_widget = ModernSearchBar(parent=self.charactersgateway_page)
+        self.search_bar_widget.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
+        self.search_bar_widget.line_edit.setObjectName("lineEdit_search_character")
+        self.search_bar_widget.search_btn.setObjectName("pushButton_search_character")
+        self.lineEdit_search_character = self.search_bar_widget.line_edit
+        self.pushButton_search_character = self.search_bar_widget.search_btn
+        self.nsfw_layout = QtWidgets.QHBoxLayout()
+        self.nsfw_layout.setSpacing(10)
+        self.label_nsfw = QtWidgets.QLabel("NSFW")
+        font_nsfw = QtGui.QFont()
+        font_nsfw.setFamily("Inter Tight SemiBold")
+        font_nsfw.setPointSize(10)
+        font_nsfw.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.label_nsfw.setFont(font_nsfw)
+        self.label_nsfw.setStyleSheet("color: #808080;")
         
+        self.checkBox_enable_nsfw = AnimatedToggle(parent=self.charactersgateway_page)
+        self.checkBox_enable_nsfw.setObjectName("checkBox_enable_nsfw")
+        
+        self.nsfw_layout.addWidget(self.label_nsfw)
+        self.nsfw_layout.addWidget(self.checkBox_enable_nsfw)
+
+        self.header_layout.addWidget(self.search_bar_widget)
+        self.header_layout.addLayout(self.nsfw_layout)
+        self.verticalLayout_3.addLayout(self.header_layout)
+
         self.tabWidget_characters_gateway = QtWidgets.QTabWidget(parent=self.charactersgateway_page)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(10)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.tabWidget_characters_gateway.setFont(font)
-        self.tabWidget_characters_gateway.setStyleSheet("QTabWidget::pane {\n"
-"    border: none;\n"
-"    background-color: rgb(27, 27, 27);\n"
-"    border-radius: 3px;\n"
-"    padding: 5px;\n"
-"}\n"
-"\n"
-"QTabWidget::tab-bar {\n"
-"    alignment: center;\n"
-"}\n"
-"\n"
-"QTabBar::tab {\n"
-"    background-color: rgba(43, 43, 43, 0.8);\n"
-"    color: rgb(180, 180, 180);\n"
-"    padding: 8px 20px;\n"
-"    margin: 1px;\n"
-"    border: none;\n"
-"    font-size: 12px;\n"
-"    border-radius: 3px;\n"
-"}\n"
-"\n"
-"QTabBar::tab:selected {\n"
-"    background-color: rgba(60, 60, 60, 0.9);\n"
-"    color: rgb(227, 227, 227);\n"
-"    font-weight: bold;\n"
-"    border-bottom: 2px solid rgba(255, 255, 255, 0.1);\n"
-"}\n"
-"\n"
-"QTabBar::tab:hover {\n"
-"    background-color: rgba(50, 50, 50, 0.9);\n"
-"    color: rgb(227, 227, 227);\n"
-"}\n"
-"\n"
-"QTabBar::tab:disabled {\n"
-"    background-color: rgba(30, 30, 30, 0.6);\n"
-"    color: rgb(100, 100, 100);\n"
-"}\n"
-"\n"
-"QTabBar::tab:!selected {\n"
-"    margin-top: 3px;\n"
-"}")
+        font_tabs = QtGui.QFont()
+        font_tabs.setFamily("Inter Tight SemiBold")
+        font_tabs.setPointSize(10)
+        font_tabs.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.tabWidget_characters_gateway.setFont(font_tabs)
+
+        self.tabWidget_characters_gateway.setStyleSheet("""
+            QTabWidget::pane {
+                border: none;
+                background-color: transparent;
+                margin-top: 15px;
+            }
+            QTabWidget::tab-bar {
+                alignment: left;
+            }
+            QTabBar::tab {
+                background-color: transparent;
+                color: #757575;
+                min-width: 120px;
+                padding: 10px 0px;
+                margin-right: 15px;
+                border-bottom: 3px solid transparent;
+                font-weight: 500;
+            }
+            QTabBar::tab:hover {
+                color: #b0b0b0;
+            }
+            QTabBar::tab:selected {
+                color: #ffffff;
+                border-bottom: 3px solid #7a7a7a;
+                font-weight: bold;
+            }
+        """)
         self.tabWidget_characters_gateway.setTabPosition(QtWidgets.QTabWidget.TabPosition.North)
         self.tabWidget_characters_gateway.setTabShape(QtWidgets.QTabWidget.TabShape.Rounded)
         self.tabWidget_characters_gateway.setObjectName("tabWidget_characters_gateway")
+
+        # --- 1. TAB SOUL GATEWAY
+        self.tab_soul_gateway = QtWidgets.QWidget()
+        self.tab_soul_gateway.setObjectName("tab_soul_gateway")
+        self.layout_tab_soul = QtWidgets.QVBoxLayout(self.tab_soul_gateway)
+        self.layout_tab_soul.setContentsMargins(0, 15, 0, 0)
         
+        self.stackedWidget_soul_gateway = QtWidgets.QStackedWidget(parent=self.tab_soul_gateway)
+        self.stackedWidget_soul_gateway.setObjectName("stackedWidget_soul_gateway")
+        
+        self.soul_gateway_page = QtWidgets.QWidget()
+        self.soul_gateway_page.setObjectName("soul_gateway_page")
+        self.layout_soul_page = QtWidgets.QVBoxLayout(self.soul_gateway_page)
+        self.layout_soul_page.setContentsMargins(0, 0, 0, 0)
+        
+        self.scrollArea_soul_gateway = QtWidgets.QScrollArea(self.soul_gateway_page)
+        self.scrollArea_soul_gateway.setWidgetResizable(True)
+        self.scrollArea_soul_gateway.setObjectName("scrollArea_soul_gateway")
+        self.scrollArea_soul_gateway.setStyleSheet("""
+            QScrollArea { 
+                border: none; 
+                background: transparent; 
+            }
+            QScrollBar:vertical {
+                background: transparent;
+                width: 0px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: transparent;
+                min-height: 0px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
+        self.scrollAreaWidgetContents_soul = QtWidgets.QWidget()
+        self.scrollAreaWidgetContents_soul.setGeometry(QtCore.QRect(0, 0, 1019, 495))
+        self.scrollAreaWidgetContents_soul.setStyleSheet("background-color: transparent;")
+        self.scrollAreaWidgetContents_soul.setObjectName("scrollAreaWidgetContents_soul")
+        
+        self.scrollArea_soul_gateway.setWidget(self.scrollAreaWidgetContents_soul)
+        self.layout_soul_page.addWidget(self.scrollArea_soul_gateway)
+        
+        self.stackedWidget_soul_gateway.addWidget(self.soul_gateway_page)
+        self.layout_tab_soul.addWidget(self.stackedWidget_soul_gateway)
+        
+        self.tabWidget_characters_gateway.addTab(self.tab_soul_gateway, "Soul Gateway")
+
+        # --- 2. TAB CHARACTER AI
         self.tab_character_ai = QtWidgets.QWidget()
         self.tab_character_ai.setObjectName("tab_character_ai")
-        self.tab_character_ai.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.gridLayout_18 = QtWidgets.QGridLayout(self.tab_character_ai)
-        self.gridLayout_18.setObjectName("gridLayout_18")
+        self.layout_tab_cai = QtWidgets.QVBoxLayout(self.tab_character_ai)
+        self.layout_tab_cai.setContentsMargins(0, 15, 0, 0)
+        
         self.stackedWidget_character_ai = QtWidgets.QStackedWidget(parent=self.tab_character_ai)
         self.stackedWidget_character_ai.setObjectName("stackedWidget_character_ai")
         
-        # ====================== Character AI Page ======================
         self.character_ai_page = QtWidgets.QWidget()
         self.character_ai_page.setObjectName("character_ai_page")
+        self.layout_cai_page = QtWidgets.QVBoxLayout(self.character_ai_page)
+        self.layout_cai_page.setContentsMargins(0, 0, 0, 0)
         
-        self.gridLayout_21 = QtWidgets.QGridLayout(self.character_ai_page)
-        self.gridLayout_21.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout_21.setSpacing(0)
-        self.gridLayout_21.setObjectName("gridLayout_21")
-        
-        self.scrollArea_character_ai_page = QtWidgets.QScrollArea(parent=self.character_ai_page)
-        self.scrollArea_character_ai_page.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: rgb(27,27,27);
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 15px 0px 15px 0px;
-                border-radius: 5px;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
+        self.scrollArea_character_ai_page = QtWidgets.QScrollArea(self.character_ai_page)
         self.scrollArea_character_ai_page.setWidgetResizable(True)
         self.scrollArea_character_ai_page.setObjectName("scrollArea_character_ai_page")
+        self.scrollArea_character_ai_page.setStyleSheet("""
+            QScrollArea { 
+                border: none; 
+                background: transparent; 
+            }
+            QScrollBar:vertical {
+                background: transparent;
+                width: 0px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: transparent;
+                min-height: 0px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
         self.scrollAreaWidgetContents_character_ai = QtWidgets.QWidget()
         self.scrollAreaWidgetContents_character_ai.setGeometry(QtCore.QRect(0, 0, 1019, 495))
+        self.scrollAreaWidgetContents_character_ai.setStyleSheet("background-color: transparent;")
         self.scrollAreaWidgetContents_character_ai.setObjectName("scrollAreaWidgetContents_character_ai")
+        
         self.scrollArea_character_ai_page.setWidget(self.scrollAreaWidgetContents_character_ai)
-        self.gridLayout_21.addWidget(self.scrollArea_character_ai_page, 0, 0, 1, 1)
+        self.layout_cai_page.addWidget(self.scrollArea_character_ai_page)
+        
         self.stackedWidget_character_ai.addWidget(self.character_ai_page)
-        
-        # ====================== Character AI Search Page ======================
-        
-        self.gridLayout_18.addWidget(self.stackedWidget_character_ai, 0, 0, 1, 1)
-        self.tabWidget_characters_gateway.addTab(self.tab_character_ai, "")
+        self.layout_tab_cai.addWidget(self.stackedWidget_character_ai)
+        self.tabWidget_characters_gateway.addTab(self.tab_character_ai, "Character AI")
 
+        # --- 3. TAB CHUB AI
         self.tab_character_cards = QtWidgets.QWidget()
         self.tab_character_cards.setObjectName("tab_character_cards")
-        self.tab_character_cards.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.gridLayout_19 = QtWidgets.QGridLayout(self.tab_character_cards)
-        self.gridLayout_19.setObjectName("gridLayout_19")
+        self.layout_tab_cards = QtWidgets.QVBoxLayout(self.tab_character_cards)
+        self.layout_tab_cards.setContentsMargins(0, 15, 0, 0)
+        
         self.stackedWidget_character_card_gateway = QtWidgets.QStackedWidget(parent=self.tab_character_cards)
         self.stackedWidget_character_card_gateway.setObjectName("stackedWidget_character_card_gateway")
         
-        # ====================== Character Card Page ======================
         self.character_card_page = QtWidgets.QWidget()
         self.character_card_page.setObjectName("character_card_page")
-        self.gridLayout_22 = QtWidgets.QGridLayout(self.character_card_page)
-        self.gridLayout_22.setContentsMargins(0, 0, 0, 0)
-        self.gridLayout_22.setSpacing(0)
-        self.gridLayout_22.setObjectName("gridLayout_22")
-
-
-        self.scrollArea_character_card = QtWidgets.QScrollArea(parent=self.character_card_page)
-        self.scrollArea_character_card.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: rgb(27,27,27);
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 15px 0px 15px 0px;
-                border-radius: 5px;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
+        self.layout_card_page = QtWidgets.QVBoxLayout(self.character_card_page)
+        self.layout_card_page.setContentsMargins(0, 0, 0, 0)
+        
+        self.scrollArea_character_card = QtWidgets.QScrollArea(self.character_card_page)
         self.scrollArea_character_card.setWidgetResizable(True)
         self.scrollArea_character_card.setObjectName("scrollArea_character_card")
+        self.scrollArea_character_card.setStyleSheet("""
+            QScrollArea { 
+                border: none; 
+                background: transparent; 
+            }
+            QScrollBar:vertical {
+                background: transparent;
+                width: 0px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: transparent;
+                min-height: 0px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
+        
         self.scrollAreaWidgetContents_character_card = QtWidgets.QWidget()
         self.scrollAreaWidgetContents_character_card.setGeometry(QtCore.QRect(0, 0, 1021, 497))
+        self.scrollAreaWidgetContents_character_card.setStyleSheet("background-color: transparent;")
         self.scrollAreaWidgetContents_character_card.setObjectName("scrollAreaWidgetContents_character_card")
-        self.scrollArea_character_card.setWidget(self.scrollAreaWidgetContents_character_card)
-        self.gridLayout_22.addWidget(self.scrollArea_character_card, 0, 0, 1, 1)
-        self.stackedWidget_character_card_gateway.addWidget(self.character_card_page)
         
-        # ====================== Character Card Search Page ======================
-        self.gridLayout_19.addWidget(self.stackedWidget_character_card_gateway, 0, 0, 1, 1)
-        self.tabWidget_characters_gateway.addTab(self.tab_character_cards, "")
+        self.scrollArea_character_card.setWidget(self.scrollAreaWidgetContents_character_card)
+        self.layout_card_page.addWidget(self.scrollArea_character_card)
+        
+        self.stackedWidget_character_card_gateway.addWidget(self.character_card_page)
+        self.layout_tab_cards.addWidget(self.stackedWidget_character_card_gateway)
+        self.tabWidget_characters_gateway.addTab(self.tab_character_cards, "Chub AI / Cards")
+
         self.verticalLayout_3.addWidget(self.tabWidget_characters_gateway)
-        self.tabWidget_characters_gateway.raise_()
-        self.frame_gateway_search.raise_()
         self.stackedWidget.addWidget(self.charactersgateway_page)
         
         # ====================== Options Page ======================
         self.options_page = QtWidgets.QWidget()
         self.options_page.setObjectName("options_page")
+        self.options_page.setStyleSheet("background: transparent;")
+
         self.gridLayout = QtWidgets.QGridLayout(self.options_page)
         self.gridLayout.setObjectName("gridLayout")
-        self.tabWidget_options = QtWidgets.QTabWidget(parent=self.options_page)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(10)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.tabWidget_options.setFont(font)
-        self.tabWidget_options.setStyleSheet("QTabWidget::pane {\n"
-"    border: none;\n"
-"    background-color: rgb(27, 27, 27);\n"
-"    border-radius: 3px;\n"
-"    padding: 5px;\n"
-"}\n"
-"\n"
-"QTabWidget::tab-bar {\n"
-"    alignment: center;\n"
-"}\n"
-"\n"
-"QTabBar::tab {\n"
-"    background-color: rgba(43, 43, 43, 0.8);\n"
-"    color: rgb(180, 180, 180);\n"
-"    padding: 8px 20px;\n"
-"    margin: 1px;\n"
-"    border: none;\n"
-"    font-size: 12px;\n"
-"    border-radius: 3px;\n"
-"}\n"
-"\n"
-"QTabBar::tab:selected {\n"
-"    background-color: rgba(60, 60, 60, 0.9);\n"
-"    color: rgb(227, 227, 227);\n"
-"    font-weight: bold;\n"
-"    border-bottom: 2px solid rgba(255, 255, 255, 0.1);\n"
-"}\n"
-"\n"
-"QTabBar::tab:hover {\n"
-"    background-color: rgba(50, 50, 50, 0.9);\n"
-"    color: rgb(227, 227, 227);\n"
-"}\n"
-"\n"
-"QTabBar::tab:disabled {\n"
-"    background-color: rgba(30, 30, 30, 0.6);\n"
-"    color: rgb(100, 100, 100);\n"
-"}\n"
-"\n"
-"QTabBar::tab:!selected {\n"
-"    margin-top: 3px;\n"
-"}")
-        self.tabWidget_options.setObjectName("tabWidget_options")
-        self.configuration_tab = QtWidgets.QWidget()
-        self.configuration_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.configuration_tab.setStyleSheet("")
+        self.gridLayout.setContentsMargins(0, 0, 0, 0)
+        
+        self.options_container = QtWidgets.QWidget()
+        self.layout_options = QtWidgets.QHBoxLayout(self.options_container)
+        self.layout_options.setContentsMargins(0, 0, 0, 0)
+        self.layout_options.setSpacing(0)
+
+        self.options_menu = QtWidgets.QListWidget(self.options_page)
+        self.options_menu.setObjectName("options_menu")
+        self.options_menu.setFixedWidth(230)
+        self.options_menu.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.options_menu.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.options_menu.setStyleSheet("""
+            QListWidget {
+                background-color: rgba(15, 15, 18, 0.45);
+                border: none;
+                border-right: 1px solid rgba(255, 255, 255, 0.05);
+                padding-top: 25px;
+                outline: none;
+            }
+            QListWidget::item {
+                color: rgba(255, 255, 255, 0.5);
+                font-family: 'Inter Tight SemiBold';
+                font-size: 14px;
+                padding: 14px 20px;
+                border-radius: 8px;
+                margin: 4px 15px;
+            }
+            QListWidget::item:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+                color: rgba(255, 255, 255, 0.9);
+            }
+            QListWidget::item:selected {
+                background-color: rgba(255, 255, 255, 0.15);
+                color: #ffffff;
+                border-left: 3px solid #ffffff;
+                font-weight: bold;
+            }
+        """)
+        
+        tab_names = ["API & Providers", "System & UI", "Local LLM", "SoW Modules"]
+        for name in tab_names:
+            self.options_menu.addItem(QtWidgets.QListWidgetItem(name))
+            
+        self.layout_options.addWidget(self.options_menu)
+
+        self.tabWidget_options = QtWidgets.QStackedWidget(self.options_page)
+        self.tabWidget_options.setStyleSheet("background: transparent; border: none;")
+        self.layout_options.addWidget(self.tabWidget_options)
+
+        self.options_menu.currentRowChanged.connect(self.tabWidget_options.setCurrentIndex)
+
+        font_title = QtGui.QFont("Inter Tight SemiBold", 15, QtGui.QFont.Weight.Bold)
+        font_title.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        
+        font_label = QtGui.QFont("Inter Tight Medium", 11)
+        font_label.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        
+        font_input = QtGui.QFont("Inter Tight Medium", 10)
+        font_input.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+
+        global_input_style = """
+            QComboBox {
+                background-color: rgba(15, 15, 18, 0.4);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                padding: 8px 12px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.05),
+                                            stop:1 rgba(0, 0, 0, 0.05));
+            }
+            QComboBox:hover {
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.08),
+                                            stop:1 rgba(0, 0, 0, 0.08));
+            }
+            QComboBox:focus {
+                border: 1px solid rgba(255, 255, 255, 0.6);
+                outline: none;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: url(:/sowInterface/arrowDown.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba(30, 30, 35, 0.8);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+                selection-background-color: rgba(255, 255, 255, 0.15);
+                selection-color: #ffffff;
+                padding: 5px;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 8px 12px;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.1),
+                                            stop:1 rgba(255, 255, 255, 0.05));
+                color: #ffffff;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.15),
+                                            stop:1 rgba(255, 255, 255, 0.05));
+                color: #ffffff;
+            }
+            QLineEdit, QSpinBox {
+                background-color: rgba(30, 30, 35, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                color: white;
+                padding: 5px 15px;
+            }
+            QLineEdit:focus, QSpinBox:focus {
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                background-color: rgba(40, 40, 45, 0.6);
+            }
+            QSpinBox::up-button, QSpinBox::down-button {
+                subcontrol-origin: border;
+                width: 0px;
+                height: 0px;
+            }
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                color: white;
+                padding: 8px 15px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+            QCheckBox {
+                color: rgba(255, 255, 255, 0.9);
+                spacing: 10px;
+                font-size: 14px;
+            }
+
+            QCheckBox::indicator {
+                width: 20px;
+                height: 20px;
+                border-radius: 5px;
+                background-color: rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+
+            QCheckBox::indicator:hover {
+                border: 1px solid rgba(255, 255, 255, 0.5);
+                background-color: rgba(255, 255, 255, 0.05);
+            }
+
+            QCheckBox::indicator:checked {
+                background-color: rgba(25, 25, 35, 0.9); 
+                border: 1px solid rgba(180, 180, 180, 0.6);
+                image: url(:/sowInterface/checked.png);
+            }
+        """
+
+        def create_glass_card(title_text):
+            card = QtWidgets.QFrame()
+            card.setStyleSheet(f"""
+                QFrame {{
+                    background-color: rgba(22, 22, 26, 0.5);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 16px;
+                }}
+                QLabel {{ color: rgba(255, 255, 255, 0.85); border: none; background: transparent; }}
+                {global_input_style}
+            """)
+            shadow = QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(35)
+            shadow.setColor(QColor(0, 0, 0, 100))
+            shadow.setOffset(0, 8)
+            card.setGraphicsEffect(shadow)
+            
+            layout = QtWidgets.QVBoxLayout(card)
+            layout.setContentsMargins(30, 30, 30, 30)
+            layout.setSpacing(20)
+            
+            title = QtWidgets.QLabel(title_text)
+            title.setFont(font_title)
+            title.setStyleSheet("color: #ffffff; font-weight: bold; padding-bottom: 5px;")
+            title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            title.setContentsMargins(0, 0, 0, 0)
+            title.setMinimumWidth(0)
+
+            layout.addWidget(title)
+            
+            return card, layout
+
+        def create_scroll_page():
+            page = QtWidgets.QWidget()
+            layout = QtWidgets.QVBoxLayout(page)
+            layout.setContentsMargins(0, 0, 0, 0)
+            
+            scroll = QtWidgets.QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll.setStyleSheet("""
+                QScrollArea { background: transparent; border: none; }
+                QScrollBar:vertical { background-color: transparent; width: 6px; margin: 10px 0px; }
+                QScrollBar::handle:vertical { background-color: rgba(255, 255, 255, 0.15); border-radius: 3px; min-height: 30px; }
+                QScrollBar::handle:vertical:hover { background-color: rgba(255, 255, 255, 0.3); }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; border: none; }
+            """)
+            
+            content = QtWidgets.QWidget()
+            content.setStyleSheet("background: transparent;")
+            content_layout = QtWidgets.QVBoxLayout(content)
+            content_layout.setContentsMargins(50, 40, 50, 50)
+            content_layout.setSpacing(30)
+            
+            scroll.setWidget(content)
+            layout.addWidget(scroll)
+            return page, content_layout
+
+        # =================================================================
+        # API & Providers
+        # =================================================================
+        self.configuration_tab, conf_layout = create_scroll_page()
         self.configuration_tab.setObjectName("configuration_tab")
-        self.configuration_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.conversation_method_title_label = QtWidgets.QLabel(parent=self.configuration_tab)
-        self.conversation_method_title_label.setGeometry(QtCore.QRect(10, 10, 261, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferAntialias)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.conversation_method_title_label.setFont(font)
-        self.conversation_method_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.conversation_method_title_label.setObjectName("conversation_method_title_label")
-        self.conversation_method_token_title_label = QtWidgets.QLabel(parent=self.configuration_tab)
-        self.conversation_method_token_title_label.setGeometry(QtCore.QRect(21, 126, 141, 20))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.conversation_method_token_title_label.setFont(font)
-        self.conversation_method_token_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.conversation_method_token_title_label.setObjectName("conversation_method_token_title_label")
-        self.lineEdit_api_token_options = QtWidgets.QLineEdit(parent=self.configuration_tab)
-        self.lineEdit_api_token_options.setGeometry(QtCore.QRect(20, 150, 291, 33))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(8)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_api_token_options.setFont(font)
-        self.lineEdit_api_token_options.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.lineEdit_api_token_options.setObjectName("lineEdit_api_token_options")
-        self.conversation_method_options_label = QtWidgets.QLabel(parent=self.configuration_tab)
-        self.conversation_method_options_label.setGeometry(QtCore.QRect(21, 60, 221, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.conversation_method_options_label.setFont(font)
-        self.conversation_method_options_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.conversation_method_options_label.setObjectName("conversation_method_options_label")
-        self.comboBox_conversation_method = QtWidgets.QComboBox(parent=self.configuration_tab)
-        self.comboBox_conversation_method.setGeometry(QtCore.QRect(20, 80, 141, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_conversation_method.setFont(font)
-        self.comboBox_conversation_method.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_conversation_method.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
+        self.conversation_provider_title = self.translations.get("conversation_provider_title", "Conversation Provider")
+        self.api_configuration_title = self.translations.get("api_configuration_title", "API Configuration")
+        self.user_profile_title = self.translations.get("user_profile_title", "User Profile")
+        self.localization_title = self.translations.get("localization_title", "Localization & Translation")
+        self.audio_devices_title = self.translations.get("audio_devices_title", "Audio Devices")
+        self.hardware_spec_title = self.translations.get("hardware_spec_title", "Hardware Specifications")
+        self.llm_settings_title = self.translations.get("llm_settings_title", "LLM Settings")
+        self.memory_and_offloading_title = self.translations.get("memory_and_offloading_title", "Memory & Offloading")
+        self.generation_params_title = self.translations.get("generation_params_title", "Generation Parameters")
+        self.global_editors_title = self.translations.get("global_editors_title", "Global Editors")
+        self.visualizations_title = self.translations.get("visualizations_title", "Visualizations (Live2D / VRM)")
+        self.sub_modules_title = self.translations.get("sub_modules_title", "Sub-Modules")
+        
+        self.gpu_layers_text = self.translations.get("gpu_layers_text", "GPU Layers")
+        self.context_size_text = self.translations.get("context_size_text", "Context Size")
+        self.temperature_text = self.translations.get("temperature_label", "Temperature")
+        self.top_p_text = self.translations.get("top_p_label", "Top P")
+        self.rep_penalty_text = self.translations.get("repeat_penalty_label", "Repeat Penalty")
+        self.max_tokens_text = self.translations.get("max_tokens_label", "Max Tokens")
 
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_conversation_method.setGraphicsEffect(shadow)
+        card_method, l_method = create_glass_card(self.conversation_provider_title)
+        form_method = QtWidgets.QFormLayout()
+        form_method.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        form_method.setVerticalSpacing(20)
+        form_method.setHorizontalSpacing(30)
+        
+        self.conversation_method_options_label = QtWidgets.QLabel("Conversation Method")
+        self.conversation_method_options_label.setFont(font_label)
+        self.comboBox_conversation_method = QtWidgets.QComboBox()
+        self.comboBox_conversation_method.setFont(font_input)
+        self.comboBox_conversation_method.setFixedHeight(40)
+        self.comboBox_conversation_method.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_conversation_method.addItems(["Character AI", "Mistral AI", "Open AI", "OpenRouter"])
         self.comboBox_conversation_method.setObjectName("comboBox_conversation_method")
-        self.comboBox_conversation_method.addItem("")
-        self.comboBox_conversation_method.addItem("")
-        self.comboBox_conversation_method.addItem("")
-        self.comboBox_conversation_method.addItem("")
-        self.separator_options_4 = QtWidgets.QFrame(parent=self.configuration_tab)
-        self.separator_options_4.setGeometry(QtCore.QRect(20, 240, 1070, 3))
-        self.separator_options_4.setMaximumSize(QtCore.QSize(16777215, 3))
-        self.separator_options_4.setStyleSheet("QFrame {\n"
-"        background-color: rgba(10, 10, 10, 80);\n"
-"        border-radius: 2px;\n"
-"        height: 1px;\n"
-"}")
-        self.separator_options_4.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        self.separator_options_4.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        self.separator_options_4.setObjectName("separator_options_4")
-        self.choose_your_name_label = QtWidgets.QLabel(parent=self.configuration_tab)
-        self.choose_your_name_label.setGeometry(QtCore.QRect(20, 348, 161, 20))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_your_name_label.setFont(font)
-        self.choose_your_name_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_your_name_label.setObjectName("choose_your_name_label")
-        self.user_building_title_label = QtWidgets.QLabel(parent=self.configuration_tab)
-        self.user_building_title_label.setGeometry(QtCore.QRect(10, 251, 261, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.user_building_title_label.setFont(font)
-        self.user_building_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.user_building_title_label.setObjectName("user_building_title_label")
         
-        self.openrouter_models_options_label = QtWidgets.QLabel(parent=self.configuration_tab)
-        self.openrouter_models_options_label.setEnabled(True)
-        self.openrouter_models_options_label.setGeometry(QtCore.QRect(330, 130, 111, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.openrouter_models_options_label.setFont(font)
-        self.openrouter_models_options_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.openrouter_models_options_label.setObjectName("openrouter_models_options_label")
-        self.comboBox_openrouter_models = QtWidgets.QComboBox(parent=self.configuration_tab)
-        self.comboBox_openrouter_models.setGeometry(QtCore.QRect(330, 190, 311, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_openrouter_models.setFont(font)
-        self.comboBox_openrouter_models.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_openrouter_models.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        form_method.addRow(self.conversation_method_options_label, self.comboBox_conversation_method)
+        l_method.addLayout(form_method)
+        conf_layout.addWidget(card_method)
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
+        self.card_api, l_api = create_glass_card(self.api_configuration_title)
+        form_api = QtWidgets.QFormLayout()
+        form_api.setVerticalSpacing(20)
+        form_api.setHorizontalSpacing(30)
+        
+        self.conversation_method_token_title_label = QtWidgets.QLabel("API Token")
+        self.conversation_method_token_title_label.setFont(font_label)
+        self.lineEdit_api_token_options = QtWidgets.QLineEdit()
+        self.lineEdit_api_token_options.setFont(font_input)
+        self.lineEdit_api_token_options.setFixedHeight(40)
+        self.lineEdit_api_token_options.setObjectName("lineEdit_api_token_options")
+        form_api.addRow(self.conversation_method_token_title_label, self.lineEdit_api_token_options)
 
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_openrouter_models.setGraphicsEffect(shadow)
-        self.comboBox_openrouter_models.setObjectName("comboBox_openrouter_models")
-        self.lineEdit_search_openrouter_models = QtWidgets.QLineEdit(parent=self.configuration_tab)
-        self.lineEdit_search_openrouter_models.setGeometry(QtCore.QRect(330, 150, 251, 33))
-        self.lineEdit_search_openrouter_models.setMinimumSize(QtCore.QSize(200, 33))
-        self.lineEdit_search_openrouter_models.setMaximumSize(QtCore.QSize(260, 33))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_search_openrouter_models.setFont(font)
-        self.lineEdit_search_openrouter_models.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.lineEdit_search_openrouter_models.setObjectName("lineEdit_search_openrouter_models")
-        self.lineEdit_base_url_options = QtWidgets.QLineEdit(parent=self.configuration_tab)
-        self.lineEdit_base_url_options.setGeometry(QtCore.QRect(20, 190, 291, 33))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(8)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_base_url_options.setFont(font)
-        self.lineEdit_base_url_options.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
+        self.label_base_url = QtWidgets.QLabel("Base URL")
+        self.label_base_url.setFont(font_label)
+        self.lineEdit_base_url_options = QtWidgets.QLineEdit()
+        self.lineEdit_base_url_options.setFont(font_input)
+        self.lineEdit_base_url_options.setFixedHeight(40)
+        self.lineEdit_base_url_options.setPlaceholderText("Custom Endpoint URL (Optional)")
         self.lineEdit_base_url_options.setObjectName("lineEdit_base_url_options")
+        form_api.addRow(self.label_base_url, self.lineEdit_base_url_options)
+
+        self.label_openai_model = QtWidgets.QLabel("OpenAI Model")
+        self.label_openai_model.setFont(font_label)
         
-        self.lineEdit_mistral_model = QtWidgets.QLineEdit(parent=self.configuration_tab)
-        self.lineEdit_mistral_model.setGeometry(QtCore.QRect(20, 190, 291, 33))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(8)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_mistral_model.setFont(font)
-        self.lineEdit_mistral_model.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
+        self.lineEdit_openai_model = QtWidgets.QLineEdit()
+        self.lineEdit_openai_model.setFont(font_input)
+        self.lineEdit_openai_model.setFixedHeight(40)
+        self.lineEdit_openai_model.setPlaceholderText("gpt-5.4 or something else")
+        self.lineEdit_openai_model.setObjectName("lineEdit_openai_model")
+        form_api.addRow(self.label_openai_model, self.lineEdit_openai_model)
+
+        self.label_mistral_model = QtWidgets.QLabel("Mistral Model")
+        self.label_mistral_model.setFont(font_label)
+        self.lineEdit_mistral_model = QtWidgets.QLineEdit()
+        self.lineEdit_mistral_model.setFont(font_input)
+        self.lineEdit_mistral_model.setFixedHeight(40)
         self.lineEdit_mistral_model.setObjectName("lineEdit_mistral_model")
+        form_api.addRow(self.label_mistral_model, self.lineEdit_mistral_model)
 
-        self.personas_button = QtWidgets.QPushButton(parent=self.configuration_tab)
-        self.personas_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.personas_button.setGeometry(QtCore.QRect(20, 300, 190, 35))
-        self.personas_button.setMinimumSize(QtCore.QSize(25, 25))
-        self.personas_button.setMaximumSize(QtCore.QSize(1000, 35))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.personas_button.setFont(font)
-        self.personas_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.personas_button.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
-        icon_personas = QtGui.QIcon()
-        icon_personas.addPixmap(QtGui.QPixmap("app/gui/icons/personas.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.personas_button.setIcon(icon_personas)
-        self.personas_button.setIconSize(QtCore.QSize(19, 19))
-        self.personas_button.setCheckable(False)
-        self.personas_button.setObjectName("personas_button")
-        self.tabWidget_options.addTab(self.configuration_tab, "")
-        self.system_tab = QtWidgets.QWidget()
-        self.system_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.system_tab.setStyleSheet("")
+        self.openrouter_models_options_label = QtWidgets.QLabel("Model")
+        self.openrouter_models_options_label.setFont(font_label)
+        
+        self.openrouter_layout_widget = QtWidgets.QWidget()
+        openrouter_layout = QtWidgets.QHBoxLayout(self.openrouter_layout_widget)
+        openrouter_layout.setContentsMargins(0,0,0,0)
+        openrouter_layout.setSpacing(15)
+        
+        self.lineEdit_search_openrouter_models = QtWidgets.QLineEdit()
+        self.lineEdit_search_openrouter_models.setFont(font_input)
+        self.lineEdit_search_openrouter_models.setFixedHeight(40)
+        self.lineEdit_search_openrouter_models.setPlaceholderText("Search models...")
+        self.lineEdit_search_openrouter_models.setObjectName("lineEdit_search_openrouter_models")
+        
+        self.comboBox_openrouter_models = QtWidgets.QComboBox()
+        self.comboBox_openrouter_models.setFont(font_input)
+        self.comboBox_openrouter_models.setFixedHeight(40)
+        self.comboBox_openrouter_models.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_openrouter_models.setObjectName("comboBox_openrouter_models")
+        
+        openrouter_layout.addWidget(self.lineEdit_search_openrouter_models, 1)
+        openrouter_layout.addWidget(self.comboBox_openrouter_models, 2)
+        
+        form_api.addRow(self.openrouter_models_options_label, self.openrouter_layout_widget)
+        l_api.addLayout(form_api)
+        conf_layout.addWidget(self.card_api)
+        
+        conf_layout.addStretch()
+        self.tabWidget_options.addWidget(self.configuration_tab)
+
+        # =================================================================
+        # System & UI
+        # =================================================================
+        self.system_tab, sys_layout = create_scroll_page()
         self.system_tab.setObjectName("system_tab")
-        self.system_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.language_title_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.language_title_label.setGeometry(QtCore.QRect(10, 10, 261, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.language_title_label.setFont(font)
-        self.language_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.language_title_label.setObjectName("language_title_label")
-        self.comboBox_program_language = QtWidgets.QComboBox(parent=self.system_tab)
-        self.comboBox_program_language.setGeometry(QtCore.QRect(20, 80, 131, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_program_language.setFont(font)
-        self.comboBox_program_language.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_program_language.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
+        card_lang, l_lang = create_glass_card(self.localization_title)
+        form_lang = QtWidgets.QFormLayout()
+        form_lang.setVerticalSpacing(20)
+        form_lang.setHorizontalSpacing(30)
 
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
+        self.program_language_label = QtWidgets.QLabel("App Language")
+        self.program_language_label.setFont(font_label)
+        self.comboBox_program_language = QtWidgets.QComboBox()
+        self.comboBox_program_language.setFont(font_input)
+        self.comboBox_program_language.setFixedHeight(40)
+        self.comboBox_program_language.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_program_language.addItems(["English", "Russian"])
         self.comboBox_program_language.setObjectName("comboBox_program_language")
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_program_language.setGraphicsEffect(shadow)
-        self.comboBox_program_language.addItem("")
-        self.comboBox_program_language.addItem("")
-        self.separator_options_2 = QtWidgets.QFrame(parent=self.system_tab)
-        self.separator_options_2.setGeometry(QtCore.QRect(20, 130, 1070, 3))
-        self.separator_options_2.setMaximumSize(QtCore.QSize(16777215, 3))
-        self.separator_options_2.setStyleSheet("QFrame {\n"
-"        background-color: rgba(10, 10, 10, 80);\n"
-"        border-radius: 2px;\n"
-"        height: 1px;\n"
-"}")
-        self.separator_options_2.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        self.separator_options_2.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        self.separator_options_2.setObjectName("separator_options_2")
-        self.devices_title_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.devices_title_label.setGeometry(QtCore.QRect(10, 150, 261, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.devices_title_label.setFont(font)
-        self.devices_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.devices_title_label.setObjectName("devices_title_label")
-        self.input_device_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.input_device_label.setGeometry(QtCore.QRect(20, 200, 111, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.input_device_label.setFont(font)
-        self.input_device_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.input_device_label.setObjectName("input_device_label")
-        self.comboBox_input_devices = QtWidgets.QComboBox(parent=self.system_tab)
-        self.comboBox_input_devices.setGeometry(QtCore.QRect(20, 220, 231, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_input_devices.setFont(font)
-        self.comboBox_input_devices.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_input_devices.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        form_lang.addRow(self.program_language_label, self.comboBox_program_language)
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_input_devices.setGraphicsEffect(shadow)
-        self.comboBox_input_devices.setObjectName("comboBox_input_devices")
-        self.output_device_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.output_device_label.setGeometry(QtCore.QRect(20, 270, 140, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.output_device_label.setFont(font)
-        self.output_device_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.output_device_label.setObjectName("output_device_label")
-        self.comboBox_output_devices = QtWidgets.QComboBox(parent=self.system_tab)
-        self.comboBox_output_devices.setGeometry(QtCore.QRect(20, 290, 231, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_output_devices.setFont(font)
-        self.comboBox_output_devices.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_output_devices.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
-
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_output_devices.setGraphicsEffect(shadow)
-        self.comboBox_output_devices.setObjectName("comboBox_output_devices")
-        self.program_language_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.program_language_label.setGeometry(QtCore.QRect(20, 60, 221, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.program_language_label.setFont(font)
-        self.program_language_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.program_language_label.setObjectName("program_language_label")
-        self.translator_title_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.translator_title_label.setGeometry(QtCore.QRect(10, 360, 261, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.translator_title_label.setFont(font)
-        self.translator_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.translator_title_label.setObjectName("translator_title_label")
-        self.separator_options_3 = QtWidgets.QFrame(parent=self.system_tab)
-        self.separator_options_3.setGeometry(QtCore.QRect(20, 340, 1070, 3))
-        self.separator_options_3.setMaximumSize(QtCore.QSize(16777215, 3))
-        self.separator_options_3.setStyleSheet("QFrame {\n"
-"        background-color: rgba(10, 10, 10, 80);\n"
-"        border-radius: 2px;\n"
-"        height: 1px;\n"
-"}")
-        self.separator_options_3.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        self.separator_options_3.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        self.separator_options_3.setObjectName("separator_options_3")
-        self.choose_translator_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.choose_translator_label.setGeometry(QtCore.QRect(20, 410, 181, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_translator_label.setFont(font)
-        self.choose_translator_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_translator_label.setObjectName("choose_translator_label")
-        self.comboBox_translator = QtWidgets.QComboBox(parent=self.system_tab)
-        self.comboBox_translator.setGeometry(QtCore.QRect(19, 431, 181, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_translator.setFont(font)
-        self.comboBox_translator.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_translator.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
-
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_translator.setGraphicsEffect(shadow)
+        self.choose_translator_label = QtWidgets.QLabel("Translator")
+        self.choose_translator_label.setFont(font_label)
+        self.comboBox_translator = QtWidgets.QComboBox()
+        self.comboBox_translator.setFont(font_input)
+        self.comboBox_translator.setFixedHeight(40)
+        self.comboBox_translator.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_translator.addItems(["None", "Google", "Yandex"])
         self.comboBox_translator.setObjectName("comboBox_translator")
-        self.comboBox_translator.addItem("")
-        self.comboBox_translator.addItem("")
-        self.comboBox_translator.addItem("")
-        self.comboBox_translator.addItem("")
-        self.target_language_translator_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.target_language_translator_label.setGeometry(QtCore.QRect(220, 410, 141, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.target_language_translator_label.setFont(font)
-        self.target_language_translator_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.target_language_translator_label.setObjectName("target_language_translator_label")
-        self.comboBox_target_language_translator = QtWidgets.QComboBox(parent=self.system_tab)
-        self.comboBox_target_language_translator.setGeometry(QtCore.QRect(220, 430, 141, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_target_language_translator.setFont(font)
-        self.comboBox_target_language_translator.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_target_language_translator.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        form_lang.addRow(self.choose_translator_label, self.comboBox_translator)
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_target_language_translator.setGraphicsEffect(shadow)
-        self.comboBox_target_language_translator.setObjectName("comboBox_target_language_translator")
-        self.comboBox_target_language_translator.addItem("")
-        self.comboBox_mode_translator = QtWidgets.QComboBox(parent=self.system_tab)
-        self.comboBox_mode_translator.setGeometry(QtCore.QRect(380, 430, 161, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_mode_translator.setFont(font)
-        self.comboBox_mode_translator.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_mode_translator.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
-
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_mode_translator.setGraphicsEffect(shadow)
+        self.mode_translator_label = QtWidgets.QLabel("Translation Mode")
+        self.mode_translator_label.setFont(font_label)
+        self.comboBox_mode_translator = QtWidgets.QComboBox()
+        self.comboBox_mode_translator.setFont(font_input)
+        self.comboBox_mode_translator.setFixedHeight(40)
+        self.comboBox_mode_translator.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_mode_translator.addItems(["Both", "User Only", "Character Only"])
         self.comboBox_mode_translator.setObjectName("comboBox_mode_translator")
-        self.comboBox_mode_translator.addItem("")
-        self.comboBox_mode_translator.addItem("")
-        self.comboBox_mode_translator.addItem("")
-        self.mode_translator_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.mode_translator_label.setGeometry(QtCore.QRect(380, 410, 131, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.mode_translator_label.setFont(font)
-        self.mode_translator_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.mode_translator_label.setObjectName("mode_translator_label")
-        self.computer_specs_title_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.computer_specs_title_label.setGeometry(QtCore.QRect(10, 500, 261, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.computer_specs_title_label.setFont(font)
-        self.computer_specs_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.computer_specs_title_label.setObjectName("computer_specs_title_label")
-        self.separator_options_5 = QtWidgets.QFrame(parent=self.system_tab)
-        self.separator_options_5.setGeometry(QtCore.QRect(20, 480, 1070, 3))
-        self.separator_options_5.setMaximumSize(QtCore.QSize(16777215, 3))
-        self.separator_options_5.setStyleSheet("QFrame {\n"
-"        background-color: rgba(10, 10, 10, 80);\n"
-"        border-radius: 2px;\n"
-"        height: 1px;\n"
-"}")
-        self.separator_options_5.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        self.separator_options_5.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        self.separator_options_5.setObjectName("separator_options_5")
-        self.ram_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.ram_label.setGeometry(QtCore.QRect(50, 547, 201, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.ram_label.setFont(font)
-        self.ram_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.ram_label.setScaledContents(False)
-        self.ram_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.ram_label.setObjectName("ram_label")
-        self.ram_label_icon = QtWidgets.QLabel(parent=self.system_tab)
-        self.ram_label_icon.setGeometry(QtCore.QRect(20, 553, 20, 20))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.ram_label_icon.setFont(font)
-        self.ram_label_icon.setStyleSheet("color: rgb(227, 227, 227);")
-        self.ram_label_icon.setText("")
-        self.ram_label_icon.setPixmap(QtGui.QPixmap("app/gui/icons/memory.png"))
-        self.ram_label_icon.setScaledContents(True)
-        self.ram_label_icon.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.ram_label_icon.setObjectName("ram_label_icon")
-        self.gpu_label_icon = QtWidgets.QLabel(parent=self.system_tab)
-        self.gpu_label_icon.setGeometry(QtCore.QRect(20, 587, 20, 20))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.gpu_label_icon.setFont(font)
-        self.gpu_label_icon.setStyleSheet("color: rgb(227, 227, 227);")
-        self.gpu_label_icon.setText("")
-        self.gpu_label_icon.setPixmap(QtGui.QPixmap("app/gui/icons/gpu.png"))
-        self.gpu_label_icon.setScaledContents(True)
-        self.gpu_label_icon.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.gpu_label_icon.setObjectName("gpu_label_icon")
-        self.gpu_label = QtWidgets.QLabel(parent=self.system_tab)
-        self.gpu_label.setGeometry(QtCore.QRect(50, 582, 261, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.gpu_label.setFont(font)
-        self.gpu_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.gpu_label.setScaledContents(False)
-        self.gpu_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.gpu_label.setObjectName("gpu_label")
+        form_lang.addRow(self.mode_translator_label, self.comboBox_mode_translator)
 
-        self.tabWidget_options.addTab(self.system_tab, "")
-        self.llm_tab = QtWidgets.QWidget()
+        self.target_language_translator_label = QtWidgets.QLabel("Target Language:")
+        self.target_language_translator_label.setFont(font_label)
+        self.comboBox_target_language_translator = QtWidgets.QComboBox()
+        self.comboBox_target_language_translator.setFont(font_input)
+        self.comboBox_target_language_translator.setFixedHeight(40)
+        self.comboBox_target_language_translator.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_target_language_translator.addItem("Russian")
+        self.comboBox_target_language_translator.setObjectName("comboBox_target_language_translator")
+        form_lang.addRow(self.target_language_translator_label, self.comboBox_target_language_translator)
+
+        l_lang.addLayout(form_lang)
+        sys_layout.addWidget(card_lang)
+
+        card_audio, l_audio = create_glass_card(self.audio_devices_title)
+        form_audio = QtWidgets.QFormLayout()
+        form_audio.setVerticalSpacing(20)
+        form_audio.setHorizontalSpacing(30)
+
+        self.input_device_label = QtWidgets.QLabel("Microphone")
+        self.input_device_label.setFont(font_label)
+        self.comboBox_input_devices = QtWidgets.QComboBox()
+        self.comboBox_input_devices.setFont(font_input)
+        self.comboBox_input_devices.setFixedHeight(40)
+        self.comboBox_input_devices.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_input_devices.setObjectName("comboBox_input_devices")
+        form_audio.addRow(self.input_device_label, self.comboBox_input_devices)
+
+        self.output_device_label = QtWidgets.QLabel("Speakers")
+        self.output_device_label.setFont(font_label)
+        self.comboBox_output_devices = QtWidgets.QComboBox()
+        self.comboBox_output_devices.setFont(font_input)
+        self.comboBox_output_devices.setFixedHeight(40)
+        self.comboBox_output_devices.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_output_devices.setObjectName("comboBox_output_devices")
+        form_audio.addRow(self.output_device_label, self.comboBox_output_devices)
+
+        l_audio.addLayout(form_audio)
+        sys_layout.addWidget(card_audio)
+
+        card_hw, l_hw = create_glass_card(self.hardware_spec_title)
+        hw_layout = QtWidgets.QHBoxLayout()
+        
+        ram_box = QtWidgets.QHBoxLayout()
+        self.ram_label_icon = QtWidgets.QLabel()
+        self.ram_label_icon.setPixmap(QtGui.QPixmap("app/gui/icons/memory.png").scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.ram_label = QtWidgets.QLabel("0 GB RAM")
+        self.ram_label.setFont(font_label)
+        ram_box.addWidget(self.ram_label_icon)
+        ram_box.addWidget(self.ram_label)
+        ram_box.addStretch()
+        
+        gpu_box = QtWidgets.QHBoxLayout()
+        self.gpu_label_icon = QtWidgets.QLabel()
+        self.gpu_label_icon.setPixmap(QtGui.QPixmap("app/gui/icons/gpu.png").scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        self.gpu_label = QtWidgets.QLabel("No GPU")
+        self.gpu_label.setFont(font_label)
+        gpu_box.addWidget(self.gpu_label_icon)
+        gpu_box.addWidget(self.gpu_label)
+        gpu_box.addStretch()
+
+        hw_layout.addLayout(ram_box)
+        hw_layout.addLayout(gpu_box)
+        l_hw.addLayout(hw_layout)
+        sys_layout.addWidget(card_hw)
+
+        sys_layout.addStretch()
+        self.tabWidget_options.addWidget(self.system_tab)
+
+        # =================================================================
+        # LLM Settings
+        # =================================================================
+        self.llm_tab, llm_layout = create_scroll_page()
         self.llm_tab.setObjectName("llm_tab")
-        self.llm_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.llm_options_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.llm_options_label.setGeometry(QtCore.QRect(20, 60, 150, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.llm_options_label.setFont(font)
-        self.llm_options_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.llm_options_label.setObjectName("llm_options_label")
-        self.llm_title_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.llm_title_label.setGeometry(QtCore.QRect(10, 10, 301, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.llm_title_label.setFont(font)
-        self.llm_title_label.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
-        self.llm_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.llm_title_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.llm_title_label.setObjectName("llm_title_label")
-        self.choose_llm_device_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.choose_llm_device_label.setGeometry(QtCore.QRect(20, 128, 101, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_llm_device_label.setFont(font)
-        self.choose_llm_device_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_llm_device_label.setObjectName("choose_llm_device_label")
-        self.comboBox_llm_devices = QtWidgets.QComboBox(parent=self.llm_tab)
-        self.comboBox_llm_devices.setGeometry(QtCore.QRect(20, 155, 111, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_llm_devices.setFont(font)
-        self.comboBox_llm_devices.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_llm_devices.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
+        card_llm_base, l_llm_base = create_glass_card(self.llm_settings_title)
+        form_llm_base = QtWidgets.QFormLayout()
+        form_llm_base.setVerticalSpacing(20)
+        form_llm_base.setHorizontalSpacing(30)
 
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_llm_devices.setGraphicsEffect(shadow)
-        self.comboBox_llm_devices.setObjectName("comboBox_llm_devices")
-        self.comboBox_llm_devices.addItem("")
-        self.comboBox_llm_devices.addItem("")
-        self.gpu_layers_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.gpu_layers_label.setGeometry(QtCore.QRect(20, 203, 81, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.gpu_layers_label.setFont(font)
-        self.gpu_layers_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.gpu_layers_label.setObjectName("gpu_layers_label")
-        self.checkBox_enable_mlock = QtWidgets.QCheckBox(parent=self.llm_tab)
-        self.checkBox_enable_mlock.setGeometry(QtCore.QRect(20, 328, 131, 41))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.checkBox_enable_mlock.setFont(font)
-        self.checkBox_enable_mlock.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.checkBox_enable_mlock.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.checkBox_enable_mlock.setStyleSheet("QCheckBox {\n"
-"    color: #e0e0e0;\n"
-"    spacing: 5px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    border: 2px solid #333;\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"    border-radius: 11px;\n"
-"    background-color: #2b2b2b;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:hover {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #3a3a3a;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #444;\n"
-"    image: url(:/sowInterface/checked.png);\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:disabled {\n"
-"    border: 2px solid #444;\n"
-"    background-color: #555;\n"
-"}\n"
-"\n"
-"QCheckBox:disabled {\n"
-"    color: #888;\n"
-"}")
-        self.checkBox_enable_mlock.setObjectName("checkBox_enable_mlock")
-        self.context_size_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.context_size_label.setGeometry(QtCore.QRect(20, 266, 161, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.context_size_label.setFont(font)
-        self.context_size_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.context_size_label.setObjectName("context_size_label")
-        self.line_llm = QtWidgets.QFrame(parent=self.llm_tab)
-        self.line_llm.setGeometry(QtCore.QRect(20, 388, 1070, 3))
-        self.line_llm.setMaximumSize(QtCore.QSize(16777215, 3))
-        self.line_llm.setStyleSheet("QFrame {\n"
-"        background-color: rgba(10, 10, 10, 80);\n"
-"        border-radius: 2px;\n"
-"        height: 1px;\n"
-"}")
-        self.line_llm.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        self.line_llm.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        self.line_llm.setObjectName("line_llm")
-        self.llm_title_label_2 = QtWidgets.QLabel(parent=self.llm_tab)
-        self.llm_title_label_2.setGeometry(QtCore.QRect(10, 400, 401, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.llm_title_label_2.setFont(font)
-        self.llm_title_label_2.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
-        self.llm_title_label_2.setStyleSheet("color: rgb(227, 227, 227);")
-        self.llm_title_label_2.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.llm_title_label_2.setObjectName("llm_title_label_2")
-        self.reapet_penalty_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.reapet_penalty_label.setGeometry(QtCore.QRect(290, 448, 151, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.reapet_penalty_label.setFont(font)
-        self.reapet_penalty_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.reapet_penalty_label.setObjectName("reapet_penalty_label")
-        self.temperature_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.temperature_label.setGeometry(QtCore.QRect(20, 448, 131, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.temperature_label.setFont(font)
-        self.temperature_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.temperature_label.setObjectName("temperature_label")
-        self.temperature_horizontalSlider = QtWidgets.QSlider(parent=self.llm_tab)
-        self.temperature_horizontalSlider.setGeometry(QtCore.QRect(20, 468, 160, 22))
-        self.temperature_horizontalSlider.setStyleSheet("QSlider::groove:horizontal {\n"
-"    background-color: #333;\n"
-"    height: 8px;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::sub-page:horizontal {\n"
-"    background-color: #555;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::add-page:horizontal {\n"
-"    background-color: #2b2b2b;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal {\n"
-"    background-color: #e0e0e0;\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    margin: -4px 0;\n"
-"    border-radius: 8px;\n"
-"    border: 2px solid #333;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:hover {\n"
-"    background-color: #ffffff;\n"
-"    border: 2px solid #555;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:pressed {\n"
-"    background-color: #cccccc;\n"
-"    border: 2px solid #2b2b2b;\n"
-"}\n"
-"\n"
-"QSlider::groove:horizontal:disabled {\n"
-"    background-color: #444;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:disabled {\n"
-"    background-color: #666;\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.temperature_horizontalSlider.setMinimum(0)
-        self.temperature_horizontalSlider.setMaximum(20)
-        self.temperature_horizontalSlider.setSingleStep(1)
-        self.temperature_horizontalSlider.setProperty("value", 10)
-        self.temperature_horizontalSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.temperature_horizontalSlider.setObjectName("temperature_horizontalSlider")
-        self.temperature_value_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.temperature_value_label.setGeometry(QtCore.QRect(190, 448, 61, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.temperature_value_label.setFont(font)
-        self.temperature_value_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.temperature_value_label.setObjectName("temperature_value_label")
-        self.top_p_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.top_p_label.setGeometry(QtCore.QRect(20, 500, 51, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.top_p_label.setFont(font)
-        self.top_p_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.top_p_label.setObjectName("top_p_label")
-        self.top_p_horizontalSlider = QtWidgets.QSlider(parent=self.llm_tab)
-        self.top_p_horizontalSlider.setGeometry(QtCore.QRect(20, 518, 160, 22))
-        self.top_p_horizontalSlider.setStyleSheet("QSlider::groove:horizontal {\n"
-"    background-color: #333;\n"
-"    height: 8px;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::sub-page:horizontal {\n"
-"    background-color: #555;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::add-page:horizontal {\n"
-"    background-color: #2b2b2b;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal {\n"
-"    background-color: #e0e0e0;\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    margin: -4px 0;\n"
-"    border-radius: 8px;\n"
-"    border: 2px solid #333;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:hover {\n"
-"    background-color: #ffffff;\n"
-"    border: 2px solid #555;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:pressed {\n"
-"    background-color: #cccccc;\n"
-"    border: 2px solid #2b2b2b;\n"
-"}\n"
-"\n"
-"QSlider::groove:horizontal:disabled {\n"
-"    background-color: #444;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:disabled {\n"
-"    background-color: #666;\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.top_p_horizontalSlider.setMinimum(0)
-        self.top_p_horizontalSlider.setMaximum(10)
-        self.top_p_horizontalSlider.setSingleStep(1)
-        self.top_p_horizontalSlider.setPageStep(0)
-        self.top_p_horizontalSlider.setProperty("value", 10)
-        self.top_p_horizontalSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.top_p_horizontalSlider.setObjectName("top_p_horizontalSlider")
-        self.top_p_value_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.top_p_value_label.setGeometry(QtCore.QRect(190, 499, 61, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.top_p_value_label.setFont(font)
-        self.top_p_value_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.top_p_value_label.setObjectName("top_p_value_label")
-        self.gpu_layers_horizontalSlider = QtWidgets.QSlider(parent=self.llm_tab)
-        self.gpu_layers_horizontalSlider.setGeometry(QtCore.QRect(20, 225, 160, 22))
-        self.gpu_layers_horizontalSlider.setStyleSheet("QSlider::groove:horizontal {\n"
-"    background-color: #333;\n"
-"    height: 8px;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::sub-page:horizontal {\n"
-"    background-color: #555;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::add-page:horizontal {\n"
-"    background-color: #2b2b2b;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal {\n"
-"    background-color: #e0e0e0;\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    margin: -4px 0;\n"
-"    border-radius: 8px;\n"
-"    border: 2px solid #333;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:hover {\n"
-"    background-color: #ffffff;\n"
-"    border: 2px solid #555;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:pressed {\n"
-"    background-color: #cccccc;\n"
-"    border: 2px solid #2b2b2b;\n"
-"}\n"
-"\n"
-"QSlider::groove:horizontal:disabled {\n"
-"    background-color: #444;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:disabled {\n"
-"    background-color: #666;\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.gpu_layers_horizontalSlider.setMinimum(1)
-        self.gpu_layers_horizontalSlider.setMaximum(100)
-        self.gpu_layers_horizontalSlider.setSingleStep(1)
-        self.gpu_layers_horizontalSlider.setProperty("value", 1)
-        self.gpu_layers_horizontalSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.gpu_layers_horizontalSlider.setObjectName("gpu_layers_horizontalSlider")
-        self.context_size_horizontalSlider = QtWidgets.QSlider(parent=self.llm_tab)
-        self.context_size_horizontalSlider.setGeometry(QtCore.QRect(20, 288, 160, 22))
-        self.context_size_horizontalSlider.setStyleSheet("QSlider::groove:horizontal {\n"
-"    background-color: #333;\n"
-"    height: 8px;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::sub-page:horizontal {\n"
-"    background-color: #555;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::add-page:horizontal {\n"
-"    background-color: #2b2b2b;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal {\n"
-"    background-color: #e0e0e0;\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    margin: -4px 0;\n"
-"    border-radius: 8px;\n"
-"    border: 2px solid #333;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:hover {\n"
-"    background-color: #ffffff;\n"
-"    border: 2px solid #555;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:pressed {\n"
-"    background-color: #cccccc;\n"
-"    border: 2px solid #2b2b2b;\n"
-"}\n"
-"\n"
-"QSlider::groove:horizontal:disabled {\n"
-"    background-color: #444;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:disabled {\n"
-"    background-color: #666;\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.context_size_horizontalSlider.setMinimum(512)
-        self.context_size_horizontalSlider.setMaximum(16384)
-        self.context_size_horizontalSlider.setSingleStep(64)
-        self.context_size_horizontalSlider.setPageStep(0)
-        self.context_size_horizontalSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.context_size_horizontalSlider.setObjectName("context_size_horizontalSlider")
-        self.repeat_penalty_horizontalSlider = QtWidgets.QSlider(parent=self.llm_tab)
-        self.repeat_penalty_horizontalSlider.setGeometry(QtCore.QRect(290, 468, 160, 22))
-        self.repeat_penalty_horizontalSlider.setStyleSheet("QSlider::groove:horizontal {\n"
-"    background-color: #333;\n"
-"    height: 8px;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::sub-page:horizontal {\n"
-"    background-color: #555;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::add-page:horizontal {\n"
-"    background-color: #2b2b2b;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal {\n"
-"    background-color: #e0e0e0;\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    margin: -4px 0;\n"
-"    border-radius: 8px;\n"
-"    border: 2px solid #333;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:hover {\n"
-"    background-color: #ffffff;\n"
-"    border: 2px solid #555;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:pressed {\n"
-"    background-color: #cccccc;\n"
-"    border: 2px solid #2b2b2b;\n"
-"}\n"
-"\n"
-"QSlider::groove:horizontal:disabled {\n"
-"    background-color: #444;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:disabled {\n"
-"    background-color: #666;\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.repeat_penalty_horizontalSlider.setMinimum(10)
-        self.repeat_penalty_horizontalSlider.setMaximum(20)
-        self.repeat_penalty_horizontalSlider.setSingleStep(1)
-        self.repeat_penalty_horizontalSlider.setPageStep(0)
-        self.repeat_penalty_horizontalSlider.setProperty("value", 10)
-        self.repeat_penalty_horizontalSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.repeat_penalty_horizontalSlider.setObjectName("repeat_penalty_horizontalSlider")
-        self.max_tokens_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.max_tokens_label.setGeometry(QtCore.QRect(290, 500, 150, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.max_tokens_label.setFont(font)
-        self.max_tokens_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.max_tokens_label.setObjectName("max_tokens_label")
-        self.max_tokens_horizontalSlider = QtWidgets.QSlider(parent=self.llm_tab)
-        self.max_tokens_horizontalSlider.setGeometry(QtCore.QRect(290, 518, 160, 22))
-        self.max_tokens_horizontalSlider.setStyleSheet("QSlider::groove:horizontal {\n"
-"    background-color: #333;\n"
-"    height: 8px;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::sub-page:horizontal {\n"
-"    background-color: #555;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::add-page:horizontal {\n"
-"    background-color: #2b2b2b;\n"
-"    border-radius: 4px;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal {\n"
-"    background-color: #e0e0e0;\n"
-"    width: 16px;\n"
-"    height: 16px;\n"
-"    margin: -4px 0;\n"
-"    border-radius: 8px;\n"
-"    border: 2px solid #333;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:hover {\n"
-"    background-color: #ffffff;\n"
-"    border: 2px solid #555;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:pressed {\n"
-"    background-color: #cccccc;\n"
-"    border: 2px solid #2b2b2b;\n"
-"}\n"
-"\n"
-"QSlider::groove:horizontal:disabled {\n"
-"    background-color: #444;\n"
-"}\n"
-"\n"
-"QSlider::handle:horizontal:disabled {\n"
-"    background-color: #666;\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.max_tokens_horizontalSlider.setMinimum(16)
-        self.max_tokens_horizontalSlider.setMaximum(2048)
-        self.max_tokens_horizontalSlider.setSingleStep(12)
-        self.max_tokens_horizontalSlider.setPageStep(0)
-        self.max_tokens_horizontalSlider.setProperty("value", 16)
-        self.max_tokens_horizontalSlider.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.max_tokens_horizontalSlider.setObjectName("max_tokens_horizontalSlider")
-        self.repeat_penalty_value_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.repeat_penalty_value_label.setGeometry(QtCore.QRect(460, 448, 61, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.repeat_penalty_value_label.setFont(font)
-        self.repeat_penalty_value_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.repeat_penalty_value_label.setObjectName("repeat_penalty_value_label")
-        self.max_tokens_value_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.max_tokens_value_label.setGeometry(QtCore.QRect(460, 499, 61, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.max_tokens_value_label.setFont(font)
-        self.max_tokens_value_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.max_tokens_value_label.setObjectName("max_tokens_value_label")
-        self.context_size_value_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.context_size_value_label.setGeometry(QtCore.QRect(190, 266, 61, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.context_size_value_label.setFont(font)
-        self.context_size_value_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.context_size_value_label.setObjectName("context_size_value_label")
-        self.gpu_layers_value_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.gpu_layers_value_label.setGeometry(QtCore.QRect(190, 203, 61, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.gpu_layers_value_label.setFont(font)
-        self.gpu_layers_value_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.gpu_layers_value_label.setObjectName("gpu_layers_value_label")
-        self.lineEdit_gpuLayers = QtWidgets.QLineEdit(parent=self.llm_tab)
-        self.lineEdit_gpuLayers.setGeometry(QtCore.QRect(190, 225, 60, 24))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(8)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_gpuLayers.setFont(font)
-        self.lineEdit_gpuLayers.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}")
-        self.lineEdit_gpuLayers.setText("")
-        self.lineEdit_gpuLayers.setReadOnly(False)
-        self.lineEdit_gpuLayers.setObjectName("lineEdit_gpuLayers")
-        self.lineEdit_contextSize = QtWidgets.QLineEdit(parent=self.llm_tab)
-        self.lineEdit_contextSize.setGeometry(QtCore.QRect(190, 288, 60, 24))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(8)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_contextSize.setFont(font)
-        self.lineEdit_contextSize.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}")
-        self.lineEdit_contextSize.setText("")
-        self.lineEdit_contextSize.setObjectName("lineEdit_contextSize")
-        self.lineEdit_temperature = QtWidgets.QLineEdit(parent=self.llm_tab)
-        self.lineEdit_temperature.setGeometry(QtCore.QRect(190, 468, 60, 24))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(8)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_temperature.setFont(font)
-        self.lineEdit_temperature.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}")
-        self.lineEdit_temperature.setText("")
-        self.lineEdit_temperature.setObjectName("lineEdit_temperature")
-        self.lineEdit_topP = QtWidgets.QLineEdit(parent=self.llm_tab)
-        self.lineEdit_topP.setGeometry(QtCore.QRect(190, 518, 60, 24))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(8)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_topP.setFont(font)
-        self.lineEdit_topP.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}")
-        self.lineEdit_topP.setText("")
-        self.lineEdit_topP.setObjectName("lineEdit_topP")
-        self.lineEdit_repeatPenalty = QtWidgets.QLineEdit(parent=self.llm_tab)
-        self.lineEdit_repeatPenalty.setGeometry(QtCore.QRect(460, 468, 60, 24))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(8)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_repeatPenalty.setFont(font)
-        self.lineEdit_repeatPenalty.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}")
-        self.lineEdit_repeatPenalty.setText("")
-        self.lineEdit_repeatPenalty.setObjectName("lineEdit_repeatPenalty")
-        self.lineEdit_maxTokens = QtWidgets.QLineEdit(parent=self.llm_tab)
-        self.lineEdit_maxTokens.setGeometry(QtCore.QRect(460, 518, 60, 24))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(8)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_maxTokens.setFont(font)
-        self.lineEdit_maxTokens.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}")
-        self.lineEdit_maxTokens.setText("")
-        self.lineEdit_maxTokens.setObjectName("lineEdit_maxTokens")
-        self.choose_llm_gpu_device_label = QtWidgets.QLabel(parent=self.llm_tab)
-        self.choose_llm_gpu_device_label.setGeometry(QtCore.QRect(150, 128, 111, 21))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_llm_gpu_device_label.setFont(font)
-        self.choose_llm_gpu_device_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_llm_gpu_device_label.setObjectName("choose_llm_gpu_device_label")
-        self.comboBox_llm_gpu_devices = QtWidgets.QComboBox(parent=self.llm_tab)
-        self.comboBox_llm_gpu_devices.setGeometry(QtCore.QRect(150, 155, 111, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_llm_gpu_devices.setFont(font)
-        self.comboBox_llm_gpu_devices.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_llm_gpu_devices.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
-
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_llm_gpu_devices.setGraphicsEffect(shadow)
-        self.comboBox_llm_gpu_devices.setObjectName("comboBox_llm_gpu_devices")
-        self.comboBox_llm_gpu_devices.addItem("")
-        self.comboBox_llm_gpu_devices.addItem("")
-        self.checkBox_enable_flash_attention = QtWidgets.QCheckBox(parent=self.llm_tab)
-        self.checkBox_enable_flash_attention.setGeometry(QtCore.QRect(170, 328, 181, 41))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.checkBox_enable_flash_attention.setFont(font)
-        self.checkBox_enable_flash_attention.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.checkBox_enable_flash_attention.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.checkBox_enable_flash_attention.setStyleSheet("QCheckBox {\n"
-"    color: #e0e0e0;\n"
-"    spacing: 5px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    border: 2px solid #333;\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"    border-radius: 11px;\n"
-"    background-color: #2b2b2b;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:hover {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #3a3a3a;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #444;\n"
-"    image: url(:/sowInterface/checked.png);\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:disabled {\n"
-"    border: 2px solid #444;\n"
-"    background-color: #555;\n"
-"}\n"
-"\n"
-"QCheckBox:disabled {\n"
-"    color: #888;\n"
-"}")
-        self.checkBox_enable_flash_attention.setObjectName("checkBox_enable_flash_attention")
-
-        self.lineEdit_server = QtWidgets.QLineEdit(parent=self.llm_tab)
-        self.lineEdit_server.setGeometry(QtCore.QRect(20, 85, 241, 27))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(8)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_server.setFont(font)
-        self.lineEdit_server.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.lineEdit_server.setDragEnabled(False)
+        self.llm_options_label = QtWidgets.QLabel("Server Endpoint")
+        self.llm_options_label.setFont(font_label)
+        self.lineEdit_server = QtWidgets.QLineEdit()
+        self.lineEdit_server.setFont(font_input)
+        self.lineEdit_server.setFixedHeight(40)
         self.lineEdit_server.setReadOnly(True)
         self.lineEdit_server.setObjectName("lineEdit_server")
-        self.system_prompt_button = QtWidgets.QPushButton(parent=self.llm_tab)
-        self.system_prompt_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.system_prompt_button.setGeometry(QtCore.QRect(20, 570, 190, 35))
-        self.system_prompt_button.setMinimumSize(QtCore.QSize(25, 25))
-        self.system_prompt_button.setMaximumSize(QtCore.QSize(1000, 35))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.system_prompt_button.setFont(font)
-        self.system_prompt_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.system_prompt_button.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
-        icon_system_prompt = QtGui.QIcon()
-        icon_system_prompt.addPixmap(QtGui.QPixmap("app/gui/icons/system_prompt.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.system_prompt_button.setIcon(icon_system_prompt)
-        self.system_prompt_button.setIconSize(QtCore.QSize(21, 21))
-        self.system_prompt_button.setCheckable(False)
-        self.system_prompt_button.setObjectName("system_prompt_button")
-        self.lorebook_editor_button = QtWidgets.QPushButton(parent=self.llm_tab)
-        self.lorebook_editor_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.lorebook_editor_button.setGeometry(QtCore.QRect(220, 570, 181, 35))
-        self.lorebook_editor_button.setMinimumSize(QtCore.QSize(25, 25))
-        self.lorebook_editor_button.setMaximumSize(QtCore.QSize(1000, 35))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lorebook_editor_button.setFont(font)
-        self.lorebook_editor_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.lorebook_editor_button.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
-        icon_lorebook = QtGui.QIcon()
-        icon_lorebook.addPixmap(QtGui.QPixmap("app/gui/icons/lorebook.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.lorebook_editor_button.setIcon(icon_lorebook)
-        self.lorebook_editor_button.setIconSize(QtCore.QSize(21, 21))
-        self.lorebook_editor_button.setCheckable(False)
-        self.lorebook_editor_button.setObjectName("lorebook_editor_button")
-        self.tabWidget_options.addTab(self.llm_tab, "")
-        self.sow_system_tab = QtWidgets.QWidget()
-        self.sow_system_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.sow_system_tab.setObjectName("sow_system_tab")
-        self.sow_system_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.scrollArea_modules = QtWidgets.QScrollArea(parent=self.sow_system_tab)
-        self.scrollArea_modules.setEnabled(True)
-        self.scrollArea_modules.setStyleSheet("QScrollArea {\n"
-"                border: none;\n"
-"                background-color: rgb(27,27,27);\n"
-"}\n"
-"\n"
-"QScrollBar:vertical {\n"
-"                background-color: #2b2b2b;\n"
-"                width: 12px;\n"
-"                margin: 15px 0px 15px 0px;\n"
-"                border-radius: 5px;\n"
-"}\n"
-"\n"
-"        QScrollBar::handle:vertical {\n"
-"                background-color: #383838;\n"
-"                min-height: 30px;\n"
-"                border-radius: 3px;\n"
-"                margin: 2px;\n"
-"        }\n"
-"\n"
-"        QScrollBar::handle:vertical:hover {\n"
-"                background-color: #454545;\n"
-"        }\n"
-"\n"
-"        QScrollBar::handle:vertical:pressed {\n"
-"                background-color: #424242;\n"
-"        }\n"
-"\n"
-"        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {\n"
-"                border: none;\n"
-"                background: none;\n"
-"        }\n"
-"\n"
-"        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {\n"
-"                background: none;\n"
-"        }")
-        self.scrollArea_modules.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scrollArea_modules.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scrollArea_modules.setWidgetResizable(True)
-        self.scrollArea_modules.setObjectName("scrollArea_modules")
+        form_llm_base.addRow(self.llm_options_label, self.lineEdit_server)
 
-        self.scrollAreaWidgetContents_modules = QtWidgets.QWidget()
-        self.scrollAreaWidgetContents_modules.setObjectName("scrollAreaWidgetContents_modules")
+        self.choose_llm_device_label = QtWidgets.QLabel("Compute Device")
+        self.choose_llm_device_label.setFont(font_label)
+        self.comboBox_llm_devices = QtWidgets.QComboBox()
+        self.comboBox_llm_devices.setFont(font_input)
+        self.comboBox_llm_devices.setFixedHeight(40)
+        self.comboBox_llm_devices.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_llm_devices.addItems(["CPU", "GPU"])
+        self.comboBox_llm_devices.setObjectName("comboBox_llm_devices")
+        form_llm_base.addRow(self.choose_llm_device_label, self.comboBox_llm_devices)
 
-        self.choose_live2d_mode_label = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.choose_live2d_mode_label.setGeometry(QtCore.QRect(20, 97, 141, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_live2d_mode_label.setFont(font)
-        self.choose_live2d_mode_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_live2d_mode_label.setObjectName("choose_live2d_mode_label")
-        self.comboBox_live2d_mode = QtWidgets.QComboBox(parent=self.scrollAreaWidgetContents_modules)
-        self.comboBox_live2d_mode.setGeometry(QtCore.QRect(20, 120, 141, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_live2d_mode.setFont(font)
-        self.comboBox_live2d_mode.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_live2d_mode.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        self.choose_llm_gpu_device_label = QtWidgets.QLabel("GPU Backend")
+        self.choose_llm_gpu_device_label.setFont(font_label)
+        self.comboBox_llm_gpu_devices = QtWidgets.QComboBox()
+        self.comboBox_llm_gpu_devices.setFont(font_input)
+        self.comboBox_llm_gpu_devices.setFixedHeight(40)
+        self.comboBox_llm_gpu_devices.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_llm_gpu_devices.addItems(["Vulkan", "CUDA"])
+        self.comboBox_llm_gpu_devices.setObjectName("comboBox_llm_gpu_devices")
+        form_llm_base.addRow(self.choose_llm_gpu_device_label, self.comboBox_llm_gpu_devices)
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
+        check_box_layout = QtWidgets.QHBoxLayout()
+        check_box_layout.setSpacing(25)
+        self.checkBox_enable_mlock = QtWidgets.QCheckBox("MLock")
+        self.checkBox_enable_mlock.setFont(font_input)
+        self.checkBox_enable_mlock.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.checkBox_enable_mlock.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
             }
         """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_live2d_mode.setGraphicsEffect(shadow)
-        self.comboBox_live2d_mode.setObjectName("comboBox_live2d_mode")
-        self.comboBox_live2d_mode.addItem("")
-        self.comboBox_live2d_mode.addItem("")
-        self.checkBox_enable_sow_system = QtWidgets.QCheckBox(parent=self.scrollAreaWidgetContents_modules)
-        self.checkBox_enable_sow_system.setGeometry(QtCore.QRect(20, 60, 291, 22))
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.checkBox_enable_sow_system.sizePolicy().hasHeightForWidth())
-        self.checkBox_enable_sow_system.setSizePolicy(sizePolicy)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.checkBox_enable_sow_system.setFont(font)
-        self.checkBox_enable_sow_system.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.checkBox_enable_sow_system.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.checkBox_enable_sow_system.setStyleSheet("QCheckBox {\n"
-"    color: #e0e0e0;\n"
-"    spacing: 5px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    border: 2px solid #333;\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"    border-radius: 11px;\n"
-"    background-color: #2b2b2b;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:hover {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #3a3a3a;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #444;\n"
-"    image: url(:/sowInterface/checked.png);\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:disabled {\n"
-"    border: 2px solid #444;\n"
-"    background-color: #555;\n"
-"}\n"
-"\n"
-"QCheckBox:disabled {\n"
-"    color: #888;\n"
-"}")
-        self.checkBox_enable_sow_system.setIconSize(QtCore.QSize(16, 16))
-        self.checkBox_enable_sow_system.setObjectName("checkBox_enable_sow_system")
-        self.sow_system_title_label = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.sow_system_title_label.setGeometry(QtCore.QRect(10, 10, 211, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.sow_system_title_label.setFont(font)
-        self.sow_system_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.sow_system_title_label.setObjectName("sow_system_title_label")
-        self.separator_options = QtWidgets.QFrame(parent=self.scrollAreaWidgetContents_modules)
-        self.separator_options.setGeometry(QtCore.QRect(20, 290, 1060, 3))
-        self.separator_options.setMaximumSize(QtCore.QSize(16777215, 3))
-        self.separator_options.setStyleSheet("QFrame {\n"
-"        background-color: rgba(10, 10, 10, 80);\n"
-"        border-radius: 2px;\n"
-"        height: 1px;\n"
-"}")
-        self.separator_options.setFrameShape(QtWidgets.QFrame.Shape.HLine)
-        self.separator_options.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
-        self.separator_options.setObjectName("separator_options")
-        self.sow_system_modules_title_label = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.sow_system_modules_title_label.setGeometry(QtCore.QRect(10, 310, 171, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(12)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.sow_system_modules_title_label.setFont(font)
-        self.sow_system_modules_title_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.sow_system_modules_title_label.setObjectName("sow_system_modules_title_label")
-        self.speech_to_text_method_label = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.speech_to_text_method_label.setGeometry(QtCore.QRect(21, 360, 151, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.speech_to_text_method_label.setFont(font)
-        self.speech_to_text_method_label.setStyleSheet("color: rgb(227, 227, 227);")
-        self.speech_to_text_method_label.setObjectName("speech_to_text_method_label")
-        self.comboBox_speech_to_text_method = QtWidgets.QComboBox(parent=self.scrollAreaWidgetContents_modules)
-        self.comboBox_speech_to_text_method.setGeometry(QtCore.QRect(20, 380, 181, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_speech_to_text_method.setFont(font)
-        self.comboBox_speech_to_text_method.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_speech_to_text_method.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        self.checkBox_enable_mlock.setObjectName("checkBox_enable_mlock")
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
+        self.checkBox_enable_flash_attention = QtWidgets.QCheckBox("Flash Attention")
+        self.checkBox_enable_flash_attention.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
             }
         """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_speech_to_text_method.setGraphicsEffect(shadow)
-        self.comboBox_speech_to_text_method.setObjectName("comboBox_speech_to_text_method")
-        self.comboBox_speech_to_text_method.addItem("")
-        self.comboBox_speech_to_text_method.addItem("")
-        self.comboBox_speech_to_text_method.addItem("")
-        self.choose_model_fps = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.choose_model_fps.setGeometry(QtCore.QRect(180, 97, 151, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_model_fps.setFont(font)
-        self.choose_model_fps.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_model_fps.setObjectName("choose_model_fps")
-        self.comboBox_model_fps = QtWidgets.QComboBox(parent=self.scrollAreaWidgetContents_modules)
-        self.comboBox_model_fps.setGeometry(QtCore.QRect(180, 120, 141, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_model_fps.setFont(font)
-        self.comboBox_model_fps.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_model_fps.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
-
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_model_fps.setGraphicsEffect(shadow)
-        self.comboBox_model_fps.setObjectName("comboBox_model_fps")
-        self.comboBox_model_fps.addItem("")
-        self.comboBox_model_fps.addItem("")
-        self.comboBox_model_fps.addItem("")
+        self.checkBox_enable_flash_attention.setFont(font_input)
+        self.checkBox_enable_flash_attention.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.checkBox_enable_flash_attention.setObjectName("checkBox_enable_flash_attention")
         
-        self.comboBox_model_background = QtWidgets.QComboBox(parent=self.scrollAreaWidgetContents_modules)
-        self.comboBox_model_background.setGeometry(QtCore.QRect(20, 190, 151, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_model_background.setFont(font)
-        self.comboBox_model_background.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_model_background.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        check_box_layout.addWidget(self.checkBox_enable_mlock)
+        check_box_layout.addWidget(self.checkBox_enable_flash_attention)
+        check_box_layout.addStretch()
+        form_llm_base.addRow("", check_box_layout)
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
+        l_llm_base.addLayout(form_llm_base)
+        llm_layout.addWidget(card_llm_base)
 
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
+        def create_slider_row(label_text, slider_obj, line_edit_obj, min_val, max_val, step=1):
+            row = QtWidgets.QHBoxLayout()
+            row.setSpacing(20)
+            
+            lbl = QtWidgets.QLabel(label_text)
+            lbl.setFont(font_label)
+            lbl.setFixedWidth(120)
+            
+            slider_obj.setOrientation(QtCore.Qt.Orientation.Horizontal)
+            slider_obj.setMinimum(min_val)
+            slider_obj.setMaximum(max_val)
+            slider_obj.setSingleStep(step)
+            slider_obj.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            slider_obj.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            slider_obj.setStyleSheet("""
+                QToolTip { 
+                    background-color: rgba(25, 25, 30, 0.95); 
+                    color: #E0E0E0; 
+                    border: 1px solid rgba(255, 255, 255, 0.15); 
+                    border-radius: 6px; 
+                    padding: 6px 10px; font-size: 12px; 
+                    font-weight: 500; 
+                }
+                QSlider::groove:horizontal { background: rgba(0,0,0,0.5); height: 6px; border-radius: 3px; }
+                QSlider::sub-page:horizontal { background: rgba(255, 255, 255, 0.6); border-radius: 3px; }
+                QSlider::handle:horizontal { background: white; width: 16px; height: 16px; margin: -5px 0; border-radius: 8px; border: 1px solid rgba(0,0,0,0.2); }
+                QSlider::handle:horizontal:hover { background: #ffffff; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+            """)
+            
+            line_edit_obj.setFont(font_input)
+            line_edit_obj.setFixedSize(65, 35)
+            line_edit_obj.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            row.addWidget(lbl)
+            row.addWidget(slider_obj)
+            row.addWidget(line_edit_obj)
+            return row
 
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
+        card_llm_mem, l_llm_mem = create_glass_card(self.memory_and_offloading_title)
+        self.gpu_layers_horizontalSlider = QtWidgets.QSlider()
+        self.gpu_layers_horizontalSlider.setObjectName("gpu_layers_horizontalSlider")
+        self.lineEdit_gpuLayers = QtWidgets.QLineEdit()
+        self.lineEdit_gpuLayers.setObjectName("lineEdit_gpuLayers")
+        l_llm_mem.addLayout(create_slider_row(self.gpu_layers_text, self.gpu_layers_horizontalSlider, self.lineEdit_gpuLayers, 0, 100))
 
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
+        self.context_size_horizontalSlider = QtWidgets.QSlider()
+        self.context_size_horizontalSlider.setObjectName("context_size_horizontalSlider")
+        self.lineEdit_contextSize = QtWidgets.QLineEdit()
+        self.lineEdit_contextSize.setObjectName("lineEdit_contextSize")
+        l_llm_mem.addLayout(create_slider_row(self.context_size_text, self.context_size_horizontalSlider, self.lineEdit_contextSize, 512, 32768, 512))
+        llm_layout.addWidget(card_llm_mem)
 
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
+        card_llm_gen, l_llm_gen = create_glass_card(self.generation_params_title)
+        self.temperature_horizontalSlider = QtWidgets.QSlider()
+        self.temperature_horizontalSlider.setObjectName("temperature_horizontalSlider")
+        self.lineEdit_temperature = QtWidgets.QLineEdit()
+        self.lineEdit_temperature.setObjectName("lineEdit_temperature")
+        l_llm_gen.addLayout(create_slider_row(self.temperature_text, self.temperature_horizontalSlider, self.lineEdit_temperature, 0, 20))
 
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
+        self.top_p_horizontalSlider = QtWidgets.QSlider()
+        self.top_p_horizontalSlider.setObjectName("top_p_horizontalSlider")
+        self.lineEdit_topP = QtWidgets.QLineEdit()
+        self.lineEdit_topP.setObjectName("lineEdit_topP")
+        l_llm_gen.addLayout(create_slider_row(self.top_p_text, self.top_p_horizontalSlider, self.lineEdit_topP, 0, 10))
 
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
+        self.repeat_penalty_horizontalSlider = QtWidgets.QSlider()
+        self.repeat_penalty_horizontalSlider.setObjectName("repeat_penalty_horizontalSlider")
+        self.lineEdit_repeatPenalty = QtWidgets.QLineEdit()
+        self.lineEdit_repeatPenalty.setObjectName("lineEdit_repeatPenalty")
+        l_llm_gen.addLayout(create_slider_row(self.rep_penalty_text, self.repeat_penalty_horizontalSlider, self.lineEdit_repeatPenalty, 10, 20))
 
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
+        self.max_tokens_horizontalSlider = QtWidgets.QSlider()
+        self.max_tokens_horizontalSlider.setObjectName("max_tokens_horizontalSlider")
+        self.lineEdit_maxTokens = QtWidgets.QLineEdit()
+        self.lineEdit_maxTokens.setObjectName("lineEdit_maxTokens")
+        l_llm_gen.addLayout(create_slider_row(self.max_tokens_text, self.max_tokens_horizontalSlider, self.lineEdit_maxTokens, 16, 4096, 16))
+        llm_layout.addWidget(card_llm_gen)
 
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
+        llm_layout.addStretch()
+        self.tabWidget_options.addWidget(self.llm_tab)
 
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
+        # =================================================================
+        # SoW Modules
+        # =================================================================
+        self.sow_system_tab, sow_layout = create_scroll_page()
+        self.sow_system_tab.setObjectName("sow_system_tab")
 
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
+        card_sow_main, l_sow_main = create_glass_card("Soul of Waifu System")
+        self.checkBox_enable_sow_system = QtWidgets.QCheckBox("Enable Soul of Waifu System")
+        f = QtGui.QFont("Inter Tight SemiBold", 12, QtGui.QFont.Weight.Bold)
+        self.checkBox_enable_sow_system.setFont(f)
+        self.checkBox_enable_sow_system.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
             }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
+            QCheckBox { 
+                color: #ffffff; 
+                spacing: 10px;
             }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
+            QCheckBox::indicator { 
+                width: 26px; 
+                height: 26px; 
+                border-radius: 13px; 
+                background-color: rgba(0, 0, 0, 0.5); 
+                border: 2px solid rgba(255, 255, 255, 0.4); 
             }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
+            QCheckBox::indicator:hover { 
+                border: 2px solid rgba(255, 255, 255, 0.8); 
+                background-color: rgba(255, 255, 255, 0.1); 
+            }
+            QCheckBox::indicator:checked { 
+                background-color: rgba(20, 20, 30, 0.95); 
+                border: 2px solid rgba(180, 180, 180, 0.8); 
+                image: url(:/sowInterface/checked.png); 
             }
         """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_model_background.setGraphicsEffect(shadow)
+        self.checkBox_enable_sow_system.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.checkBox_enable_sow_system.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.checkBox_enable_sow_system.setObjectName("checkBox_enable_sow_system")
+        l_sow_main.addWidget(self.checkBox_enable_sow_system)
+        sow_layout.addWidget(card_sow_main)
+
+        self.card_visuals, l_visuals = create_glass_card(self.visualizations_title)
+        form_vis = QtWidgets.QFormLayout()
+        form_vis.setVerticalSpacing(20)
+        form_vis.setHorizontalSpacing(30)
+
+        self.label_live2d_mode = QtWidgets.QLabel("Render Mode")
+        self.label_live2d_mode.setFont(font_label)
+        self.comboBox_live2d_mode = QtWidgets.QComboBox()
+        self.comboBox_live2d_mode.setFont(font_input)
+        self.comboBox_live2d_mode.setFixedHeight(40)
+        self.comboBox_live2d_mode.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_live2d_mode.addItems(["With GUI", "Without GUI"])
+        self.comboBox_live2d_mode.setObjectName("comboBox_live2d_mode")
+        form_vis.addRow(self.label_live2d_mode, self.comboBox_live2d_mode)
+
+        self.label_model_fps = QtWidgets.QLabel("Target FPS")
+        self.label_model_fps.setFont(font_label)
+        self.comboBox_model_fps = QtWidgets.QComboBox()
+        self.comboBox_model_fps.setFont(font_input)
+        self.comboBox_model_fps.setFixedHeight(40)
+        self.comboBox_model_fps.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_model_fps.addItems(["30 FPS", "60 FPS", "120 FPS"])
+        self.comboBox_model_fps.setObjectName("comboBox_model_fps")
+        form_vis.addRow(self.label_model_fps, self.comboBox_model_fps)
+
+        self.label_model_background = QtWidgets.QLabel("Background Type")
+        self.label_model_background.setFont(font_label)
+        self.comboBox_model_background = QtWidgets.QComboBox()
+        self.comboBox_model_background.setFont(font_input)
+        self.comboBox_model_background.setFixedHeight(40)
+        self.comboBox_model_background.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_model_background.addItems(["Solid Color", "Image"])
         self.comboBox_model_background.setObjectName("comboBox_model_background")
-        self.comboBox_model_background.addItem("")
-        self.comboBox_model_background.addItem("")
-        self.choose_model_background = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.choose_model_background.setGeometry(QtCore.QRect(20, 167, 161, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_model_background.setFont(font)
-        self.choose_model_background.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_model_background.setObjectName("choose_model_background")
-        self.comboBox_model_bg_color = QtWidgets.QComboBox(parent=self.scrollAreaWidgetContents_modules)
-        self.comboBox_model_bg_color.setGeometry(QtCore.QRect(190, 190, 181, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_model_bg_color.setFont(font)
-        self.comboBox_model_bg_color.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_model_bg_color.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        form_vis.addRow(self.label_model_background, self.comboBox_model_background)
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_model_bg_color.setGraphicsEffect(shadow)
+        bg_container = QtWidgets.QWidget()
+        bg_dyn_layout = QtWidgets.QGridLayout(bg_container)
+        bg_dyn_layout.setContentsMargins(0, 0, 0, 0)
+        bg_dyn_layout.setSpacing(10)
+        
+        self.label_bg_color = QtWidgets.QLabel("Color")
+        self.label_bg_color.setFont(font_label)
+        
+        self.comboBox_model_bg_color = QtWidgets.QComboBox()
+        self.comboBox_model_bg_color.setFont(font_input)
+        self.comboBox_model_bg_color.setFixedHeight(40)
+        self.comboBox_model_bg_color.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_model_bg_color.addItems(["Black", "Deep Blue", "Vinous", "Dark Green", "Soft Purple", "Warm Coal Grey"])
         self.comboBox_model_bg_color.setObjectName("comboBox_model_bg_color")
-        self.comboBox_model_bg_color.addItem("")
-        self.comboBox_model_bg_color.addItem("")
-        self.comboBox_model_bg_color.addItem("")
-        self.comboBox_model_bg_color.addItem("")
-        self.comboBox_model_bg_color.addItem("")
-        self.comboBox_model_bg_color.addItem("")
-        self.choose_model_bg_color = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.choose_model_bg_color.setGeometry(QtCore.QRect(190, 167, 181, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_model_bg_color.setFont(font)
-        self.choose_model_bg_color.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_model_bg_color.setObjectName("choose_model_bg_color")
-        self.choose_model_bg_image = QtWidgets.QLabel(parent=self.scrollAreaWidgetContents_modules)
-        self.choose_model_bg_image.setGeometry(QtCore.QRect(190, 167, 181, 16))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.choose_model_bg_image.setFont(font)
-        self.choose_model_bg_image.setStyleSheet("color: rgb(227, 227, 227);")
-        self.choose_model_bg_image.setObjectName("choose_model_bg_image")
-        self.comboBox_model_bg_image = QtWidgets.QComboBox(parent=self.scrollAreaWidgetContents_modules)
-        self.comboBox_model_bg_image.setGeometry(QtCore.QRect(190, 190, 181, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_model_bg_image.setFont(font)
-        self.comboBox_model_bg_image.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_model_bg_image.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
-
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
-
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_model_bg_image.setGraphicsEffect(shadow)
+        
+        self.label_bg_image = QtWidgets.QLabel("Image")
+        self.label_bg_image.setFont(font_label)
+        
+        self.comboBox_model_bg_image = QtWidgets.QComboBox()
+        self.comboBox_model_bg_image.setFont(font_input)
+        self.comboBox_model_bg_image.setFixedHeight(40)
+        self.comboBox_model_bg_image.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.comboBox_model_bg_image.setObjectName("comboBox_model_bg_image")
-        self.pushButton_reload_bg_image = QtWidgets.QPushButton(parent=self.scrollAreaWidgetContents_modules)
+        
+        self.pushButton_reload_bg_image = QtWidgets.QPushButton()
+        self.pushButton_reload_bg_image.setFixedSize(40, 40)
         self.pushButton_reload_bg_image.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_reload_bg_image.setGeometry(QtCore.QRect(380, 190, 30, 30))
-        self.pushButton_reload_bg_image.setMinimumSize(QtCore.QSize(30, 30))
-        self.pushButton_reload_bg_image.setMaximumSize(QtCore.QSize(30, 30))
-        font = QtGui.QFont()
-        font.setFamily("Muli ExtraBold")
-        font.setPointSize(10)
-        font.setBold(True)
-        font.setWeight(75)
-        self.pushButton_reload_bg_image.setFont(font)
-        self.pushButton_reload_bg_image.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_reload_bg_image.setStyleSheet("QPushButton { \n"
-"    background-color: rgba(255, 255, 255, 0); \n"
-"    text-align: center;\n"
-"    border: none;  \n"
-"    border-radius: 5px;\n"
-"}\n"
-"\n"
-"QPushButton:hover { \n"
-"    background-color: rgb(60, 60, 60); \n"
-"    border-style: solid; \n"
-"    border-radius: 15px;\n"
-"}\n"
-"\n"
-"QPushButton:pressed { \n"
-"    background-color: rgb(30, 30, 30); \n"
-"    border-style: solid; \n"
-"    border-radius: 15px;\n"
-"}")
-        self.pushButton_reload_bg_image.setText("")
-        icon_reload = QtGui.QIcon()
-        icon_reload.addPixmap(QtGui.QPixmap("app/gui/icons/reload.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_reload_bg_image.setIcon(icon_reload)
-        self.pushButton_reload_bg_image.setIconSize(QtCore.QSize(25, 25))
-        self.pushButton_reload_bg_image.setCheckable(False)
-        self.pushButton_reload_bg_image.setAutoExclusive(True)
+        self.pushButton_reload_bg_image.setIcon(QtGui.QIcon("app/gui/icons/reload.png"))
         self.pushButton_reload_bg_image.setObjectName("pushButton_reload_bg_image")
+        
+        bg_dyn_layout.addWidget(self.label_bg_color, 0, 0)
+        bg_dyn_layout.addWidget(self.comboBox_model_bg_color, 0, 1)
+        bg_dyn_layout.addWidget(self.label_bg_image, 0, 2)
+        bg_dyn_layout.addWidget(self.comboBox_model_bg_image, 0, 3)
+        bg_dyn_layout.addWidget(self.pushButton_reload_bg_image, 0, 4)
+        
+        bg_dyn_layout.setColumnStretch(1, 1)
+        bg_dyn_layout.setColumnStretch(3, 1)
 
-        self.pushButton_reload_ambient = QtWidgets.QPushButton(parent=self.scrollAreaWidgetContents_modules)
-        self.pushButton_reload_ambient.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_reload_ambient.setGeometry(QtCore.QRect(390, 240, 30, 30))
-        self.pushButton_reload_ambient.setMinimumSize(QtCore.QSize(30, 30))
-        self.pushButton_reload_ambient.setMaximumSize(QtCore.QSize(30, 30))
-        font = QtGui.QFont()
-        font.setFamily("Muli ExtraBold")
-        font.setPointSize(10)
-        font.setBold(True)
-        font.setWeight(75)
-        self.pushButton_reload_ambient.setFont(font)
-        self.pushButton_reload_ambient.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_reload_ambient.setStyleSheet("QPushButton { \n"
-"    background-color: rgba(255, 255, 255, 0); \n"
-"    text-align: center;\n"
-"    border: none;  \n"
-"    border-radius: 5px;\n"
-"}\n"
-"\n"
-"QPushButton:hover { \n"
-"    background-color: rgb(60, 60, 60); \n"
-"    border-style: solid; \n"
-"    border-radius: 15px;\n"
-"}\n"
-"\n"
-"QPushButton:pressed { \n"
-"    background-color: rgb(30, 30, 30); \n"
-"    border-style: solid; \n"
-"    border-radius: 15px;\n"
-"}")
-        self.pushButton_reload_ambient.setText("")
-        icon_reload = QtGui.QIcon()
-        icon_reload.addPixmap(QtGui.QPixmap("app/gui/icons/reload.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_reload_ambient.setIcon(icon_reload)
-        self.pushButton_reload_ambient.setIconSize(QtCore.QSize(25, 25))
-        self.pushButton_reload_ambient.setCheckable(False)
-        self.pushButton_reload_ambient.setAutoExclusive(True)
-        self.pushButton_reload_ambient.setObjectName("pushButton_reload_ambient")
-        self.comboBox_ambient_mode = QtWidgets.QComboBox(parent=self.scrollAreaWidgetContents_modules)
-        self.comboBox_ambient_mode.setGeometry(QtCore.QRect(200, 240, 181, 31))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.comboBox_ambient_mode.setFont(font)
-        self.comboBox_ambient_mode.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.comboBox_ambient_mode.setStyleSheet("""
-            QComboBox {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 2px solid #333;
-                border-radius: 5px;
-                padding: 5px;
-                padding-left: 10px;
-                selection-color: #ffffff;
-                selection-background-color: #454545;
-            }
+        form_vis.addRow("", bg_container)
+        l_visuals.addLayout(form_vis)
+        sow_layout.addWidget(self.card_visuals)
 
-            QComboBox:hover {
-                border: 2px solid #444;
-            }
+        self.card_modules, l_modules = create_glass_card(self.sub_modules_title)
+        
+        layout_modules_main = QtWidgets.QVBoxLayout()
+        layout_modules_main.setSpacing(20)
 
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: top right;
-                width: 18px;
-                border-left: 1px solid #333;
-                background-color: #2b2b2b;
-                border-top-right-radius: 5px;
-                border-bottom-right-radius: 5px;
-            }
-
-            QComboBox::down-arrow {
-                width: 12px;
-                height: 12px;
-                image: url(:/sowInterface/arrowDown.png);
-            }
-
-            QComboBox::down-arrow:hover {
-                width: 12px;
-                height: 12px;
-            }
-
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-                color: #e0e0e0;
-                border: 1px solid rgb(70, 70, 70);
-                border-radius: 6px;
-                padding: 5px;
-                outline: 0px;
-                selection-color: #ffffff;
-                selection-background-color: #8f8f8f;
-            }
-
-            QComboBox QAbstractItemView::item {
-                border: none;
-                height: 20px;
-                padding: 4px 8px;
-                border-radius: 4px;
-            }
-
-            QComboBox QAbstractItemView::item:hover {
-                background-color: #5a5a5a;
-                color: white;
-            }
-
-            QComboBox QAbstractItemView::item:selected {
-                background-color: #454545;
-                color: white;
-                border-radius: 4px;
-            }
-
-            QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border: none;
-            }
-
-            QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-            }
-
-            QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-            }
-
-            QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-            }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
+        amb_layout = QtWidgets.QHBoxLayout()
+        amb_layout.setSpacing(15)
+        
+        self.checkBox_enable_ambient = QtWidgets.QCheckBox("Ambient Audio")
+        self.checkBox_enable_ambient.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
             }
         """)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 4)        
-        self.comboBox_ambient_mode.setGraphicsEffect(shadow)
-        self.comboBox_ambient_mode.setObjectName("comboBox_ambient_mode")
-        self.checkBox_enable_ambient = QtWidgets.QCheckBox(parent=self.scrollAreaWidgetContents_modules)
-        self.checkBox_enable_ambient.setGeometry(QtCore.QRect(20, 244, 171, 22))
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.checkBox_enable_ambient.sizePolicy().hasHeightForWidth())
-        self.checkBox_enable_ambient.setSizePolicy(sizePolicy)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.checkBox_enable_ambient.setFont(font)
-        self.checkBox_enable_ambient.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.checkBox_enable_ambient.setFont(font_input)
         self.checkBox_enable_ambient.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.checkBox_enable_ambient.setStyleSheet("QCheckBox {\n"
-"    color: #e0e0e0;\n"
-"    spacing: 5px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    border: 2px solid #333;\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"    border-radius: 11px;\n"
-"    background-color: #2b2b2b;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:hover {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #3a3a3a;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #444;\n"
-"    image: url(:/sowInterface/checked.png);\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:disabled {\n"
-"    border: 2px solid #444;\n"
-"    background-color: #555;\n"
-"}\n"
-"\n"
-"QCheckBox:disabled {\n"
-"    color: #888;\n"
-"}")
-        self.checkBox_enable_ambient.setIconSize(QtCore.QSize(16, 16))
         self.checkBox_enable_ambient.setObjectName("checkBox_enable_ambient")
-        self.checkBox_enable_memory = QtWidgets.QCheckBox(parent=self.scrollAreaWidgetContents_modules)
-        self.checkBox_enable_memory.setGeometry(QtCore.QRect(20, 440, 221, 22))
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.checkBox_enable_memory.sizePolicy().hasHeightForWidth())
-        self.checkBox_enable_memory.setSizePolicy(sizePolicy)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.checkBox_enable_memory.setFont(font)
-        self.checkBox_enable_memory.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.checkBox_enable_memory.setStyleSheet("QCheckBox {\n"
-"    color: #e0e0e0;\n"
-"    spacing: 5px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator {\n"
-"    border: 2px solid #333;\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"    border-radius: 11px;\n"
-"    background-color: #2b2b2b;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:hover {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #3a3a3a;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:checked {\n"
-"    border: 2px solid #555;\n"
-"    background-color: #444;\n"
-"    image: url(:/sowInterface/checked.png);\n"
-"    width: 18px;\n"
-"    height: 18px;\n"
-"}\n"
-"\n"
-"QCheckBox::indicator:disabled {\n"
-"    border: 2px solid #444;\n"
-"    background-color: #555;\n"
-"}\n"
-"\n"
-"QCheckBox:disabled {\n"
-"    color: #888;\n"
-"}")
-        self.checkBox_enable_memory.setIconSize(QtCore.QSize(16, 16))
+        
+        self.comboBox_ambient_mode = QtWidgets.QComboBox()
+        self.comboBox_ambient_mode.setFont(font_input)
+        self.comboBox_ambient_mode.setFixedHeight(40)
+        self.comboBox_ambient_mode.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_ambient_mode.setObjectName("comboBox_ambient_mode")
+        
+        self.pushButton_reload_ambient = QtWidgets.QPushButton()
+        self.pushButton_reload_ambient.setFixedSize(40, 40)
+        self.pushButton_reload_ambient.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pushButton_reload_ambient.setIcon(QtGui.QIcon("app/gui/icons/reload.png"))
+        self.pushButton_reload_ambient.setObjectName("pushButton_reload_ambient")
+        
+        amb_layout.addWidget(self.checkBox_enable_ambient)
+        amb_layout.addWidget(self.comboBox_ambient_mode, 1)
+        amb_layout.addWidget(self.pushButton_reload_ambient)
+        layout_modules_main.addLayout(amb_layout)
+
+        mem_layout = QtWidgets.QVBoxLayout()
+        mem_layout.setSpacing(15)
+        
+        self.checkBox_enable_memory = QtWidgets.QCheckBox("Smart Memory (Vector DB)")
+        self.checkBox_enable_memory.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
+        """)
+        self.checkBox_enable_memory.setFont(font_input)
         self.checkBox_enable_memory.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.checkBox_enable_memory.setObjectName("checkBox_enable_memory")
-
-        self.scrollArea_modules.setWidget(self.scrollAreaWidgetContents_modules)
-        tab_layout = QtWidgets.QVBoxLayout(self.sow_system_tab)
-        tab_layout.setContentsMargins(0, 0, 0, 0)
-        tab_layout.setSpacing(0)
-        tab_layout.addWidget(self.scrollArea_modules)
-
-        self.tabWidget_options.addTab(self.sow_system_tab, "")
-        self.gridLayout.addWidget(self.tabWidget_options, 0, 0, 1, 1)
+        
+        sum_row = QtWidgets.QHBoxLayout()
+        sum_row.setSpacing(15)      
+        self.checkBox_enable_summary = QtWidgets.QCheckBox("Auto-Summarization")
+        self.checkBox_enable_summary.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
+        """)
+        self.checkBox_enable_summary.setFont(font_input)
+        self.checkBox_enable_summary.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.checkBox_enable_summary.setObjectName("checkBox_enable_summary")        
+        self.label_summary_interval = QtWidgets.QLabel("Interval:")
+        self.label_summary_interval.setFont(font_input)        
+        self.spinBox_summary_interval = QtWidgets.QSpinBox()
+        self.spinBox_summary_interval.setFont(font_input)
+        self.spinBox_summary_interval.setFixedHeight(35)
+        self.spinBox_summary_interval.setFixedWidth(80)
+        self.spinBox_summary_interval.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.spinBox_summary_interval.setMinimum(5)
+        self.spinBox_summary_interval.setObjectName("spinBox_summary_interval")        
+        sum_row.addWidget(self.checkBox_enable_summary)
+        sum_row.addWidget(self.label_summary_interval)
+        sum_row.addWidget(self.spinBox_summary_interval)
+        sum_row.addStretch()
+        mem_layout.addWidget(self.checkBox_enable_memory)
+        mem_layout.addLayout(sum_row)
+        layout_modules_main.addLayout(mem_layout)
+        l_modules.addLayout(layout_modules_main)
+        sow_layout.addWidget(self.card_modules)
+        sow_layout.addStretch()
+        self.tabWidget_options.addWidget(self.sow_system_tab)
+        self.options_menu.setCurrentRow(0)
+        self.gridLayout.addWidget(self.options_container, 0, 0, 1, 1)
         self.stackedWidget.addWidget(self.options_page)
+
         self.chat_page = QtWidgets.QWidget()
         self.chat_page.setObjectName("chat_page")
         self.verticalLayout_6 = QtWidgets.QVBoxLayout(self.chat_page)
@@ -5833,18 +2180,18 @@ class Ui_MainWindow(object):
         self.top.setMinimumSize(QtCore.QSize(0, 60))
         self.top.setMaximumSize(QtCore.QSize(16777215, 60))
         self.top.setStyleSheet("#top {\n"
-"    background-color: rgb(27,27,27);\n"
-"    border: none;\n"
+"    background-color: rgba(20, 20, 20, 180);\n"
 "}\n"
 "\n"
 "#user_name { \n"
-"    color: rgb(179, 179, 179);\n"
+"    color: rgb(220, 220, 220);\n"
 "    font: 600 12pt \"Segoe UI\";\n"
+"    background: transparent;\n"
 "}\n"
 "\n"
 "#user_image {\n"
-"    border: 1px solid rgb(30, 32, 33);\n"
-"    background-color: rgb(47, 48, 50);\n"
+"    border: 1px solid rgba(255, 255, 255, 80);\n"
+"    background-color: rgba(255, 255, 255, 40);\n"
 "    border-radius: 20px;\n"
 "}")
         self.top.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
@@ -5865,7 +2212,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_2.addWidget(self.character_avatar_label)
         self.user_information_frame = QtWidgets.QFrame(parent=self.top)
         self.user_information_frame.setMinimumSize(QtCore.QSize(0, 45))
-        self.user_information_frame.setStyleSheet("")
+        self.user_information_frame.setStyleSheet("background-color: transparent;")
         self.user_information_frame.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self.user_information_frame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.user_information_frame.setObjectName("user_information_frame")
@@ -5901,7 +2248,7 @@ class Ui_MainWindow(object):
         spacerItem24 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_2.addItem(spacerItem24)
         
-        self.pushButton_change_chat_background = PushButton()
+        self.pushButton_change_chat_background = PushButton("app/gui/icons/background_icon.png")
         self.pushButton_change_chat_background.setMinimumSize(QtCore.QSize(40, 40))
         self.pushButton_change_chat_background.setMaximumSize(QtCore.QSize(40, 40))
         self.pushButton_change_chat_background.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
@@ -5927,7 +2274,7 @@ class Ui_MainWindow(object):
         self.pushButton_change_chat_background.setIconSize(QtCore.QSize(18, 18))
         self.pushButton_change_chat_background.setObjectName("pushButton_change_chat_background")
         self.horizontalLayout_2.addWidget(self.pushButton_change_chat_background)
-        self.pushButton_author_notes = PushButton()
+        self.pushButton_author_notes = PushButton("app/gui/icons/author_notes.png")
         self.pushButton_author_notes.setMinimumSize(QtCore.QSize(40, 40))
         self.pushButton_author_notes.setMaximumSize(QtCore.QSize(40, 40))
         self.pushButton_author_notes.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
@@ -5954,7 +2301,34 @@ class Ui_MainWindow(object):
         self.pushButton_author_notes.setObjectName("pushButton_author_notes")
         self.pushButton_author_notes.hide()
         self.horizontalLayout_2.addWidget(self.pushButton_author_notes)
-        self.pushButton_more = PushButton()
+        self.pushButton_summary = PushButton("app/gui/icons/summary.png")
+        self.pushButton_summary.setMinimumSize(QtCore.QSize(40, 40))
+        self.pushButton_summary.setMaximumSize(QtCore.QSize(40, 40))
+        self.pushButton_summary.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_summary.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pushButton_summary.setStyleSheet("QPushButton {\n"
+"    background-color: rgb(27, 27, 27);\n"
+"    border-radius: 20px;\n"
+"    background-repeat: no-repeat;\n"
+"    background-position: center;\n"
+"}\n"
+"\n"
+"QPushButton:hover {\n"
+"    background-color: #2C2C2C;\n"
+"}\n"
+"\n"
+"QPushButton:pressed {\n"
+"    background-color: #424242;\n"
+"}")
+        self.pushButton_summary.setText("")
+        icon_summary = QtGui.QIcon()
+        icon_summary.addPixmap(QtGui.QPixmap("app/gui/icons/summary.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.pushButton_summary.setIcon(icon_summary)
+        self.pushButton_summary.setIconSize(QtCore.QSize(20, 20))
+        self.pushButton_summary.setObjectName("pushButton_summary")
+        self.pushButton_summary.hide()
+        self.horizontalLayout_2.addWidget(self.pushButton_summary)
+        self.pushButton_more = PushButton("app/gui/icons/more.png")
         self.pushButton_more.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.pushButton_more.setMinimumSize(QtCore.QSize(40, 40))
         self.pushButton_more.setMaximumSize(QtCore.QSize(40, 40))
@@ -5981,13 +2355,9 @@ class Ui_MainWindow(object):
         self.horizontalLayout_2.addWidget(self.pushButton_more)
         self.verticalLayout_6.addWidget(self.top)
         self.frame_separator_chat = QtWidgets.QFrame(parent=self.chat_page)
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(10)
-        shadow.setColor(QColor(0, 0, 0, 100))
-        shadow.setOffset(0, 2) 
         self.frame_separator_chat.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        self.frame_separator_chat.setStyleSheet("background-color: transparent;")
         self.frame_separator_chat.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_separator_chat.setGraphicsEffect(shadow)
         self.frame_separator_chat.setObjectName("frame_separator_chat")
         self.horizontalLayout_10 = QtWidgets.QHBoxLayout(self.frame_separator_chat)
         self.horizontalLayout_10.setContentsMargins(0, 0, 0, 0)
@@ -6074,12 +2444,13 @@ class Ui_MainWindow(object):
         self.scrollAreaWidgetContents_messages.setObjectName("scrollAreaWidgetContents_messages")
         self.scrollArea_chat.setWidget(self.scrollAreaWidgetContents_messages)
         self.verticalLayout_6.addWidget(self.scrollArea_chat)
+        
         self.frame_send_message_full = QtWidgets.QFrame(parent=self.chat_page)
         self.frame_send_message_full.setMinimumSize(QtCore.QSize(0, 40))
         self.frame_send_message_full.setMaximumSize(QtCore.QSize(16777215, 40))
         self.frame_send_message_full.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.frame_send_message_full.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.frame_send_message_full.setStyleSheet("background-color: rgb(27,27,27); border: none;")
+        self.frame_send_message_full.setStyleSheet("background-color: transparent; border: none;")
         self.frame_send_message_full.setObjectName("frame_send_message_full")
         self.horizontalLayout_5 = QtWidgets.QHBoxLayout(self.frame_send_message_full)
         self.horizontalLayout_5.setContentsMargins(0, 0, 0, 5)
@@ -6097,74 +2468,22 @@ class Ui_MainWindow(object):
         self.frame_send_message.setMinimumSize(QtCore.QSize(0, 40))
         self.frame_send_message.setMaximumSize(QtCore.QSize(681, 40))
         self.frame_send_message.setBaseSize(QtCore.QSize(0, 0))
+        
         self.frame_send_message.setStyleSheet("""
-        #frame_send_message { 
-                background-color: rgb(47, 48, 50);
-                border-radius: 20px;
-        }
-
-        #frame_send_message QPushButton {
-                background-color: rgb(76, 77, 80);
-                border-radius: 15px;
-                background-repeat: no-repeat;
-                background-position: center;
-        }
-
-        #frame_send_message QPushButton:hover {
-                background-color: rgb(81, 82, 86);
-        }
-
-        #frame_send_message QPushButton:pressed {
-                background-color: rgb(16, 17, 18);
-        }
-
-        #frame_send_message QTextEdit {
+            QFrame#frame_send_message { 
+                background-color: rgba(20, 20, 22, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 19px;
+            }
+            QTextEdit {
                 background-color: transparent;
                 border: none;
-                padding-top: 7px;
-                padding-left: 15px;
-                padding-right: 15px;
-                background-repeat: none;
-                background-position: left center;
-                color: rgb(225, 225, 225);
-        }
-
-        #frame_send_message QTextEdit:focus {
-                color: rgb(165, 165, 165);
-        }
-
-        #frame_send_message QScrollBar:vertical {
-                background-color: #2b2b2b;
-                width: 12px;
-                margin: 0px;
-                border-radius: 5px;
-        }
-
-        #frame_send_message QScrollBar::handle:vertical {
-                background-color: #383838;
-                min-height: 30px;
-                border-radius: 3px;
-                margin: 2px;
-        }
-
-        #frame_send_message QScrollBar::handle:vertical:hover {
-                background-color: #454545;
-        }
-
-        #frame_send_message QScrollBar::handle:vertical:pressed {
-                background-color: #424242;
-        }
-
-        #frame_send_message QScrollBar::add-line:vertical,
-        #frame_send_message QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-        }
-
-        #frame_send_message QScrollBar::add-page:vertical,
-        #frame_send_message QScrollBar::sub-page:vertical {
-                background: none;
-        }
+                color: rgba(255, 255, 255, 0.9);
+                padding-top: 6px;
+                padding-left: 10px;
+                padding-right: 10px;
+                selection-background-color: rgba(255, 255, 255, 0.2);
+            }
         """)
         self.frame_send_message.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.frame_send_message.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
@@ -6220,26 +2539,56 @@ class Ui_MainWindow(object):
         spacerItem28 = QtWidgets.QSpacerItem(200, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_5.addItem(spacerItem28)
         self.verticalLayout_6.addWidget(self.frame_send_message_full)
+
         self.top.raise_()
         self.scrollArea_chat.raise_()
         self.frame_send_message_full.raise_()
         self.stackedWidget.addWidget(self.chat_page)
 
+        # ======= Models Hub Page ========
         self.modelshub_page = QtWidgets.QWidget()
         self.modelshub_page.setObjectName("modelshub_page")
         self.verticalLayout_models_hub = QtWidgets.QVBoxLayout(self.modelshub_page)
         self.verticalLayout_models_hub.setContentsMargins(0, 0, 0, 5)
         self.verticalLayout_models_hub.setSpacing(0)
         self.verticalLayout_models_hub.setObjectName("verticalLayout_models_hub")
+        
         self.frame_models_hub_search = QtWidgets.QFrame(parent=self.modelshub_page)
         self.frame_models_hub_search.setMinimumSize(QtCore.QSize(0, 50))
         self.frame_models_hub_search.setMaximumSize(QtCore.QSize(16777215, 50))
         self.frame_models_hub_search.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.frame_models_hub_search.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.frame_models_hub_search.setObjectName("frame_models_hub_search")
+        self.frame_models_hub_search.setStyleSheet("""
+            QFrame#frame_models_hub_search {
+                background-color: transparent;
+            }
+        """)
         self.horizontalLayout_8 = QtWidgets.QHBoxLayout(self.frame_models_hub_search)
         self.horizontalLayout_8.setContentsMargins(30, 0, 30, 0)
         self.horizontalLayout_8.setObjectName("horizontalLayout_8")
+
+        glass_toggle_style = """
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.03);
+                color: rgba(255, 255, 255, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 12px;
+                padding: 5px 15px;
+                font-family: 'Inter Tight SemiBold';
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+                color: rgba(255, 255, 255, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+            }
+            QPushButton:checked {
+                background-color: rgba(255, 255, 255, 0.12);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+            }
+        """
 
         self.pushButton_models_hub_recommendations = QtWidgets.QPushButton(parent=self.frame_models_hub_search)
         self.pushButton_models_hub_recommendations.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -6253,51 +2602,6 @@ class Ui_MainWindow(object):
         font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         self.pushButton_models_hub_recommendations.setFont(font)
         self.pushButton_models_hub_recommendations.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_models_hub_recommendations.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}\n"
-"\n"
-"QPushButton:checked {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #999999;\n"
-"    font-weight: bold;\n"
-"}")
         icon_recommendations = QtGui.QIcon()
         icon_recommendations.addPixmap(QtGui.QPixmap("app/gui/icons/recommendations.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
         self.pushButton_models_hub_recommendations.setIcon(icon_recommendations)
@@ -6318,51 +2622,6 @@ class Ui_MainWindow(object):
         font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         self.pushButton_models_hub_popular.setFont(font)
         self.pushButton_models_hub_popular.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_models_hub_popular.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}\n"
-"\n"
-"QPushButton:checked {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #999999;\n"
-"    font-weight: bold;\n"
-"}")
         icon_popular = QtGui.QIcon()
         icon_popular.addPixmap(QtGui.QPixmap("app/gui/icons/popular.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
         self.pushButton_models_hub_popular.setIcon(icon_popular)
@@ -6383,51 +2642,6 @@ class Ui_MainWindow(object):
         font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         self.pushButton_models_hub_my_models.setFont(font)
         self.pushButton_models_hub_my_models.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_models_hub_my_models.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}\n"
-"\n"
-"QPushButton:checked {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #999999;\n"
-"    font-weight: bold;\n"
-"}")
         icon_my_models = QtGui.QIcon()
         icon_my_models.addPixmap(QtGui.QPixmap("app/gui/icons/models.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
         self.pushButton_models_hub_my_models.setIcon(icon_my_models)
@@ -6437,6 +2651,11 @@ class Ui_MainWindow(object):
         self.pushButton_models_hub_my_models.setAutoExclusive(True)
         self.pushButton_models_hub_my_models.setObjectName("pushButton_models_hub_my_models")
         self.horizontalLayout_8.addWidget(self.pushButton_models_hub_my_models)
+
+        self.pushButton_models_hub_recommendations.setStyleSheet(glass_toggle_style)
+        self.pushButton_models_hub_popular.setStyleSheet(glass_toggle_style)
+        self.pushButton_models_hub_my_models.setStyleSheet(glass_toggle_style)
+
         self.pushButton_reload_models = QtWidgets.QPushButton(parent=self.frame_models_hub_search)
         self.pushButton_reload_models.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.pushButton_reload_models.setMinimumSize(QtCore.QSize(33, 33))
@@ -6447,40 +2666,7 @@ class Ui_MainWindow(object):
         font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         self.pushButton_reload_models.setFont(font)
         self.pushButton_reload_models.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_reload_models.setStyleSheet("QPushButton {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #2f2f2f,\n"
-"        stop: 1 #1e1e1e\n"
-"    );\n"
-"    color: rgb(227, 227, 227);\n"
-"    border: 2px solid #3A3A3A;\n"
-"    border-radius: 5px;\n"
-"    padding: 2px;\n"
-"}\n"
-"\n"
-"QPushButton:hover {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #343434,\n"
-"        stop: 1 #222222\n"
-"    );\n"
-"    border: 2px solid #666666;\n"
-"    border-top: 2px solid #777777;\n"
-"    border-bottom: 2px solid #555555;\n"
-"}\n"
-"\n"
-"QPushButton:pressed {\n"
-"    background-color: qlineargradient(\n"
-"        spread: pad,\n"
-"        x1: 0, y1: 0, x2: 0, y2: 1,\n"
-"        stop: 0 #4a4a4a,\n"
-"        stop: 1 #3a3a3a\n"
-"    );\n"
-"    border: 2px solid #888888;\n"
-"}")
+        self.pushButton_reload_models.setStyleSheet(glass_toggle_style)
         self.pushButton_reload_models.setText("")
         icon_reload_models = QtGui.QIcon()
         icon_reload_models.addPixmap(QtGui.QPixmap("app/gui/icons/reload.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
@@ -6490,51 +2676,15 @@ class Ui_MainWindow(object):
         spacerItem31 = QtWidgets.QSpacerItem(612, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_8.addItem(spacerItem31)
         
-        self.lineEdit_search_model = QtWidgets.QLineEdit(parent=self.frame_models_hub_search)
-        self.lineEdit_search_model.setMinimumSize(QtCore.QSize(250, 33))
-        self.lineEdit_search_model.setMaximumSize(QtCore.QSize(250, 33))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight Medium")
-        font.setPointSize(9)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.lineEdit_search_model.setFont(font)
-        self.lineEdit_search_model.setStyleSheet("QLineEdit {\n"
-"    background-color: #2b2b2b;\n"
-"    color: #e0e0e0;\n"
-"    border: 2px solid #333;\n"
-"    border-radius: 5px;\n"
-"    padding: 5px;\n"
-"    selection-color: #ffffff;\n"
-"    selection-background-color: #4a90d9;\n"
-"}\n"
-"QLineEdit::placeholder {\n"
-"    color: #888888;\n"
-"}\n"
-"\n"
-"QLineEdit:hover {\n"
-"    border: 2px solid #444;\n"
-"}")
-        self.lineEdit_search_model.setObjectName("lineEdit_search_model")
-        self.horizontalLayout_8.addWidget(self.lineEdit_search_model)
-        self.pushButton_search_model = QtWidgets.QPushButton(parent=self.frame_models_hub_search)
-        self.pushButton_search_model.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_search_model.setMinimumSize(QtCore.QSize(27, 27))
-        self.pushButton_search_model.setMaximumSize(QtCore.QSize(27, 27))
-        font = QtGui.QFont()
-        font.setStyleStrategy(QtGui.QFont.StyleStrategy.PreferAntialias)
-        self.pushButton_search_model.setFont(font)
-        self.pushButton_search_model.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_search_model.setStyleSheet("QPushButton { background-color: rgba(255, 255, 255, 0); border: none;  border-radius: 13px; }\n"
-"QPushButton:hover { background-color: rgb(50, 50, 50); border-style: solid; border-radius: 13px; }\n"
-"QPushButton:pressed { background-color: rgb(23, 23, 23); border-style: solid; border-radius: 13px; }\n"
-"")
-        icon_search = QtGui.QIcon()
-        icon_search.addPixmap(QtGui.QPixmap("app/gui/icons/search.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_search_model.setIcon(icon_search)
-        self.pushButton_search_model.setIconSize(QtCore.QSize(16, 16))
-        self.pushButton_search_model.setFlat(True)
-        self.pushButton_search_model.setObjectName("pushButton_search_model")
-        self.horizontalLayout_8.addWidget(self.pushButton_search_model)
+        self.search_bar_models = ModernSearchBar(parent=self.frame_models_hub_search)
+        self.search_bar_models.setMinimumSize(QtCore.QSize(300, 45))
+        self.search_bar_models.setMaximumSize(QtCore.QSize(400, 45))
+        self.search_bar_models.line_edit.setPlaceholderText("Search models...")
+        self.lineEdit_search_model = self.search_bar_models.line_edit
+        self.pushButton_search_model = self.search_bar_models.search_btn
+        
+        self.horizontalLayout_8.addWidget(self.search_bar_models)
+
         self.verticalLayout_models_hub.addWidget(self.frame_models_hub_search)
         self.listWidget_models_hub = QtWidgets.QListWidget(parent=self.modelshub_page)
         self.listWidget_models_hub.setMinimumSize(QtCore.QSize(0, 0))
@@ -6547,29 +2697,16 @@ class Ui_MainWindow(object):
         self.listWidget_models_hub.setStyleSheet("""
             QListWidget {
                 background: transparent;
-                color: #dcdcdc;
-                outline: 0px;
-                padding-left: 100px;
-                padding-right: 100px;
                 border: none;
+                outline: none;
             }
-
             QListWidget::item {
-                background-color: rgb(40, 40, 40);
-                margin-top: 10px;
-                border: 1px solid rgb(50, 50, 50);
-                border-radius: 10px;
-            }
-
-            QListWidget::item:hover {
-                background-color: rgb(80, 80, 80);
+                background: transparent;
                 border: none;
+                padding: 5px 15px;
             }
-
-            QListWidget::item:selected {
-                color: #dcdcdc;
-                border: none;
-            }
+            QListWidget::item:selected { background: transparent; border: none; }
+            QListWidget::item:hover { background: transparent; }
                                                  
             QScrollBar:vertical {
                 background-color: #2b2b2b;
@@ -6606,6 +2743,71 @@ class Ui_MainWindow(object):
         self.listWidget_models_hub.setObjectName("listWidget_models_hub")
         self.verticalLayout_models_hub.addWidget(self.listWidget_models_hub)
         self.stackedWidget.addWidget(self.modelshub_page)
+
+        # ====================== RP Editors Page ======================
+        self.rp_editors_page = QtWidgets.QWidget()
+        self.rp_editors_page.setObjectName("rp_editors_page")
+        self.rp_editors_page.setStyleSheet("background: transparent;")
+
+        self.rp_layout = QtWidgets.QVBoxLayout(self.rp_editors_page)
+        self.rp_layout.setContentsMargins(50, 50, 50, 50)
+        self.rp_layout.setSpacing(20)
+
+        self.rp_header_layout = QtWidgets.QVBoxLayout()
+        self.rp_header_layout.setSpacing(5)
+
+        self.rp_title_label = QtWidgets.QLabel(self.translations.get("rp_editors_title", "RolePlay Editors"))
+        font_rp_title = QtGui.QFont("Inter Tight SemiBold", 26, QtGui.QFont.Weight.Bold)
+        font_rp_title.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.rp_title_label.setFont(font_rp_title)
+        self.rp_title_label.setStyleSheet("color: rgba(255, 255, 255, 0.95); border: none; background: transparent;")
+
+        self.rp_subtitle_label = QtWidgets.QLabel(self.translations.get("rp_editors_subtitle", "Manage your personas, world lore, and system prompts"))
+        font_rp_sub = QtGui.QFont("Inter Tight Medium", 12)
+        font_rp_sub.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.rp_subtitle_label.setFont(font_rp_sub)
+        self.rp_subtitle_label.setStyleSheet("color: rgba(255, 255, 255, 0.5); border: none; background: transparent;")
+
+        self.rp_header_layout.addWidget(self.rp_title_label)
+        self.rp_header_layout.addWidget(self.rp_subtitle_label)
+        self.rp_layout.addLayout(self.rp_header_layout)
+
+        self.rp_separator = QtWidgets.QFrame()
+        self.rp_separator.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        self.rp_separator.setStyleSheet("background-color: rgba(255, 255, 255, 0.05); border: none; max-height: 1px; margin-top: 15px; margin-bottom: 25px;")
+        self.rp_layout.addWidget(self.rp_separator)
+
+        self.rp_grid_layout = QtWidgets.QGridLayout()
+        self.rp_grid_layout.setSpacing(30)
+        self.rp_grid_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+
+        self.btn_open_lorebook = RPGlassCard(
+            title=self.translations.get("rp_card_lorebook_title", "Lorebooks"),
+            description=self.translations.get("rp_card_lorebook_desc", "Create rules, places, and world events for your scenarios."),
+            icon_path="app/gui/icons/lorebook.png"
+        )
+        
+        self.btn_open_personas = RPGlassCard(
+            title=self.translations.get("rp_card_personas_title", "Personas"),
+            description=self.translations.get("rp_card_personas_desc", "Manage your user profiles, avatars, and identity descriptions."),
+            icon_path="app/gui/icons/personas.png"
+        )
+
+        self.btn_open_prompts = RPGlassCard(
+            title=self.translations.get("rp_card_prompts_title", "System Prompts"),
+            description=self.translations.get("rp_card_prompts_desc", "Configure instructions and format how the AI receives character data."),
+            icon_path="app/gui/icons/system_prompt.png"
+        )
+
+        self.rp_grid_layout.addWidget(self.btn_open_lorebook, 0, 0)
+        self.rp_grid_layout.addWidget(self.btn_open_personas, 0, 1)
+        self.rp_grid_layout.addWidget(self.btn_open_prompts, 0, 2)
+
+        self.rp_layout.addLayout(self.rp_grid_layout)
+        self.rp_layout.addStretch()
+
+        self.stackedWidget.addWidget(self.rp_editors_page)
+        # =============================================================
         
         self.gridLayout_3.addWidget(self.stackedWidget, 0, 0, 1, 1)
         self.gridLayout_20.addWidget(self.SideBar_Right, 1, 1, 1, 1)
@@ -6645,7 +2847,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.label_logotype = QtWidgets.QLabel(parent=self.SideBar_Left)
         self.label_logotype.setMinimumSize(QtCore.QSize(185, 0))
-        self.label_logotype.setMaximumSize(QtCore.QSize(185, 75))
+        self.label_logotype.setMaximumSize(QtCore.QSize(185, 85))
         self.label_logotype.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
         self.label_logotype.setStyleSheet("padding: 10px;")
         self.label_logotype.setText("")
@@ -6739,6 +2941,57 @@ class Ui_MainWindow(object):
         self.pushButton_main.setFlat(False)
         self.pushButton_main.setObjectName("pushButton_main")
         self.verticalLayout.addWidget(self.pushButton_main)
+
+        self.pushButton_rp_editors = RippleButton(parent=self.SideBar_Left)
+        self.pushButton_rp_editors.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pushButton_rp_editors.sizePolicy().hasHeightForWidth())
+        self.pushButton_rp_editors.setSizePolicy(sizePolicy)
+        font = QtGui.QFont()
+        font.setFamily("Inter Tight Medium")
+        font.setPointSize(10)
+        font.setBold(False)
+        font.setWeight(50)
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.pushButton_rp_editors.setFont(font)
+        self.pushButton_rp_editors.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_rp_editors.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.pushButton_rp_editors.setStyleSheet("QPushButton {\n"
+"    color: rgb(210, 210, 210);\n"
+"    background-position: left center;\n"
+"    background-repeat: no-repeat;\n"
+"    border: none;\n"
+"    background-color: transparent;\n"
+"    text-align: left;\n"
+"    padding-left: 10px;\n"
+"    height: 50px;\n"
+"}\n"
+"\n"
+"QPushButton:hover {\n"
+"    background-color:  rgb(27,27,27);\n"
+"    color: rgb(210, 210, 210);\n"
+"}\n"
+"        \n"
+"QPushButton:pressed {\n"
+"    background-color:  rgb(27,27,27);\n"
+"    color: rgb(210, 210, 210);\n"
+"}\n"
+"        \n"
+"QPushButton:checked {\n"
+"    background-color:  rgb(27,27,27);\n"
+"    color: rgb(210, 210, 210);\n"
+"    border-left: 3px solid rgb(160, 160, 160);\n"
+"}")
+        icon_rp = QtGui.QIcon()
+        icon_rp.addPixmap(QtGui.QPixmap("app/gui/icons/lorebook.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.pushButton_rp_editors.setIcon(icon_rp)
+        self.pushButton_rp_editors.setIconSize(QtCore.QSize(21, 21))
+        self.pushButton_rp_editors.setCheckable(True)
+        self.pushButton_rp_editors.setAutoExclusive(True)
+        self.pushButton_rp_editors.setObjectName("pushButton_rp_editors")
+        self.verticalLayout.addWidget(self.pushButton_rp_editors)
         
         self.pushButton_create_character = RippleButton(parent=self.SideBar_Left)
         self.pushButton_create_character.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -6944,67 +3197,6 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addLayout(self.verticalLayout)
         spacerItem30 = QtWidgets.QSpacerItem(40, 326, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.verticalLayout_2.addItem(spacerItem30)
-        self.pushButton_turn_off_llm = QtWidgets.QPushButton(parent=self.SideBar_Left)
-        self.pushButton_turn_off_llm.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Minimum)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.pushButton_turn_off_llm.sizePolicy().hasHeightForWidth())
-        self.pushButton_turn_off_llm.setSizePolicy(sizePolicy)
-        self.pushButton_turn_off_llm.setMinimumSize(QtCore.QSize(0, 40))
-        self.pushButton_turn_off_llm.setMaximumSize(QtCore.QSize(16777215, 40))
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setPointSize(10)
-        font.setBold(False)
-        font.setWeight(50)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_turn_off_llm.setFont(font)
-        self.pushButton_turn_off_llm.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_turn_off_llm.setStyleSheet("""
-            QPushButton {
-                background-color: qlineargradient(
-                    spread: pad,
-                    x1: 0, y1: 0,
-                    x2: 0, y2: 1,
-                    stop: 0 #2f2f2f,
-                    stop: 0.5 #1e1e1e,
-                    stop: 1 #2f2f2f
-                );
-                color: rgb(227, 227, 227);
-                border-radius: 5px;
-                padding: 2px;
-            }
-
-            QPushButton:hover {
-                background-color: qlineargradient(
-                    spread: pad,
-                    x1: 0, y1: 0,
-                    x2: 0, y2: 1,
-                    stop: 0 #343434,
-                    stop: 0.5 #222222,
-                    stop: 1 #343434
-                );
-                border: 2px solid #666666;
-                border-top: 2px solid #777777;
-                border-bottom: 2px solid #555555;
-            }
-
-            QPushButton:pressed {
-                background-color: qlineargradient(
-                    spread: pad,
-                    x1: 0, y1: 0,
-                    x2: 0, y2: 1,
-                    stop: 0 #4a4a4a,
-                    stop: 1 #3a3a3a
-                );
-                border: 2px solid #888888;
-            }
-""")
-        self.pushButton_turn_off_llm.setIcon(icon5)
-        self.pushButton_turn_off_llm.setIconSize(QtCore.QSize(13, 13))
-        self.pushButton_turn_off_llm.setObjectName("pushButton_turn_off_llm")
-        self.verticalLayout_2.addWidget(self.pushButton_turn_off_llm)
         self.progressBar_llm_loading = QtWidgets.QProgressBar(parent=self.SideBar_Left)
         self.progressBar_llm_loading.setMinimumSize(QtCore.QSize(188, 40))
         self.progressBar_llm_loading.setMaximumSize(QtCore.QSize(188, 40))
@@ -7069,160 +3261,55 @@ class Ui_MainWindow(object):
         self.separator_left_bar_3.setFrameShape(QtWidgets.QFrame.Shape.HLine)
         self.separator_left_bar_3.setObjectName("separator_left_bar_3")
         self.verticalLayout_2.addWidget(self.separator_left_bar_3, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setContentsMargins(10, 5, 10, 5)
-        self.horizontalLayout.setSpacing(0)
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.pushButton_github = QtWidgets.QPushButton(parent=self.SideBar_Left)
-        self.pushButton_github.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_github.setMinimumSize(QtCore.QSize(35, 35))
-        self.pushButton_github.setMaximumSize(QtCore.QSize(35, 35))
-        font = QtGui.QFont()
-        font.setFamily("Muli ExtraBold")
-        font.setPointSize(10)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_github.setFont(font)
-        self.pushButton_github.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_github.setStyleSheet("QPushButton { \n"
-"    background-color: rgba(255, 255, 255, 0); \n"
-"    text-align: center;\n"
-"    border: none;  \n"
-"    border-radius: 5px;\n"
-"}\n"
-"\n"
-"QPushButton:hover { \n"
-"    background-color: rgb(60, 60, 60); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}\n"
-"\n"
-"QPushButton:pressed { \n"
-"    background-color: rgb(50, 50, 50); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}")
-        self.pushButton_github.setText("")
-        icon10 = QtGui.QIcon()
-        icon10.addPixmap(QtGui.QPixmap("app/gui/icons/github.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_github.setIcon(icon10)
-        self.pushButton_github.setIconSize(QtCore.QSize(25, 25))
-        self.pushButton_github.setCheckable(False)
-        self.pushButton_github.setAutoExclusive(True)
+
+        self.footer_container = QtWidgets.QWidget(self.SideBar_Left)
+        footer_layout = QtWidgets.QHBoxLayout(self.footer_container)
+        footer_layout.setContentsMargins(5, 10, 5, 10) 
+        footer_layout.setSpacing(5)
+        footer_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        
+        self.glass_capsule = QtWidgets.QFrame()
+        self.glass_capsule.setMinimumHeight(46)
+        self.glass_capsule.setFixedWidth(170)
+        self.glass_capsule.setStyleSheet("""
+            QFrame {
+                background-color: rgba(0, 0, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 23px;
+            }
+        """)
+        
+        capsule_shadow = QtWidgets.QGraphicsDropShadowEffect()
+        capsule_shadow.setBlurRadius(20)
+        capsule_shadow.setColor(QColor(0, 0, 0, 100))
+        capsule_shadow.setOffset(0, 5)
+        self.glass_capsule.setGraphicsEffect(capsule_shadow)
+
+        capsule_layout = QtWidgets.QHBoxLayout(self.glass_capsule)
+        capsule_layout.setContentsMargins(0, 0, 0, 0)
+        capsule_layout.setSpacing(5)
+        capsule_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        self.pushButton_github = LiquidButton("app/gui/icons/github.png", "#FFFFFF", self.glass_capsule)
         self.pushButton_github.setObjectName("pushButton_github")
-        self.horizontalLayout.addWidget(self.pushButton_github)
-        self.pushButton_discord = QtWidgets.QPushButton(parent=self.SideBar_Left)
-        self.pushButton_discord.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_discord.setMinimumSize(QtCore.QSize(35, 35))
-        self.pushButton_discord.setMaximumSize(QtCore.QSize(35, 35))
-        self.pushButton_discord.setBaseSize(QtCore.QSize(0, 0))
-        font = QtGui.QFont()
-        font.setFamily("Muli ExtraBold")
-        font.setPointSize(10)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_discord.setFont(font)
-        self.pushButton_discord.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_discord.setStyleSheet("QPushButton { \n"
-"    background-color: rgba(255, 255, 255, 0); \n"
-"    text-align: center;\n"
-"    border: none;  \n"
-"    border-radius: 5px;\n"
-"}\n"
-"\n"
-"QPushButton:hover { \n"
-"    background-color: rgb(60, 60, 60); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}\n"
-"\n"
-"QPushButton:pressed { \n"
-"    background-color: rgb(50, 50, 50); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}")
-        self.pushButton_discord.setText("")
-        icon11 = QtGui.QIcon()
-        icon11.addPixmap(QtGui.QPixmap("app/gui/icons/discord.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_discord.setIcon(icon11)
-        self.pushButton_discord.setIconSize(QtCore.QSize(25, 25))
-        self.pushButton_discord.setCheckable(False)
-        self.pushButton_discord.setAutoExclusive(True)
+        capsule_layout.addWidget(self.pushButton_github)
+
+        self.pushButton_discord = LiquidButton("app/gui/icons/discord.png", "#5865F2", self.glass_capsule)
         self.pushButton_discord.setObjectName("pushButton_discord")
-        self.horizontalLayout.addWidget(self.pushButton_discord)
-        self.pushButton_youtube = QtWidgets.QPushButton(parent=self.SideBar_Left)
-        self.pushButton_youtube.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.pushButton_youtube.setMinimumSize(QtCore.QSize(35, 35))
-        self.pushButton_youtube.setMaximumSize(QtCore.QSize(35, 35))
-        font = QtGui.QFont()
-        font.setFamily("Muli ExtraBold")
-        font.setPointSize(10)
-        font.setBold(True)
-        font.setWeight(75)
-        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
-        self.pushButton_youtube.setFont(font)
-        self.pushButton_youtube.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.pushButton_youtube.setStyleSheet("QPushButton { \n"
-"    background-color: rgba(255, 255, 255, 0); \n"
-"    text-align: center;\n"
-"    border: none;  \n"
-"    border-radius: 5px;\n"
-"}\n"
-"\n"
-"QPushButton:hover { \n"
-"    background-color: rgb(60, 60, 60); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}\n"
-"\n"
-"QPushButton:pressed { \n"
-"    background-color: rgb(50, 50, 50); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}")
-        self.pushButton_youtube.setText("")
-        icon12 = QtGui.QIcon()
-        icon12.addPixmap(QtGui.QPixmap("app/gui/icons/youtube.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.pushButton_youtube.setIcon(icon12)
-        self.pushButton_youtube.setIconSize(QtCore.QSize(25, 25))
-        self.pushButton_youtube.setCheckable(False)
-        self.pushButton_youtube.setAutoExclusive(True)
+        capsule_layout.addWidget(self.pushButton_discord)
+
+        self.pushButton_youtube = LiquidButton("app/gui/icons/youtube.png", "#FF0000", self.glass_capsule)
         self.pushButton_youtube.setObjectName("pushButton_youtube")
-        self.horizontalLayout.addWidget(self.pushButton_youtube)
-        self.about_btn = QtWidgets.QPushButton(parent=self.SideBar_Left)
-        self.about_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.about_btn.setMinimumSize(QtCore.QSize(35, 35))
-        self.about_btn.setMaximumSize(QtCore.QSize(35, 35))
-        self.about_btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.about_btn.setStyleSheet("QPushButton { \n"
-"    background-color: rgba(255, 255, 255, 0); \n"
-"    text-align: center;\n"
-"    border: none;  \n"
-"    border-radius: 5px;\n"
-"}\n"
-"\n"
-"QPushButton:hover { \n"
-"    background-color: rgb(60, 60, 60); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}\n"
-"\n"
-"QPushButton:pressed { \n"
-"    background-color: rgb(30, 30, 30); \n"
-"    border-style: solid; \n"
-"    border-radius: 17px;\n"
-"}")
-        self.about_btn.setText("")
-        icon22 = QtGui.QIcon()
-        icon22.addPixmap(QtGui.QPixmap("app/gui/icons/information.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.about_btn.setIcon(icon22)
-        self.about_btn.setIconSize(QtCore.QSize(23, 23))
+        capsule_layout.addWidget(self.pushButton_youtube)
+
+        self.about_btn = LiquidButton("app/gui/icons/information.png", "#00BFFF", self.glass_capsule)
         self.about_btn.setObjectName("about_btn")
-        self.horizontalLayout.addWidget(self.about_btn)
-        self.verticalLayout_2.addLayout(self.horizontalLayout)
+        capsule_layout.addWidget(self.about_btn)
+
+        footer_layout.addWidget(self.glass_capsule)
+        self.verticalLayout_2.addWidget(self.footer_container)
         self.gridLayout_20.addWidget(self.SideBar_Left, 1, 0, 1, 1)
+
         self.SideBar_Right.raise_()
         self.SideBar_Left.raise_()
         self.menu_bar.raise_()
@@ -7296,171 +3383,502 @@ class RippleButton(QPushButton):
         self.update()
 
 class PushButton(QtWidgets.QPushButton):
-    def __init__(self, parent=None):
+    def __init__(self, icon_path, parent=None):
         super().__init__(parent)
-        self._start_color = QtGui.QColor(27, 27, 27)
-        self._end_color = QtGui.QColor(81, 82, 86)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
 
-        self._animation = QtCore.QVariantAnimation(
-            startValue=self._start_color,
-            endValue=self._end_color,
-            valueChanged=self._on_value_changed,
-            duration=300
-        )
-        self._update_stylesheet(self._start_color)
+        self.icon_pixmap = QtGui.QPixmap(icon_path)
+        
+        self._color_normal = QColor(255, 255, 255, 10)
+        self._color_hover = QColor(255, 255, 255, 40)
+        self._color_pressed = QColor(255, 255, 255, 60)
 
-    def _on_value_changed(self, color):
-        self._update_stylesheet(color)
+        self._current_bg_color = self._color_normal
+        
+        self._animation = QtCore.QVariantAnimation(self)
+        self._animation.setDuration(300)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self._animation.valueChanged.connect(self._update_bg_color)
 
-    def _update_stylesheet(self, color):
-        self.setStyleSheet(
-            """
-            QPushButton {
-                background-color: %s;
-                color: white;
-                border: none;
-                font-size: 14px;
-                font-family: 'Inter Tight ExtraBold';
-                border-radius: 20px;
-            }
-            """
-            % color.name()
-        )
+    def _update_bg_color(self, color):
+        self._current_bg_color = color
+        self.update()
 
     def enterEvent(self, event):
-        self._animation.setDirection(QtCore.QAbstractAnimation.Direction.Forward)
+        self._animation.stop()
+        self._animation.setStartValue(self._current_bg_color)
+        self._animation.setEndValue(self._color_hover)
         self._animation.start()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self._animation.setDirection(QtCore.QAbstractAnimation.Direction.Backward)
+        self._animation.stop()
+        self._animation.setStartValue(self._current_bg_color)
+        self._animation.setEndValue(self._color_normal)
         self._animation.start()
         super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        self._animation.stop()
+        self._current_bg_color = self._color_pressed
+        self.update()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._animation.setStartValue(self._current_bg_color)
+        self._animation.setEndValue(self._color_hover)
+        self._animation.start()
+        super().mouseReleaseEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect()
+        draw_rect = QRectF(rect).adjusted(1, 1, -1, -1)
+        radius = 20
+
+        painter.setBrush(QBrush(self._current_bg_color))
+        painter.setPen(QPen(QColor(255, 255, 255, 30), 1)) 
+        painter.drawRoundedRect(draw_rect, radius, radius)
+
+        if not self.icon_pixmap.isNull():
+            icon_size = 20
+            x = (self.width() - icon_size) // 2
+            y = (self.height() - icon_size) // 2
+            painter.drawPixmap(x, y, icon_size, icon_size, 
+                               self.icon_pixmap.scaled(
+                                   icon_size, icon_size, 
+                                   Qt.AspectRatioMode.KeepAspectRatio, 
+                                   Qt.TransformationMode.SmoothTransformation
+                               ))
 
 class PushButton_2(QtWidgets.QPushButton):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._start_color = QtGui.QColor(67, 68, 70)
-        self._end_color = QtGui.QColor(80, 83, 86)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
 
-        self._animation = QtCore.QVariantAnimation(
-            startValue=self._start_color,
-            endValue=self._end_color,
-            valueChanged=self._on_value_changed,
-            duration=200
-        )
-        self._update_stylesheet(self._start_color)
+        self._color_normal = QColor(67, 68, 70, 180) 
+        self._color_hover = QColor(90, 93, 96, 220)
+        self._color_pressed = QColor(120, 123, 126, 240)
 
-    def _on_value_changed(self, color):
-        self._update_stylesheet(color)
+        self._current_bg_color = self._color_normal
 
-    def _update_stylesheet(self, color):
-        self.setStyleSheet(
-            """
-            QPushButton {
-                background-color: %s;
-                background-repeat: no-repeat;
-	        background-position: center;
-                color: white;
-                border: none;
-                font-size: 14px;
-                font-family: 'Inter Tight ExtraBold';
-                border-radius: 15px;
-            }
-            """
-            % color.name()
-        )
+        self._animation = QtCore.QVariantAnimation(self)
+        self._animation.setDuration(200)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self._animation.valueChanged.connect(self._update_bg_color)
+
+    def _update_bg_color(self, color):
+        self._current_bg_color = color
+        self.update()
 
     def enterEvent(self, event):
-        self._animation.setDirection(QtCore.QAbstractAnimation.Direction.Forward)
+        self._animation.stop()
+        self._animation.setStartValue(self._current_bg_color)
+        self._animation.setEndValue(self._color_hover)
         self._animation.start()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self._animation.setDirection(QtCore.QAbstractAnimation.Direction.Backward)
+        self._animation.stop()
+        self._animation.setStartValue(self._current_bg_color)
+        self._animation.setEndValue(self._color_normal)
         self._animation.start()
-        super().leaveEvent(event)
-
-class CharacterCard(QListWidget):
-    def __init__(self, name, image_path, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(150, 200)
-        self.name = name
-        self.image_path = image_path
-
-        self.shadow_effect = QGraphicsDropShadowEffect(self)
-        self.shadow_effect.setBlurRadius(15)
-        self.shadow_effect.setColor(QColor(0, 0, 0, 100))
-        self.shadow_effect.setOffset(0, 0)
-        self.setGraphicsEffect(self.shadow_effect)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.image_label = QLabel(self)
-        pixmap = QPixmap(image_path).scaled(
-            130, 130,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.image_label.setPixmap(pixmap)
-        self.image_label.setStyleSheet("border-radius: 5px; background-color: #333;")
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.image_label)
-
-        self.name_label = QLabel(name, self)
-        self.name_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.name_label.setStyleSheet("""
-            color: white;
-            padding: 5px;
-            border-radius: 5px;
-            background-color: #2b2b2b;
-        """)
-        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.name_label)
-
-        self.animation = QPropertyAnimation(self.shadow_effect, b"offset")
-        self.animation.setDuration(200)
-        self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)
-
-        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-
-        self.setStyleSheet("""
-            QListWidget {
-                background-color: #2b2b2b;
-                border: none;
-                border-radius: 10px;
-            }
-        """)
-
-    def enterEvent(self, event):
-        self.animation.setStartValue(QPointF(0, 0))
-        self.animation.setEndValue(QPointF(5, 5))
-        self.animation.start()
-        self.setStyleSheet("""
-            QListWidget {
-                background-color: #3a3a3a;
-                border: none;
-                border-radius: 10px;
-            }
-        """)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        self.animation.setStartValue(QPointF(5, 5))
-        self.animation.setEndValue(QPointF(0, 0))
-        self.animation.start()
-        self.setStyleSheet("""
-            QListWidget {
-                background-color: #2b2b2b;
-                border: none;
-                border-radius: 10px;
-            }
-        """)
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):
+        self._animation.stop()
+        self._current_bg_color = self._color_pressed
+        self.update()
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._animation.setStartValue(self._current_bg_color)
+        self._animation.setEndValue(self._color_hover)
+        self._animation.start()
+        super().mouseReleaseEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        rect = self.rect()
+        draw_rect = QRectF(rect).adjusted(1, 1, -1, -1)
+        radius = 15
+
+        painter.setBrush(QBrush(self._current_bg_color))
+        painter.setPen(QPen(QColor(255, 255, 255, 30), 1)) 
+        painter.drawRoundedRect(draw_rect, radius, radius)
+
+        if not self.icon().isNull():
+            icon_size = 16
+            x = int((self.width() - icon_size) / 2)
+            y = int((self.height() - icon_size) / 2)
+            
+            self.icon().paint(painter, x, y, icon_size, icon_size)
+
+class AnimatedToggle(QtWidgets.QCheckBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(50, 28)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setText("")
+        
+        self._bg_off = QColor("#3a3a3a")
+        self._bg_on = QColor("#d32f2f")
+        self._circle_color = QColor("#dddddd")
+        self._circle_color_hover = QColor("#ffffff")
+        
+        self._circle_position = 3
+        
+        self._animation = QPropertyAnimation(self, b"circle_position", self)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._animation.setDuration(250)
+        
+        self.stateChanged.connect(self.start_transition)
+
+    @pyqtProperty(float)
+    def circle_position(self):
+        return self._circle_position
+
+    @circle_position.setter
+    def circle_position(self, pos):
+        self._circle_position = pos
+        self.update()
+
+    def start_transition(self, state):
+        self._animation.stop()
+        
+        if self.isChecked():
+            end_val = self.width() - 25
+        else:
+            end_val = 3
+            
+        self._animation.setStartValue(self._circle_position)
+        self._animation.setEndValue(end_val)
+        self._animation.start()
+
+    def hitButton(self, pos: QPoint):
+        return self.contentsRect().contains(pos)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        rect = self.rect()
+        track_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height())
+        
+        if self.isChecked():
+            bg_color = self._bg_on
+        else:
+            bg_color = self._bg_off
+            
+        p.setBrush(QBrush(bg_color))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(track_rect, 14, 14)
+        
+        circle_rect = QRectF(self._circle_position, 3, 22, 22)
+        
+        p.setBrush(QBrush(self._circle_color))
+        p.drawEllipse(circle_rect)
+        p.end()
+
+class ModernSearchBar(QtWidgets.QFrame):
+    textChanged = QtCore.pyqtSignal(str)
+    returnPressed = QtCore.pyqtSignal()
+    searchClicked = QtCore.pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(400, 45)
+        self.setMaximumHeight(45)
+        self.setObjectName("ModernSearchBar")
+        
+        self._border_color = QtGui.QColor(255, 255, 255, 40)
+        self.animation = QtCore.QPropertyAnimation(self, b"border_color")
+        self.animation.setDuration(250)
+        
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        self.layout = QtWidgets.QHBoxLayout(self)
+        self.layout.setContentsMargins(18, 0, 5, 0)
+        self.layout.setSpacing(10)
+        
+        self.line_edit = QtWidgets.QLineEdit()
+        self.line_edit.setPlaceholderText("Search characters...")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.line_edit.setFont(font)
+
+        self.line_edit.setStyleSheet("""
+            QLineEdit {
+                background-color: transparent; 
+                border: none; 
+                color: #ffffff; 
+                font-size: 14px;
+                font-family: 'Inter Tight', 'Segoe UI';
+            }
+            QLineEdit::placeholder {
+                color: rgba(255, 255, 255, 100);
+            }
+        """)
+        self.line_edit.textChanged.connect(self._handle_text_change)
+        self.line_edit.returnPressed.connect(self.returnPressed)
+        self.line_edit.installEventFilter(self)
+        
+        self.clear_btn = QtWidgets.QPushButton("✕")
+        self.clear_btn.setFont(font)
+        self.clear_btn.setFixedSize(22, 22)
+        self.clear_btn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.clear_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.clear_btn.setStyleSheet("""
+            QPushButton { 
+                background: transparent; 
+                color: rgba(255, 255, 255, 80); 
+                border-radius: 11px; 
+                font-size: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover { 
+                background: rgba(255, 255, 255, 30); 
+                color: #fff; 
+            }
+        """)
+        self.clear_btn.clicked.connect(self.line_edit.clear)
+        self.clear_btn.hide()
+
+        self.search_btn = QtWidgets.QPushButton()
+        self.search_btn.setFixedSize(34, 34)
+        self.search_btn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.search_btn.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.search_btn.setIcon(QtGui.QIcon("app/gui/icons/search.png"))
+        self.search_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 15);
+                border: 1px solid rgba(255, 255, 255, 10);
+                border-radius: 17px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 30);
+                border: 1px solid rgba(255, 255, 255, 40);
+            }
+        """)
+        self.search_btn.clicked.connect(lambda: self.searchClicked.emit(self.line_edit.text()))
+
+        self.layout.addWidget(self.line_edit)
+        self.layout.addWidget(self.clear_btn)
+        self.layout.addWidget(self.search_btn)
+
+    def _handle_text_change(self, text):
+        self.textChanged.emit(text)
+        self.clear_btn.setVisible(len(text) > 0)
+
+    @QtCore.pyqtProperty(QtGui.QColor)
+    def border_color(self):
+        return self._border_color
+
+    @border_color.setter
+    def border_color(self, color):
+        self._border_color = color
+        self.update()
+
+    def eventFilter(self, obj, event):
+        if obj == self.line_edit:
+            if event.type() == QtCore.QEvent.Type.FocusIn:
+                self.animate_focus(True)
+            elif event.type() == QtCore.QEvent.Type.FocusOut:
+                self.animate_focus(False)
+        return super().eventFilter(obj, event)
+
+    def animate_focus(self, focused):
+        self.animation.stop()
+        self.animation.setStartValue(self._border_color)
+        end_color = QtGui.QColor(255, 255, 255, 120) if focused else QtGui.QColor(255, 255, 255, 40)
+        self.animation.setEndValue(end_color)
+        self.animation.start()
+
+    def paintEvent(self, event):
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        radius = rect.height() / 2
+        
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(QtCore.QRectF(rect), radius, radius)
+        p.fillPath(path, QtGui.QColor(0, 0, 0, 65)) 
+        
+        pen = QtGui.QPen(self._border_color, 1.2)
+        p.setPen(pen)
+        p.drawPath(path)
+
+    def text(self): 
+        return self.line_edit.text()
+    
+    def setText(self, text): 
+        self.line_edit.setText(text)
+
+class AutoResizingTextEdit(QtWidgets.QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.textChanged.connect(self.adjust_height)
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def adjust_height(self):
+        doc_height = int(self.document().size().height())
+        margins = self.contentsMargins()
+        new_height = doc_height + margins.top() + margins.bottom() + 15
+        self.setMinimumHeight(max(100, new_height))
+
+class LiquidButton(QtWidgets.QPushButton):
+    def __init__(self, icon_path, hover_color_hex, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(36, 36)
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        
+        original_pixmap = QtGui.QPixmap(icon_path)
+        
+        self.icon_pixmap = original_pixmap.scaled(
+            24, 24,
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation
+        )
+        
+        self._base_color = QColor(0, 0, 0, 0)
+        self._hover_color = QColor(hover_color_hex)
+        self._hover_color.setAlpha(80)
+        self._current_color = self._base_color
+
+        self._animation = QtCore.QVariantAnimation(self)
+        self._animation.setDuration(200)
+        self._animation.setEasingCurve(QtCore.QEasingCurve.Type.OutQuad)
+        self._animation.valueChanged.connect(self._update_color)
+
+    def _update_color(self, color):
+        self._current_color = color
+        self.update()
+
+    def enterEvent(self, event):
+        self._animation.stop()
+        self._animation.setStartValue(self._current_color)
+        self._animation.setEndValue(self._hover_color)
+        self._animation.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._animation.stop()
+        self._animation.setStartValue(self._current_color)
+        self._animation.setEndValue(self._base_color)
+        self._animation.start()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        path = QtGui.QPainterPath()
+        path.addEllipse(0, 0, self.width(), self.height())
+        painter.fillPath(path, self._current_color)
+
+        icon_size = 26
+        
+        x = round((self.width() - icon_size) / 2)
+        y = round((self.height() - icon_size) / 2)
+
+        is_hovered = self._current_color.alpha() > 10
+    
+        if is_hovered:
+            painter.setOpacity(1.0)
+        else:
+            painter.setOpacity(0.6)
+        
+        painter.drawPixmap(x, y, icon_size, icon_size, self.icon_pixmap)
+
+class RPGlassCard(QtWidgets.QFrame):
+    clicked = QtCore.pyqtSignal()
+
+    def __init__(self, title, description, icon_path, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(320, 180)
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.setObjectName("rp_card")
+
+        self.style_normal = """
+            QFrame#rp_card {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 rgba(35, 35, 45, 0.4), stop:1 rgba(15, 15, 20, 0.6));
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 20px;
+            }
+        """
+        self.style_hover = """
+            QFrame#rp_card {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 rgba(50, 50, 65, 0.6), stop:1 rgba(25, 25, 35, 0.8));
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 20px;
+            }
+        """
+        self.setStyleSheet(self.style_normal)
+
+        shadow = QtWidgets.QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(35)
+        shadow.setColor(QtGui.QColor(0, 0, 0, 120))
+        shadow.setOffset(0, 8)
+        self.setGraphicsEffect(shadow)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(12)
+
+        icon_lbl = QtWidgets.QLabel()
+        pixmap = QtGui.QPixmap(icon_path).scaled(42, 42, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+        icon_lbl.setPixmap(pixmap)
+        icon_lbl.setStyleSheet("background: transparent; border: none;")
+        
+        title_lbl = QtWidgets.QLabel(title)
+        f_title = QtGui.QFont("Inter Tight SemiBold", 16, QtGui.QFont.Weight.Bold)
+        f_title.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        title_lbl.setFont(f_title)
+        title_lbl.setStyleSheet("color: rgba(255, 255, 255, 0.95); background: transparent; border: none;")
+
+        desc_lbl = QtWidgets.QLabel(description)
+        f_desc = QtGui.QFont("Inter Tight Medium", 11)
+        f_desc.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        desc_lbl.setFont(f_desc)
+        desc_lbl.setStyleSheet("color: rgba(255, 255, 255, 0.55); background: transparent; border: none; line-height: 1.4;")
+        desc_lbl.setWordWrap(True)
+        desc_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+
+        layout.addWidget(icon_lbl)
+        layout.addWidget(title_lbl)
+        layout.addWidget(desc_lbl)
+        layout.addStretch()
+
+    def enterEvent(self, event):
+        self.setStyleSheet(self.style_hover)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.setStyleSheet(self.style_normal)
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self.setStyleSheet("""
+                QFrame#rp_card {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 rgba(20, 20, 25, 0.8), stop:1 rgba(10, 10, 15, 0.9));
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 20px;
+                }
+            """)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self.setStyleSheet(self.style_hover)
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
