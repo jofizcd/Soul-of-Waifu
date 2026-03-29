@@ -51,6 +51,16 @@
 			import { VRMLoaderPlugin, VRMUtils, VRMHumanoid, VRMLookAt } from '@pixiv/three-vrm';
 			import { loadMixamoAnimation } from 'loadMixamo';
 
+			const urlParams = new URLSearchParams(window.location.search);
+			const isTransparent = urlParams.get('transparent') === '1';
+
+			if (isTransparent) {
+				document.body.style.backgroundColor = 'rgba(0,0,0,0)';
+				document.documentElement.style.backgroundColor = 'rgba(0,0,0,0)';
+				const canvas = document.querySelector('canvas');
+				if (canvas) canvas.style.backgroundColor = 'rgba(0,0,0,0)';
+			}
+
 			const mixamoVRMRigMap = {
 				mixamorigHips: 'hips',
 				mixamorigSpine: 'spine',
@@ -106,10 +116,8 @@
 				mixamorigRightToeBase: 'rightToes'
 			};
 			
-			// vector for calculations
 			const _v3A = new THREE.Vector3();
 
-			// extended vrm lookat
 			class VRMSmoothLookAt extends VRMLookAt {
 				constructor(humanoid, applier) {
 					super(humanoid, applier);
@@ -156,9 +164,12 @@
 				}
 			}
 
-			// init renderer
-			const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-			renderer.setClearColor(0x000000, 0);
+			const renderer = new THREE.WebGLRenderer({
+				antialias: true,
+				alpha: isTransparent,
+				premultipliedAlpha: isTransparent ? false : true
+			});
+			renderer.setClearColor(0x000000, isTransparent ? 0 : 1);
 			renderer.setSize(window.innerWidth, window.innerHeight);
 			renderer.setPixelRatio(window.devicePixelRatio);
 			renderer.outputEncoding = THREE.sRGBEncoding;
@@ -178,6 +189,36 @@
 
 			// init scene
 			const scene = new THREE.Scene();
+			
+			// init lookAt
+			const lookAtTarget = new THREE.Object3D();
+			camera.add(lookAtTarget);
+			scene.add(camera);
+
+			let targetMouseX = 0;
+			let targetMouseY = 0;
+			let isThinking = false;
+
+			document.addEventListener('mousemove', (event) => {
+				targetMouseX = (event.clientX / window.innerWidth) * 2 - 1;
+				targetMouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+			});
+
+			setInterval(() => {
+				if (isThinking) return;
+				
+				if (Math.random() > 0.4) {
+					jitterX = (Math.random() - 0.5) * 0.8;
+					jitterY = (Math.random() - 0.5) * 0.5;
+					
+					if (currentVrm && currentVrm.expressionManager) {
+						currentVrm.expressionManager.setValue('relaxed', Math.random() * 0.15);
+					}
+				} else {
+					jitterX = 0;
+					jitterY = 0;
+				}
+			}, 2500 + Math.random() * 2000);
         
 			// init lighting
 			const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
@@ -282,7 +323,6 @@
 				});
 			}
 
-            const urlParams = new URLSearchParams(window.location.search);
             let modelPath = decodeURIComponent(urlParams.get('model'));
 
             if (!modelPath) {
@@ -348,6 +388,11 @@
 			}
 
 			function blink() {
+				if (currentExpression === 'happy' || currentExpression === 'sad') {
+					setTimeout(blink, 2000);
+					return;
+				}
+
 				var blinktimeout = Math.floor(Math.random() * 250) + 50;
 				setTimeout(() => {
 					currentVrm.expressionManager.setValue("blink",0);
@@ -394,10 +439,28 @@
 						const progress = Math.min(elapsed / duration, 1.0);
 						
 						for (const expr in currentVrm.expressionManager.expressionMap) {
-							const targetValue = expr === expression ? 1.0 : 0.0;
-							const newValue = startValues[expr] + (targetValue - startValues[expr]) * progress;
-							currentVrm.expressionManager.setValue(expr, newValue);
-						}
+                            let targetValue = 0.0;
+                            
+                            if (expr === expression) {
+                                targetValue = 0.85; 
+                            } 
+
+                            else if (expression === 'angry' && expr === 'surprised') {
+                                targetValue = 0.15;
+                            } 
+                            else if (expression === 'happy' && expr === 'relaxed') {
+                                targetValue = 0.20;
+                            } 
+                            else if (expression === 'sad' && expr === 'surprised') {
+                                targetValue = 0.10;
+                            }
+                            else if (expression === 'surprised' && expr === 'relaxed') {
+                                targetValue = 0.10;
+                            }
+
+                            const newValue = startValues[expr] + (targetValue - startValues[expr]) * progress;
+                            currentVrm.expressionManager.setValue(expr, newValue);
+                        }
 						
 						if (progress < 1.0) {
 							requestAnimationFrame(animateTransition);
@@ -411,7 +474,76 @@
 				return { success: true };
 			}
 
+			window.setAppState = function(state) {
+				console.log("[VRM] State changed to:", state);
+				
+				if (state === "PROCESSING") {
+					isThinking = true;
+					if (currentVrm && currentVrm.expressionManager) {
+						currentVrm.expressionManager.setValue('blink', 0.15); 
+					}
+				} 
+				else {
+					isThinking = false;
+					if (currentVrm && currentVrm.expressionManager) {
+						currentVrm.expressionManager.setValue('blink', 0.0); 
+					}
+				}
+			};
+
 			window.setExpression = setExpression;
+
+			function setMouthOpen(value) {
+				if (!currentVrm || !currentVrm.expressionManager) return;
+				
+				const safeValue = Math.max(0.0, Math.min(1.0, value));
+				
+				currentVrm.expressionManager.setValue('aa', safeValue);
+
+				if (safeValue > 0.05) {
+					currentVrm.expressionManager.setValue('ih', 0);
+					currentVrm.expressionManager.setValue('ou', 0);
+					currentVrm.expressionManager.setValue('ee', 0);
+					currentVrm.expressionManager.setValue('oh', 0);
+				}
+			}
+			window.setMouthOpen = setMouthOpen;
+
+			let jitterX = 0;
+			let jitterY = 0;
+			let idleExpressionTime = 0;
+			
+			function updateIdleJitter(deltaTime) {
+				idleExpressionTime -= deltaTime;
+				
+				if (idleExpressionTime <= 0) {
+					idleExpressionTime = 2.0 + Math.random() * 3.0;
+					
+					if (!isThinking && currentExpression === 'neutral') {
+						if (Math.random() > 0.4) {
+							jitterX = (Math.random() - 0.5) * 1.5;
+							jitterY = (Math.random() - 0.5) * 1.0;
+						} else {
+							jitterX = 0;
+							jitterY = 0;
+						}
+
+						if (currentVrm && currentVrm.expressionManager) {
+							currentVrm.expressionManager.setValue('relaxed', 0);
+							currentVrm.expressionManager.setValue('surprised', 0);
+							currentVrm.expressionManager.setValue('sad', 0);
+							
+							const rand = Math.random();
+							if (rand < 0.3) {
+								currentVrm.expressionManager.setValue('relaxed', 0.15 + Math.random() * 0.1);
+							} 
+							else if (rand > 0.9) {
+								currentVrm.expressionManager.setValue('surprised', 0.05 + Math.random() * 0.1);
+							}
+						}
+					}
+				}
+			}
 
 			async function loadFBX(animationUrl) {
 				console.log("Trying to load an animation:", animationUrl);
@@ -464,33 +596,76 @@
 					return { success: false, error: error.message };
 				}
 			}
-
 			window.loadFBX = loadFBX;
+
+			window.updateLookAtTarget = function(x, y) {
+				targetMouseX = x;
+				targetMouseY = y;
+			};
+
+			window.setHeadAngle = function(angleX, angleY, angleZ) {
+				if (!currentVrm || !currentVrm.humanoid) return;
+				const head = currentVrm.humanoid.getNormalizedBoneNode('head');
+				if (!head) return;
+				head.rotation.y = THREE.MathUtils.degToRad(angleX);
+				head.rotation.x = THREE.MathUtils.degToRad(-angleY);
+				if (angleZ !== undefined) head.rotation.z = THREE.MathUtils.degToRad(angleZ);
+			};
+
+			window.setBodyAngle = function(angleX, angleZ) {
+				if (!currentVrm || !currentVrm.humanoid) return;
+				const spine = currentVrm.humanoid.getNormalizedBoneNode('spine');
+				const chest = currentVrm.humanoid.getNormalizedBoneNode('chest');
+				const upper = currentVrm.humanoid.getNormalizedBoneNode('upperChest');
+				if (spine) spine.rotation.z = THREE.MathUtils.degToRad(-angleX * 0.5);
+				if (chest) chest.rotation.z = THREE.MathUtils.degToRad(-angleX * 0.3);
+				if (upper) upper.rotation.z = THREE.MathUtils.degToRad(-angleX * 0.2);
+			};
+
+			window.setEyeOpen = function(leftValue, rightValue) {
+				if (!currentVrm || !currentVrm.expressionManager) return;
+				const avg = (leftValue + rightValue) / 2;
+				const blinkVal = 1.0 - Math.max(0.0, Math.min(1.0, avg));
+				currentVrm.expressionManager.setValue('blink', blinkVal);
+			};
+
+			window.triggerBlink = function() {
+				if (!currentVrm || !currentVrm.expressionManager) return;
+				currentVrm.expressionManager.setValue('blink', 1.0);
+				setTimeout(() => {
+					if (currentVrm && currentVrm.expressionManager) {
+						currentVrm.expressionManager.setValue('blink', 0.0);
+					}
+				}, 120);
+			};
 
 			const clock = new THREE.Clock();
 			function animate() {
-
 				requestAnimationFrame( animate );
-
 				const deltaTime = clock.getDelta();
+				const time = clock.getElapsedTime();
 
-				if ( currentMixer ) {
+				updateIdleJitter(deltaTime);
 
-					currentMixer.update( deltaTime );
+				const breathOffset = Math.sin(time * 1.5) * 0.1;
+				
+				let finalTargetX = (targetMouseX * 3.0) + jitterX;
+				let finalTargetY = (targetMouseY * 2.0) + jitterY + breathOffset;
 
+				if (isThinking) {
+					finalTargetX = Math.random() > 0.5 ? 4.0 : -4.0;
+					finalTargetY = 3.0 + breathOffset;
 				}
 
-				if ( currentVrm ) {
+				lookAtTarget.position.x += (finalTargetX - lookAtTarget.position.x) * 5.0 * deltaTime;
+				lookAtTarget.position.y += (finalTargetY - lookAtTarget.position.y) * 5.0 * deltaTime;
+				lookAtTarget.position.z = -5.0;
 
-					currentVrm.update( deltaTime );
-
-				}
+				if ( currentMixer ) currentMixer.update( deltaTime );
+				if ( currentVrm ) currentVrm.update( deltaTime );
 
 				renderer.render( scene, camera );
-
 			}
-
-			animate();
 
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
