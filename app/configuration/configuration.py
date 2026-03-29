@@ -335,6 +335,8 @@ class ConfigurationCharacters():
                     "name": "default",
                     "created_at": datetime.datetime.now().isoformat(),
                     "current_emotion": "neutral",
+                    "summary_text": "",
+                    "last_summarized_sequence": 0,
                     "chat_history": chat_history,
                     "chat_content": chat_content
                 }
@@ -774,23 +776,40 @@ class ConfigurationCharacters():
         else:
             logger.error(f"Character '{character_name}' not found in the configuration.")
 
-    def renumber_sequence_numbers(self, character_name):
+    def renumber_sequence_numbers(self, character_name, conversation_method=None):
         config = self.load_configuration()
         char_data = config["character_list"].get(character_name)
         if not char_data:
             return
         
-        chat_id = char_data.get("current_chat")
+        if conversation_method is None:
+            conversation_method = char_data.get("conversation_method")
 
-        chat_data = char_data["chats"][chat_id]
-        chat_content = chat_data.get("chat_content", {})
+        if conversation_method == "Character AI":
+            chat_content = char_data.get("chat_content", {})
+            sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf')))
+            for idx, (msg_id, msg) in enumerate(sorted_messages):
+                msg["sequence_number"] = idx + 1
+            
+            char_data["chat_content"] = chat_content
+            config["character_list"][character_name] = char_data
+        else:
+            chat_id = char_data.get("current_chat")
+            if not chat_id or "chats" not in char_data:
+                return
+            
+            chat_data = char_data["chats"][chat_id]
+            if not chat_data:
+                return
+            
+            chat_content = chat_data.get("chat_content", {})
+            sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf')))
 
-        sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf')))
+            for idx, (msg_id, msg) in enumerate(sorted_messages):
+                msg["sequence_number"] = idx + 1
 
-        for idx, (msg_id, msg) in enumerate(sorted_messages):
-            msg["sequence_number"] = idx + 1
+            chat_data["chat_content"] = chat_content
+            char_data["chats"][chat_id] = chat_data
+            config["character_list"][character_name] = char_data
 
-        chat_data["chat_content"] = chat_content
-        char_data["chats"][chat_id] = chat_data
-        config["character_list"][character_name] = char_data
         self.save_configuration_edit(config)
