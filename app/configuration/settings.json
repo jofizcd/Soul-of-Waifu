@@ -1,31 +1,31 @@
 {
     "main_settings": {
         "conversation_method": "Character AI",
-        "stt_method": 0,
         "sow_system_status": false,
         "nsfw_query": false,
         "program_language": 0,
-        "available_memory": 31,
+        "available_memory": 0,
         "input_device": 0,
         "output_device_combo_index": 1,
         "output_device_real_index": 5,
         "translator": 0,
         "target_language": 0,
-        "translator_mode": 2,
+        "translator_mode": 0,
         "live2d_mode": 0,
         "model_fps": 1,
         "local_llm": null,
         "llm_device": 0,
         "llm_backend": 0,
-        "gpu_layers": 20,
+        "gpu_layers": 30,
         "mlock_status": false,
         "flash_attention_status": false,
-        "context_size": 2048,
+        "context_size": 4096,
         "temperature": 0.7,
         "top_p": 0.7,
         "repeat_penalty": 1.5,
         "max_tokens": 500,
-        "mistral_model_endpoint": "mistral-small-2506",
+        "mistral_model_endpoint": "mistral-large-2512",
+	"openai_model": "gpt-5-mini-2025-08-07",
         "openrouter_model": "",
         "model_background_type": 0,
         "model_background_color": 0,
@@ -33,7 +33,49 @@
         "chat_background_image": "Default",
         "ambient": false,
         "ambient_sound": null,
-        "smart_memory": false
+        "smart_memory": false,
+	"auto_summary": false,
+        "interval_summary": 5,
+        "prompt_summary": "You are an expert narrative archivist. Your task is to update the ongoing story summary by seamlessly merging the previous summary with the new recent messages. \n\nCRITICAL RULES:\n1. DO NOT write the story any further or generate new dialogue. Summarize ONLY what has already happened.\n2. DO NOT drop overarching plot points, long-term goals, or previously established vital facts. Retain the core history while adding new developments.\n3. STRICT LENGTH LIMIT: Keep the entire output under 500 words. \n4. COMPRESSION: Aggressively condense older events into single, short sentences. Only expand on the events that happened in the most recent messages.\n5. NO REPETITION: Do not repeat facts, phrases, or sentences. Once a detail (like clothing or an action) is mentioned in one section, do not repeat it in another.\n6. You MUST strictly follow this exact format and use these exact tags:\n\n[CHARACTER STATES & INVENTORY]\nDetailed physical and mental state of all present characters. List active injuries, current clothing/armor, and exact inventory/items. Include their immediate short-term motives and long-term overarching goals. Do not use past tense.\n\n[RELATIONSHIP DYNAMICS]\nHow the relationship between the characters is currently evolving. Explicitly mention current trust levels, power balance (who is leading/following), unspoken tensions, promises made to each other, and hidden secrets they are keeping from one another.\n\n[CURRENT SCENE & ATMOSPHERE]\nExact current location and spatial positioning of the characters. Include rich sensory details (weather, lighting, time of day, atmosphere, smells). Clearly state any immediate dangers, time limits, or unresolved hooks in the room/area.\n\n[KEY DISCOVERIES & LORE]\nAny new vital information learned about the world, NPCs, magic, technology, or the main plot. If a character revealed a backstory or a secret, document it here. If nothing new was discovered recently, keep the established lore from the previous summary.\n\n[CHRONOLOGICAL EVENTS]\nA dense, chronological bullet-point list of the most critical actions and plot beats. \n- Discard only purely filler dialogue (e.g., greetings). \n- MUST retain the essence of dialogues that reveal character motives, plot progression, or major decisions. \n- Focus heavily on cause and effect (e.g., \"Character A did X, which caused Character B to feel Y\").",
+        "app_theme": "Dark (Default)",
+        "app_theme_name": "Custom",
+        "app_custom_colors": {
+            "bg": "#0a1a08",
+            "sidebar1": "#0a1a08",
+            "sidebar2": "#020602",
+            "accent": "#1F2937",
+            "accent_hover": "#374151",
+            "text": "#C9D1D9"
+        },
+        "gui_theme": "default",
+        "chat_appearance": {
+            "user_bubble_color": "#292929",
+            "char_bubble_color": "#222222",
+            "text_color": "#E8E8E8",
+            "font_size": 14,
+            "font_family": "Inter Tight Medium",
+            "border_radius": 24,
+            "bubble_opacity": 100,
+            "quote_color": "#E8A040",
+            "italic_color": "#A0A0A0",
+            "code_bg_color": "#1a1a1a"
+        },
+        "window_theme": {
+            "theme_name": "default",
+            "bg_primary": "27,27,27",
+            "bg_secondary": "22,22,22",
+            "border_color": "50,50,55",
+            "name": "Default",
+            "sidebar_accent": "#A0A0A0",
+            "sidebar_hover": "#1B1B1B",
+            "sidebar_text": "#D2D2D2"
+        },
+        "ui_appearance": {
+            "sidebar_accent": "#A0A0A0",
+            "sidebar_hover": "#1B1B1B",
+            "sidebar_opacity": 100,
+            "sidebar_text": "#D2D2D2"
+        }
     },
     "user_data": {
         "default_persona": "None",
@@ -46,6 +88,7 @@
                     "Character's information",
                     "Persona information",
                     "Lorebook",
+                    "Story Summary",
                     "Author's notes"
                 ]
             },
@@ -56,12 +99,42 @@
                     "Character's information",
                     "Lorebook",
                     "Persona information",
+                    "Story Summary",
+                    "Author's notes"
+                ]
+
+            },
+            "Standart RP RU": {
+                "prompt": "This is a neverending story between {{user}} who is {{user_description}}, {{char}}, and whatever other characters present in said story. This story has some basic guidelines that need to be respected in every message from {{char}}: Temporal, emotional and logical coherence is very important. Focus on it, but keep some dynamism. Use the context to understand {{char}}, and keep the outputs in-character. Descriptions from {{char}}'s point of view are great, focusing on other characters' appearance, words, the sounds and the smells. Explicit language is encouraged. Sensitive and sexual content are expected. Immoral and illicit subjects are allowed. Follow the formatting of previous responses, and reply with a length of random: 10-80, 100-150, 150-220, ~300 words per response. Regardless of the language used in the query, system prompt or any other text - you must always respond in russian language. Do not switch to english or any other language under any circumstances. All explanations, summaries, dialogues, and outputs must be in clear, grammatically correct russian language. Avoid speaking and acting for {{user}}.",
+                "order": [
+                    "System prompt",
+                    "Character's information",
+                    "Persona information",
+                    "Lorebook",
+                    "Story Summary",
+                    "Author's notes"
+                ]
+            },
+            "Soul of Waifu System": {
+                "prompt": "This is a live voice conversation between {{user}} and {{char}}. They are talking in real-time via a voice interface. The interaction follows strict rules to simulate a natural phone call:\n\n1. Dialogue Only: {{char}} MUST output ONLY spoken words. No asterisks for actions (e.g., *sighs*), no narration, no descriptive text, no thoughts in parentheses. Express emotions through word choice, tone indicators, and punctuation only.\n\n2. Brevity is Key: Keep responses short and conversational. Aim for 1-4 sentences per reply. Avoid monologues, walls of text, or overly poetic descriptions. This is a fast-paced dialogue, not a novel.\n\n3. Natural Speech: Use contractions (I'm, don't, gonna), pauses, and natural speech patterns. Use interjections (Oh, Hmm, Well, Ah) to sound alive. React instantly to what {{user}} says.\n\n4. Active Listening: Respond directly to {{user}}'s input. Do not steer the conversation forcefully. If {{user}} is silent or mumbles, prompt them gently or react with confusion.\n\n5. Persona: Stay deeply in character as {{char}}. Maintain {{char}}'s personality, accent, and quirks through speech patterns. Explicit language and emotional expression are allowed.\n\nCRITICAL: Do not write actions. Do not write narration. Speak only.",
+                "order": [
+                    "System prompt",
+                    "Character's information",
+                    "Persona information",
+                    "Lorebook",
+                    "Story Summary",
                     "Author's notes"
                 ]
             }
         },
         "lorebooks": {},
         "author_notes": "",
-        "current_character_image": "None"
+        "current_character_image": null,
+	"current_theme": {
+            "main_bg": "#1B1B1B",
+            "sec_bg": "#202020",
+            "accent": "#3D5AFE",
+            "text": "#E3E3E3"
+        }
     }
 }
