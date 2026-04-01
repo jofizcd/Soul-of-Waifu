@@ -246,7 +246,7 @@ Soul of Waifu is accompanied by very detailed documentation that explains all as
 
 <div align="center">
   <a href="https://github.com/jofizcd">
-    <img style="border-radius: 50%;" width="100" src="https://i.ibb.co/bgx4T3Dd/Av.jpg">
+    <img style="border-radius: 50%;" width="125" src="https://i.ibb.co/XrYnRsKQ/284ccd57937609ef639c04842ad52cbb.jpg">
   </a>
   <br>
   <b>Jofi</b>
