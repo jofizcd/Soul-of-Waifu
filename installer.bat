@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
-title Soul of Waifu v2.3.0 Installer
+title Soul of Waifu v2.3.1 Installer
 color 0A
 
-echo Welcome to Soul of Waifu v2.3.0 Installer
+echo Welcome to Soul of Waifu v2.3.1 Installer
 echo.
 
 if not exist "app\data\" (
@@ -70,7 +70,7 @@ pip install --no-cache-dir PyCharacterAI PyOpenGL==3.1.9 live2d-py==0.5.4
 pip install --no-cache-dir scikit-learn==1.4.2 aiohttp==3.11.13 requests==2.32.3
 pip install --no-cache-dir tiktoken==0.11.0 PyYAML==6.0.2 pillow==11.3.0 ipython==9.4.0
 
-pip install --no-cache-dir huggingface-hub==0.36.0
+pip install --no-cache-dir huggingface-hub==0.36.0 hf_transfer==0.1.9
 pip install --no-cache-dir transformers==4.57.3
 
 pip install --no-cache-dir av praat-parselmouth scipy==1.13.1
@@ -82,6 +82,7 @@ pip install --no-cache-dir coqui-tts[codec]
 
 echo Installing RVC support dependencies...
 pip install --no-cache-dir pyworld torchcrepe uvicorn omegaconf==2.3.0
+pip install --no-cache-dir --force-reinstall torchcodec==0.10.0
 
 echo [5/6] Final checks...
 python -m pip check
