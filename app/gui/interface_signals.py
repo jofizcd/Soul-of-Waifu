@@ -1797,7 +1797,7 @@ class InterfaceSignals():
         title_label = QtWidgets.QLabel("Soul of Waifu")
         title_label.setObjectName("title_label")
         
-        raw_ver = "v2.3.0"
+        raw_ver = "v2.3.1"
         version_badge = QtWidgets.QLabel(raw_ver)
         version_badge.setObjectName("version_label")
         version_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -12444,9 +12444,63 @@ class InterfaceSignals():
                         
             self.expression_widget = QtWidgets.QWidget(parent=self.ui.centralwidget)
             self.expression_widget.setObjectName("expression_widget")
-            expression_layout = QtWidgets.QVBoxLayout(self.expression_widget)
+            
+            expression_layout = QtWidgets.QHBoxLayout(self.expression_widget)
             expression_layout.setContentsMargins(0, 0, 0, 0)
             expression_layout.setSpacing(0)
+
+            self.avatar_resizer = QtWidgets.QFrame(self.expression_widget)
+            self.avatar_resizer.setCursor(QtCore.Qt.CursorShape.SplitHCursor)
+            self.avatar_resizer.setFixedWidth(3)
+            self.avatar_resizer.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+            
+            self.avatar_resizer.setAttribute(QtCore.Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+            self.avatar_resizer.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+
+            self.avatar_resizer.setStyleSheet("""
+                background-color: #4a4a4a;
+                border-left: 1px solid #666666;
+                border-right: 1px solid #666666;
+            """)
+            self.avatar_resizer.enterEvent = lambda e: self.avatar_resizer.setStyleSheet("""
+                background-color: #5a5a5a;
+                border-left: 1px solid #888888;
+                border-right: 1px solid #888888;
+            """)
+            self.avatar_resizer.leaveEvent = lambda e: self.avatar_resizer.setStyleSheet("""
+                background-color: #4a4a4a;
+                border-left: 1px solid #666666;
+                border-right: 1px solid #666666;
+            """)
+            
+            self.avatar_resizer.is_dragging = False
+            self.avatar_resizer.start_x = 0
+            self.avatar_resizer.start_width = 0
+            
+            def resizer_mouse_press(e):
+                if e.button() == QtCore.Qt.MouseButton.LeftButton:
+                    self.avatar_resizer.is_dragging = True
+                    self.avatar_resizer.start_x = e.globalPosition().x()
+                    self.avatar_resizer.start_width = self.expression_widget.width()
+                    e.accept()
+                    
+            def resizer_mouse_move(e):
+                if getattr(self.avatar_resizer, 'is_dragging', False):
+                    delta = self.avatar_resizer.start_x - e.globalPosition().x()
+                    new_width = max(200, min(800, self.avatar_resizer.start_width + delta))
+                    self.expression_widget.setFixedWidth(int(new_width))
+                    e.accept()
+                    
+            def resizer_mouse_release(e):
+                if e.button() == QtCore.Qt.MouseButton.LeftButton:
+                    self.avatar_resizer.is_dragging = False
+                    e.accept()
+
+            self.avatar_resizer.mousePressEvent = resizer_mouse_press
+            self.avatar_resizer.mouseMoveEvent = resizer_mouse_move
+            self.avatar_resizer.mouseReleaseEvent = resizer_mouse_release
+            
+            expression_layout.addWidget(self.avatar_resizer)
 
             self.stackedWidget_expressions = QtWidgets.QStackedWidget(parent=self.expression_widget)
             self.stackedWidget_expressions.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
@@ -13586,6 +13640,7 @@ class InterfaceSignals():
                                     if not first_chunk_received:
                                         typing_widget.deleteLater()
                                         self.chat_container.removeWidget(typing_widget)
+                                        typing_widget = None
                                         
                                         character_answer_container = await self.add_message(character_name, "", is_user=False, message_id=None)
                                         character_answer_label = character_answer_container["label"]
@@ -13637,12 +13692,10 @@ class InterfaceSignals():
 
                             async for chunk in generator:
                                 if chunk:
-                                    if conversation_method == "OpenRouter" and isinstance(chunk, str):
-                                        chunk = chunk.encode('latin1').decode('utf-8')
-
                                     if not first_chunk_received:
                                         typing_widget.deleteLater()
                                         self.chat_container.removeWidget(typing_widget)
+                                        typing_widget = None
                                         
                                         character_answer_container = await self.add_message(character_name, "", is_user=False, message_id=None)
                                         character_answer_label = character_answer_container["label"]
@@ -13752,8 +13805,11 @@ class InterfaceSignals():
         except Exception:
             error_message = traceback.format_exc()
             logger.error(f"Error processing the message: {error_message}")
-            if 'typing_widget' in locals():
-                typing_widget.deleteLater()
+            if 'typing_widget' in locals() and typing_widget is not None:
+                try:
+                    typing_widget.deleteLater()
+                except RuntimeError:
+                    pass
 
     async def regenerate_message(self, conversation_method, character_name, message_id):
         """
@@ -13911,9 +13967,6 @@ class InterfaceSignals():
 
                         async for chunk in generator:
                             if chunk:
-                                if conversation_method == "OpenRouter" and isinstance(chunk, str):
-                                    chunk = chunk.encode('latin1').decode('utf-8')
-
                                 if not first_chunk_received:
                                     character_answer_label.setText("")
                                     self.current_typewriter = TypewriterEffect(
@@ -15234,6 +15287,13 @@ class InterfaceSignals():
         character_data = self.configuration_characters.load_configuration()
         character_list = character_data.get("character_list")
         character_information = character_list.get(character_name)
+
+        if not character_information:
+            logger.warning(f"Character {character_name} not found in config (possible race condition).")
+            self.chat_widget.setUpdatesEnabled(True)
+            self.ui.scrollArea_chat.setVisible(True)
+            return
+        
         current_chat = character_information["current_chat"]
         chats = character_information.get("chats", {})
 
@@ -15290,6 +15350,13 @@ class InterfaceSignals():
         character_data = self.configuration_characters.load_configuration()
         character_list = character_data.get("character_list")
         character_information = character_list.get(character_name)
+
+        if not character_information:
+            logger.warning(f"Character {character_name} not found in config (possible race condition).")
+            self.chat_widget.setUpdatesEnabled(True)
+            self.ui.scrollArea_chat.setVisible(True)
+            return
+        
         current_chat = character_information["current_chat"]
         chats = character_information.get("chats", {})
 
@@ -15396,6 +15463,12 @@ class InterfaceSignals():
         character_list = character_data.get("character_list")
         character_information = character_list.get(character_name)
 
+        if not character_information:
+            logger.warning(f"Character {character_name} not found in config (possible race condition).")
+            self.chat_widget.setUpdatesEnabled(True)
+            self.ui.scrollArea_chat.setVisible(True)
+            return
+
         chat_content = character_information.get("chat_content", {})
 
         sorted_messages = sorted(
@@ -15449,6 +15522,12 @@ class InterfaceSignals():
             character_data = self.configuration_characters.load_configuration()
             character_list = character_data.get("character_list")
             character_information = character_list.get(character_name)
+
+            if not character_information:
+                logger.warning(f"Character {character_name} not found in config (possible race condition).")
+                self.chat_widget.setUpdatesEnabled(True)
+                self.ui.scrollArea_chat.setVisible(True)
+                return
 
             new_chat_content = character_information.get("chat_content", {})
 
@@ -15903,21 +15982,26 @@ class Live2DWidget(QOpenGLWidget):
         """
         Updates the emotion of the Live2D model based on the current character's emotion.
         """
-        if self.live2d_model:
+        if not self.live2d_model:
+            return
+
+        try:
             configuration_data = self.configuration_characters.load_configuration()
             character_info = configuration_data["character_list"][self.character_name]
             conversation_method = character_info["conversation_method"]
-
+            
             if conversation_method != "Character AI":
                 current_chat = character_info["current_chat"]
-                chats = character_info.get("chats", {})
-                current_emotion = chats[current_chat]["current_emotion"]
+                current_emotion = character_info.get("chats", {}).get(current_chat, {}).get("current_emotion", "neutral")
             else:
-                current_emotion = character_info["current_emotion"]
+                current_emotion = character_info.get("current_emotion", "neutral")
 
-            self.live2d_model.SetExpression(current_emotion)
-        else:
-            logger.error('Emotion not detected')
+            if current_emotion != getattr(self, '_last_emotion_applied', None):
+                self._last_emotion_applied = current_emotion
+                self.live2d_model.SetExpression(current_emotion)
+                
+        except Exception as e:
+            logger.debug(f"update_live2d_emotion error: {e}")
 
     def cleanup(self):
         """
