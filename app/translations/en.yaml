@@ -447,13 +447,13 @@ typingIndicator_text: "{character_name} <span style='color: #888;'>typing {dots}
 
 creator_label: "Developed by"
 simple_version_label: "Version"
-version_label: "Soul of Waifu v2.3.0"
+version_label: "Soul of Waifu v2.3.1"
 
 nsfw_checkbox: "NSFW"
 update_available_title: "Update Available"
 update_available_body: "A new version is available: "
 update_available_info: "Would you like to update the program?"
-update_current_version: "Current version: v2.3.0b"
+update_current_version: "Current version: v2.3.1"
 update_available_close: "Close"
 update_available_link: "Go to GitHub"
 language_changed_title: "Restart Required"
