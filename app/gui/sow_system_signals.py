@@ -2009,20 +2009,66 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._proactive_max_interval = 40 * 60 * 1000
         self._last_proactive_time = None
 
-        # Interaction / drag physics
+        # Drag physics
         self._drag_velocity_x = 0.0
         self._drag_velocity_y = 0.0
         self._drag_last_pos = None
         self._drag_last_time = 0
 
-        # Layered cursor tracking
+        self._drag_vel_buf = []
+        self._drag_vel_buf_size = 8
+        self._drag_smoothed_vx = 0.0
+        self._drag_is_active = False
+
+        self._body_tilt_target = 0.0
+        self._body_tilt_current = 0.0
+        self._body_tilt_alpha = 0.12
+
+        self._target_eye_x  = 0.0
+        self._target_eye_y  = 0.0
+        self._target_head_x = 0.0
+        self._target_head_y = 0.0
+        self._target_body_x = 0.0
+
+        self._current_eye_x  = 0.0
+        self._current_eye_y  = 0.0
         self._current_head_x = 0.0
         self._current_head_y = 0.0
         self._current_body_x = 0.0
-        self._eye_update_interval = 50          # 20fps for smooth tracking
-        self._head_smoothing   = 0.07           # medium speed
-        self._body_smoothing   = 0.03           # slow
-        self._tracking_speed_preset = "Normal"  # "Slow"/"Normal"/"Fast"
+
+        self._eye_update_interval = 50
+        self._eye_alpha   = 0.18
+        self._head_alpha  = 0.10
+        self._body_alpha  = 0.04
+
+        self._eye_max_rotation      = 0.7
+        self._tracking_speed_preset = "Normal"
+
+        self._spring_return_timer = QtCore.QTimer(self)
+        self._spring_return_timer.timeout.connect(self._spring_return_tick)
+        self._spring_body_x    = 0.0
+        self._spring_body_vel  = 0.0
+        self._spring_angle_z   = 0.0
+        self._spring_angle_vel = 0.0
+
+        self._idle_anim_timer = QtCore.QTimer(self)
+        self._idle_anim_timer.timeout.connect(self._idle_anim_tick)
+        self._idle_target_head_x   = 0.0
+        self._idle_target_head_y   = 0.0
+        self._idle_target_body_x   = 0.0
+        self._idle_anim_head_x     = 0.0
+        self._idle_anim_head_y     = 0.0
+        self._idle_anim_body_x     = 0.0
+        self._idle_anim_timer.start(33)
+
+        # Breathing micro-sway
+        self._breath_timer = QtCore.QTimer(self)
+        self._breath_timer.timeout.connect(self._breath_sway_tick)
+        self._breath_phase  = 0.0
+        self._breath_speed  = 0.018
+        self._breath_amp_x  = 0.8
+        self._breath_amp_z  = 0.4
+        self._breath_timer.start(33)
 
         # Active window reaction system
         self._active_window_timer = QtCore.QTimer(self)
@@ -2061,6 +2107,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._proactive_timer.stop()
         self._sleep_animation_timer.stop()
         self._active_window_timer.stop()
+        self._spring_return_timer.stop()
+        self._idle_anim_timer.stop()
+        self._breath_timer.stop()
         logger.info("Companion systems stopped")
 
     def _get_model(self):
@@ -2087,18 +2136,26 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
     # === EYE TRACKER ===
     def _set_tracking_speed(self, preset: str):
+        """Adjust per-frame lerp alphas for eye/head/body tracking."""
         presets = {
-            "Slow":   (0.08, 0.04, 0.015),
-            "Normal": (0.15, 0.07, 0.03),
-            "Fast":   (0.25, 0.13, 0.06),
+            #          eye   head   body
+            "Slow":   (0.08, 0.05, 0.02),
+            "Normal": (0.18, 0.10, 0.04),
+            "Fast":   (0.30, 0.18, 0.08),
         }
-        es, hs, bs = presets.get(preset, presets["Normal"])
-        self._eye_smoothing  = es
-        self._head_smoothing = hs
-        self._body_smoothing = bs
+        ea, ha, ba = presets.get(preset, presets["Normal"])
+        self._eye_alpha  = ea
+        self._head_alpha = ha
+        self._body_alpha = ba
         self._tracking_speed_preset = preset
 
     def _update_eye_tracking(self):
+        """
+        Called by timer every ~50ms.
+        PURPOSE: only read cursor position and update TARGET values.
+        Actual smooth interpolation happens per render-frame in
+        Live2DWidget_NoGUI.timerEvent via _step_tracking_frame().
+        """
         if self._is_sleeping:
             return
         try:
@@ -2119,40 +2176,80 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
             raw_x = (cursor_pos.x() - cx) / half_w
             raw_y = -(cursor_pos.y() - cy) / half_h
-            eye_tx = max(-self._eye_max_rotation, min(self._eye_max_rotation, raw_x))
-            eye_ty = max(-self._eye_max_rotation, min(self._eye_max_rotation, raw_y))
 
-            self._current_eye_x += (eye_tx - self._current_eye_x) * self._eye_smoothing
-            self._current_eye_y += (eye_ty - self._current_eye_y) * self._eye_smoothing
+            self._target_eye_x = max(-self._eye_max_rotation, min(self._eye_max_rotation, raw_x))
+            self._target_eye_y = max(-self._eye_max_rotation, min(self._eye_max_rotation, raw_y))
+            self._target_head_x = self._target_eye_x * 28.0
+            self._target_head_y = self._target_eye_y * 22.0
+            self._target_body_x = self._current_head_x * 0.30
 
-            head_tx = eye_tx * 28
-            head_ty = eye_ty * 22
-            self._current_head_x += (head_tx - self._current_head_x) * self._head_smoothing
-            self._current_head_y += (head_ty - self._current_head_y) * self._head_smoothing
-
-            body_tx = self._current_head_x * 0.30
-            self._current_body_x += (body_tx - self._current_body_x) * self._body_smoothing
-
-            self._apply_layered_tracking(
-                self._current_eye_x, self._current_eye_y,
-                self._current_head_x, self._current_head_y,
-                self._current_body_x,
-            )
+            mode = self._get_current_mode()
+            if mode == "VRM":
+                wv = self._get_webview()
+                if wv:
+                    wv.page().runJavaScript(
+                        f"updateLookAtTarget({self._target_eye_x:.3f}, {self._target_eye_y:.3f});"
+                    )
+                    wv.page().runJavaScript(
+                        f"setHeadAngle({self._target_head_x:.2f}, {self._target_head_y:.2f}, 0);"
+                    )
+                    wv.page().runJavaScript(
+                        f"setBodyAngle({self._target_body_x:.2f}, 0);"
+                    )
         except Exception as e:
             logger.debug(f"Eye tracking error: {e}")
+
+    def _step_tracking_frame(self):
+        if self._is_sleeping:
+            return
+
+        # --- 1. Drag body tilt ---
+        if self._drag_is_active:
+            vx = self._drag_smoothed_vx
+            tilt_target = max(-15.0, min(15.0, vx * 0.035))
+            self._body_tilt_target = tilt_target
+        else:
+            self._body_tilt_target = 0.0
+
+        self._body_tilt_current += (self._body_tilt_target - self._body_tilt_current) * self._body_tilt_alpha
+        tilt_z = self._body_tilt_current * 0.6
+
+        # --- 2. Eye / head / body cursor tracking ---
+        if not self._spring_return_timer.isActive() and not self._drag_is_active:
+            ea = self._eye_alpha
+            ha = self._head_alpha
+            ba = self._body_alpha
+
+            self._current_eye_x  += (self._target_eye_x  - self._current_eye_x)  * ea
+            self._current_eye_y  += (self._target_eye_y  - self._current_eye_y)  * ea
+            self._current_head_x += (self._target_head_x - self._current_head_x) * ha
+            self._current_head_y += (self._target_head_y - self._current_head_y) * ha
+            self._current_body_x += (self._target_body_x - self._current_body_x) * ba
+
+        try:
+            model = self._get_model()
+            if model:
+                if self._drag_is_active:
+                    model.SetParameterValue("ParamBodyAngleX", self._body_tilt_current)
+                    model.SetParameterValue("ParamAngleZ",     tilt_z)
+                elif self._spring_return_timer.isActive():
+                    model.SetParameterValue("ParamEyeBallX",   self._current_eye_x)
+                    model.SetParameterValue("ParamEyeBallY",   self._current_eye_y)
+                    model.SetParameterValue("ParamAngleX",     self._current_head_x)
+                    model.SetParameterValue("ParamAngleY",     self._current_head_y)
+                else:
+                    model.SetParameterValue("ParamEyeBallX",   self._current_eye_x)
+                    model.SetParameterValue("ParamEyeBallY",   self._current_eye_y)
+                    model.SetParameterValue("ParamAngleX",     self._current_head_x)
+                    model.SetParameterValue("ParamAngleY",     self._current_head_y)
+                    model.SetParameterValue("ParamBodyAngleX", self._current_body_x)
+        except Exception as e:
+            logger.debug(f"Tracking frame step error: {e}")
 
     def _apply_layered_tracking(self, eye_x, eye_y, head_x, head_y, body_x):
         try:
             mode = self._get_current_mode()
-            if mode == "Live2D Model":
-                model = self._get_model()
-                if model:
-                    model.SetParameterValue("ParamEyeBallX", eye_x)
-                    model.SetParameterValue("ParamEyeBallY", eye_y)
-                    model.SetParameterValue("ParamAngleX",    head_x)
-                    model.SetParameterValue("ParamAngleY",    head_y)
-                    model.SetParameterValue("ParamBodyAngleX", body_x)
-            elif mode == "VRM":
+            if mode == "VRM":
                 wv = self._get_webview()
                 if wv:
                     wv.page().runJavaScript(f"updateLookAtTarget({eye_x:.3f}, {eye_y:.3f});")
@@ -2175,6 +2272,115 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                     wv.page().runJavaScript(f"updateLookAtTarget({x:.3f}, {y:.3f});")
         except Exception as e:
             logger.debug(f"Apply eye direction error: {e}")
+
+    def _start_spring_return(self, initial_body_x: float, initial_angle_z: float,
+                             initial_vel_x: float = 0.0, initial_vel_z: float = 0.0):
+        self._spring_body_x    = initial_body_x
+        self._spring_angle_z   = initial_angle_z
+        self._spring_body_vel  = initial_vel_x * 0.015
+        self._spring_angle_vel = initial_vel_z * 0.008
+        self._spring_return_timer.start(16)
+
+    def _spring_return_tick(self):
+        k = 0.18
+        d = 0.55
+
+        for attr_x, attr_v in [("_spring_body_x",  "_spring_body_vel"),
+                                ("_spring_angle_z", "_spring_angle_vel")]:
+            x = getattr(self, attr_x)
+            v = getattr(self, attr_v)
+            f = -k * x - d * v
+            v += f
+            x += v
+            setattr(self, attr_x, x)
+            setattr(self, attr_v, v)
+
+        try:
+            mode = self._get_current_mode()
+            if mode == "Live2D Model":
+                model = self._get_model()
+                if model:
+                    model.SetParameterValue("ParamBodyAngleX", self._spring_body_x)
+                    model.SetParameterValue("ParamAngleZ",     self._spring_angle_z)
+            elif mode == "VRM":
+                wv = self._get_webview()
+                if wv:
+                    wv.page().runJavaScript(f"setBodyAngle({self._spring_body_x:.2f}, 0);")
+        except Exception as e:
+            logger.debug(f"Spring return error: {e}")
+
+        self._body_tilt_current = self._spring_body_x
+
+        if abs(self._spring_body_x) < 0.05 and abs(self._spring_angle_z) < 0.05:
+            self._spring_return_timer.stop()
+            self._spring_body_x    = 0.0
+            self._spring_angle_z   = 0.0
+            self._body_tilt_current = 0.0
+            self._body_tilt_target  = 0.0
+            try:
+                mode = self._get_current_mode()
+                if mode == "Live2D Model":
+                    model = self._get_model()
+                    if model:
+                        model.SetParameterValue("ParamBodyAngleX", 0.0)
+                        model.SetParameterValue("ParamAngleZ",     0.0)
+                elif mode == "VRM":
+                    wv = self._get_webview()
+                    if wv:
+                        wv.page().runJavaScript("setBodyAngle(0, 0);")
+            except Exception:
+                pass
+
+    # === SMOOTH IDLE ANIMATION ===
+    def _idle_anim_tick(self):
+        alpha = 0.06
+        self._idle_anim_head_x += (self._idle_target_head_x - self._idle_anim_head_x) * alpha
+        self._idle_anim_head_y += (self._idle_target_head_y - self._idle_anim_head_y) * alpha
+        self._idle_anim_body_x += (self._idle_target_body_x - self._idle_anim_body_x) * alpha
+
+        if self._is_sleeping or not self._eye_tracker_timer.isActive():
+            try:
+                mode = self._get_current_mode()
+                if mode == "Live2D Model":
+                    model = self._get_model()
+                    if model and not self._spring_return_timer.isActive():
+                        model.SetParameterValue("ParamAngleX",    self._idle_anim_head_x)
+                        model.SetParameterValue("ParamAngleY",    self._idle_anim_head_y)
+                        model.SetParameterValue("ParamBodyAngleX", self._idle_anim_body_x)
+                elif mode == "VRM":
+                    wv = self._get_webview()
+                    if wv and not self._spring_return_timer.isActive():
+                        wv.page().runJavaScript(
+                            f"setHeadAngle({self._idle_anim_head_x:.2f},"
+                            f"{self._idle_anim_head_y:.2f}, 0);"
+                        )
+                        wv.page().runJavaScript(
+                            f"setBodyAngle({self._idle_anim_body_x:.2f}, 0);"
+                        )
+            except Exception as e:
+                logger.debug(f"Idle anim tick error: {e}")
+
+    # === BREATHING SWAY ===
+    def _breath_sway_tick(self):
+        if self._is_sleeping or self._spring_return_timer.isActive():
+            return
+        if self.interaction_state != "STOPPED":
+            return
+
+        import math
+        self._breath_phase += self._breath_speed
+        sway_x = math.sin(self._breath_phase)         * self._breath_amp_x
+        sway_z = math.sin(self._breath_phase * 0.7)   * self._breath_amp_z
+
+        try:
+            mode = self._get_current_mode()
+            if mode == "Live2D Model":
+                model = self._get_model()
+                if model and not self._spring_return_timer.isActive():
+                    model.SetParameterValue("ParamBodyAngleX", sway_x)
+                    model.SetParameterValue("ParamAngleZ",     sway_z)
+        except Exception as e:
+            logger.debug(f"Breath sway error: {e}")
     
     # === IDLE SCHEDULER ===
     def _check_idle_action(self):
@@ -2246,14 +2452,12 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         QtCore.QTimer.singleShot(random.randint(1000, 2000), lambda: self._apply_eye_direction(self._current_eye_x, self._current_eye_y))
     
     def _set_head_angle(self, x, y):
+        """Set idle target head angle"""
+        self._idle_target_head_x = x
+        self._idle_target_head_y = y
         try:
             mode = self._get_current_mode()
-            if mode == "Live2D Model":
-                model = self._get_model()
-                if model:
-                    model.SetParameterValue("ParamAngleX", x)
-                    model.SetParameterValue("ParamAngleY", y)
-            elif mode == "VRM":
+            if mode == "VRM":
                 wv = self._get_webview()
                 if wv:
                     wv.page().runJavaScript(f"setHeadAngle({x}, {y}, 0);")
@@ -2261,13 +2465,10 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             logger.debug(f"Set head angle error: {e}")
     
     def _set_body_angle(self, x):
+        self._idle_target_body_x = x
         try:
             mode = self._get_current_mode()
-            if mode == "Live2D Model":
-                model = self._get_model()
-                if model:
-                    model.SetParameterValue("ParamBodyAngleX", x)
-            elif mode == "VRM":
+            if mode == "VRM":
                 wv = self._get_webview()
                 if wv:
                     wv.page().runJavaScript(f"setBodyAngle({x}, 0);")
@@ -3256,22 +3457,26 @@ class Live2DWidget(QOpenGLWidget):
         """
         Updates the emotion of the Live2D model based on the current character's emotion.
         """
-        if self.live2d_model:
+        if not self.live2d_model:
+            return
+
+        try:
             configuration_data = self.configuration_characters.load_configuration()
             character_info = configuration_data["character_list"][self.character_name]
-
             conversation_method = character_info["conversation_method"]
-        
+            
             if conversation_method != "Character AI":
                 current_chat = character_info["current_chat"]
-                chats = character_info.get("chats", {})
-                current_emotion = chats[current_chat]["current_emotion"]
+                current_emotion = character_info.get("chats", {}).get(current_chat, {}).get("current_emotion", "neutral")
             else:
-                current_emotion = character_info["current_emotion"]
+                current_emotion = character_info.get("current_emotion", "neutral")
 
-            self.live2d_model.SetExpression(current_emotion)
-        else:
-            logger.error('Emotion not detected')
+            if current_emotion != getattr(self, '_last_emotion_applied', None):
+                self._last_emotion_applied = current_emotion
+                self.live2d_model.SetExpression(current_emotion)
+                
+        except Exception as e:
+            logger.debug(f"update_live2d_emotion error: {e}")
 
     def cleanup(self):
         """
@@ -3462,15 +3667,22 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
 
     def timerEvent(self, a0: QTimerEvent | None):
         self.update_live2d_emotion()
+        if self.sow_system_ref:
+            self.sow_system_ref._step_tracking_frame()
         self.update()
 
     def update_live2d_emotion(self):
+        """
+        Updates the emotion of the Live2D model based on the current character's emotion.
+        """
         if not self.live2d_model:
             return
+
         try:
             configuration_data = self.configuration_characters.load_configuration()
             character_info = configuration_data["character_list"][self.character_name]
             conversation_method = character_info["conversation_method"]
+            
             if conversation_method != "Character AI":
                 current_chat = character_info["current_chat"]
                 current_emotion = character_info.get("chats", {}).get(current_chat, {}).get("current_emotion", "neutral")
@@ -3480,6 +3692,7 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
             if current_emotion != getattr(self, '_last_emotion_applied', None):
                 self._last_emotion_applied = current_emotion
                 self.live2d_model.SetExpression(current_emotion)
+                
         except Exception as e:
             logger.debug(f"update_live2d_emotion error: {e}")
 
@@ -3488,7 +3701,12 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
             self.dragging_window = True
             self.drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             if self.sow_system_ref:
-                self.sow_system_ref.companion_on_click()
+                ref = self.sow_system_ref
+                ref._drag_is_active = True
+                ref._drag_vel_buf.clear()
+                ref._drag_smoothed_vx = 0.0
+                ref._spring_return_timer.stop()
+                ref.companion_on_click()
         elif event.button() == Qt.MouseButton.RightButton:
             self.right_button_pressed = True
 
@@ -3497,18 +3715,24 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         if self.dragging_window:
             self.move(cur_pos - self.drag_offset)
 
-            if self.sow_system_ref and self.live2d_model:
+            if self.sow_system_ref:
                 ref = self.sow_system_ref
                 now = time.time()
+                ref._drag_is_active = True
                 if ref._drag_last_pos is not None and (now - ref._drag_last_time) > 0:
                     dt = now - ref._drag_last_time
-                    vx = (cur_pos.x() - ref._drag_last_pos.x()) / max(dt, 0.001)
-                    vy = (cur_pos.y() - ref._drag_last_pos.y()) / max(dt, 0.001)
-                    ref._drag_velocity_x = vx
-                    ref._drag_velocity_y = vy
-                    tilt = max(-15.0, min(15.0, vx * 0.04))
-                    self.live2d_model.SetParameterValue("ParamBodyAngleX", tilt)
-                    self.live2d_model.SetParameterValue("ParamAngleZ", max(-10.0, min(10.0, vx * 0.02)))
+                    raw_vx = (cur_pos.x() - ref._drag_last_pos.x()) / max(dt, 0.001)
+                    ref._drag_vel_buf.append((raw_vx, now))
+                    cutoff = now - 0.15
+                    ref._drag_vel_buf = [(v, t) for v, t in ref._drag_vel_buf if t >= cutoff]
+                    if len(ref._drag_vel_buf) > ref._drag_vel_buf_size:
+                        ref._drag_vel_buf = ref._drag_vel_buf[-ref._drag_vel_buf_size:]
+                    total_w, total_v = 0.0, 0.0
+                    for idx, (v, t) in enumerate(ref._drag_vel_buf):
+                        w = idx + 1
+                        total_v += v * w
+                        total_w += w
+                    ref._drag_smoothed_vx = total_v / total_w if total_w else 0.0
                 ref._drag_last_pos = cur_pos
                 ref._drag_last_time = now
         elif self.right_button_pressed and self.live2d_model:
@@ -3523,11 +3747,19 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging_window = False
-            if self.live2d_model and self.sow_system_ref:
-                self.sow_system_ref._drag_velocity_x = 0.0
-                self.sow_system_ref._drag_velocity_y = 0.0
-                QtCore.QTimer.singleShot(80,  lambda: self.live2d_model and self.live2d_model.SetParameterValue("ParamBodyAngleX", 0))
-                QtCore.QTimer.singleShot(80,  lambda: self.live2d_model and self.live2d_model.SetParameterValue("ParamAngleZ", 0))
+            if self.sow_system_ref:
+                ref = self.sow_system_ref
+                ref._drag_is_active = False
+
+                body_x  = ref._body_tilt_current
+                angle_z = body_x * 0.6
+                ref._drag_vel_buf.clear()
+                ref._drag_smoothed_vx = 0.0
+                ref._drag_last_pos = None
+
+                ref._spring_body_x  = body_x
+                ref._spring_angle_z = angle_z
+                ref._start_spring_return(body_x, angle_z)
         elif event.button() == Qt.MouseButton.RightButton:
             self.right_button_pressed = False
 
@@ -3664,7 +3896,6 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
 
         # Position
         elif action == action_center:
-            from PyQt6.QtGui import QGuiApplication
             screen = QGuiApplication.primaryScreen().geometry()
             self.move(screen.width() // 2 - self.width() // 2,
                       screen.height() // 2 - self.height() // 2)
@@ -3890,12 +4121,17 @@ class VRMWidget_NoGUI(QWidget):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging_window = False
-            wv = self.vrm_webview if hasattr(self, 'vrm_webview') else None
-            if wv:
-                QtCore.QTimer.singleShot(80, lambda: wv.page().runJavaScript("setBodyAngle(0, 0);"))
             if self.sow_system_ref:
-                self.sow_system_ref._drag_velocity_x = 0.0
-                self.sow_system_ref._drag_velocity_y = 0.0
+                ref = self.sow_system_ref
+                last_vx = ref._drag_velocity_x
+                last_vz = ref._drag_velocity_x
+                ref._drag_velocity_x = 0.0
+                ref._drag_velocity_y = 0.0
+                body_x  = max(-15.0, min(15.0, last_vx * 0.04))
+                angle_z = max(-10.0, min(10.0, last_vz * 0.02))
+                ref._spring_body_x  = body_x
+                ref._spring_angle_z = angle_z
+                ref._start_spring_return(body_x, angle_z)
  
     def contextMenuEvent(self, event):
         menu = QtWidgets.QMenu(self)
@@ -4031,7 +4267,6 @@ class VRMWidget_NoGUI(QWidget):
  
         # Position
         elif action == action_center:
-            from PyQt6.QtGui import QGuiApplication
             screen = QGuiApplication.primaryScreen().geometry()
             self.move(screen.width() // 2 - self.width() // 2,
                       screen.height() // 2 - self.height() // 2)
