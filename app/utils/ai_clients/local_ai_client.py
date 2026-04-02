@@ -432,7 +432,7 @@ class LocalAI:
                 selected_lorebook, chat_messages, character_name, user_name, user_message
             )
 
-        system_blocks = []
+        system_texts = []
         current_token_count = 0
 
         for section in order:
@@ -441,29 +441,24 @@ class LocalAI:
             match section:
                 case "System prompt":
                     content = system_prompt_template
-
                 case "Character's information":
                     char_info = character_information.get("character_information", "")
                     if char_info:
                         content = f"[CHARACTER PROFILE]\n{char_info}"
-                
                 case "Story Summary":
                     if current_summary and len(current_summary) > 5:
                         if "{{summary}}" in summary_template:
                             content = summary_template.replace("{{summary}}", current_summary)
                         else:
                             content = f"[Story Summary]\n{current_summary}"
-
                 case "Persona information":
                     if selected_persona != "None" and selected_persona in personas:
                         persona = personas[selected_persona]
                         content = f"[USER PROFILE]\nUser: {persona.get('user_name', 'User')}\nDesc: {persona.get('user_description', '')}"
-
                 case "Lorebook":
                     if activated_entries["classic"]:
                         lore_text = "\n".join([f"- {e}" for e in activated_entries["classic"]])
                         content = f"[WORLD LORE & KNOWLEDGE]\n{lore_text}"
-
                 case "Author's notes":
                     if author_notes.strip():
                         content = f"[AUTHOR NOTES]\n{author_notes}"
@@ -472,36 +467,33 @@ class LocalAI:
                 for key, value in replacements.items():
                     content = content.replace(key, str(value))
                 
-                system_blocks.append({"role": "system", "content": content})
+                system_texts.append(content)
                 current_token_count += self._count_tokens(content)
 
         final_user_message = user_message
 
         if activated_entries["scenario"]:
             scenario_text = "\n".join([f"EVENT: {e}" for e in activated_entries["scenario"]])
-            
             scenario_injection = (
                 f"\n\n[SYSTEM DIRECTIVE / NARRATION]\n"
                 f"The following event occurs immediately right now:\n"
                 f"{scenario_text}\n"
                 f"(You must react to this event in your response)"
             )
-            
             for key, value in replacements.items():
                 scenario_injection = scenario_injection.replace(key, str(value))
-            
             final_user_message += scenario_injection
         
         user_msg_tokens = self._count_tokens(final_user_message)
         current_token_count += user_msg_tokens
-
         available_tokens = self.max_context_tokens - current_token_count - self.response_reserve
 
         final_messages = []
+        combined_system_prompt = "\n\n".join(system_texts)
 
         if available_tokens <= 0:
             logger.warning("Context full! Only system prompt sent.")
-            return system_blocks + [{"role": "user", "content": user_message}]
+            return [{"role": "system", "content": combined_system_prompt}, {"role": "user", "content": user_message}]
         
         # --- Short-Term Memory ---
         reversed_history = []
@@ -523,32 +515,46 @@ class LocalAI:
             history_tokens_used += msg_tokens
             messages_processed_count += 1
 
-        short_term_memory = list(reversed(reversed_history))
+        raw_short_term_memory = list(reversed(reversed_history))
+
+        short_term_memory = []
+        for msg in raw_short_term_memory:
+            if not msg.get("content") or not str(msg["content"]).strip():
+                continue
+                
+            if not short_term_memory:
+                short_term_memory.append(msg.copy())
+            else:
+                if short_term_memory[-1]["role"] == msg["role"]:
+                    short_term_memory[-1]["content"] += "\n\n" + msg["content"]
+                else:
+                    short_term_memory.append(msg.copy())
+        
+        if short_term_memory and short_term_memory[0]["role"] == "assistant":
+            short_term_memory.insert(0, {"role": "user", "content": "..."})
+
+        if short_term_memory and short_term_memory[-1]["role"] == "user":
+            short_term_memory.append({"role": "assistant", "content": "..."})
         
         # --- Smart Memory (RAG / Long-Term) ---
-        long_term_memory = []
+        long_term_memory_text = ""
         
         if smart_memory and rag_budget > 100 and len(chat_messages) > messages_processed_count:
             try:
                 older_messages = chat_messages[:-messages_processed_count]
-                
                 model = EmbeddingCache.get_model()
-                
                 vectors_to_search = []
                 contents_map = []
 
                 for msg in older_messages:
                     content = msg["content"].strip()
                     if len(content) < 10: continue
-                    
                     msg_hash = self._get_message_hash(msg)
-                    
                     if msg_hash in self.embedding_cache:
                         vector = self.embedding_cache[msg_hash]
                     else:
                         vector = model.encode([content])[0]
                         self.embedding_cache[msg_hash] = vector
-                    
                     vectors_to_search.append(vector)
                     role_display = "User" if msg["role"] == "user" else "Char"
                     contents_map.append(f"{role_display}: {content}")
@@ -560,34 +566,31 @@ class LocalAI:
                     
                     query_text = f"{last_bot_reply}\n{user_message}"
                     query_vec = model.encode([query_text])[0]
-
                     similarities = cosine_similarity([query_vec], vectors_to_search)[0]
                     top_k_indices = np.argsort(similarities)[-3:][::-1]
-
                     rag_tokens_current = 0
                     found_fragments = []
 
                     for idx in top_k_indices:
                         if similarities[idx] < 0.35: 
                             continue
-                            
                         fragment = contents_map[idx]
                         frag_tokens = self._count_tokens(fragment)
-                        
                         if rag_tokens_current + frag_tokens > rag_budget:
                             break
-                            
                         found_fragments.append(fragment)
                         rag_tokens_current += frag_tokens
 
                     if found_fragments:
-                        memory_block = "[RECALLED MEMORIES]\n" + "\n---\n".join(found_fragments)
-                        long_term_memory.append({"role": "system", "content": memory_block})
+                        long_term_memory_text = "[RECALLED MEMORIES]\n" + "\n---\n".join(found_fragments)
 
             except Exception as e:
                 logger.error(f"Smart Memory Error: {e}")
         
-        final_messages = system_blocks + long_term_memory + short_term_memory + [{"role": "user", "content": final_user_message}]
+        if long_term_memory_text:
+            combined_system_prompt += f"\n\n{long_term_memory_text}"
+
+        final_messages = [{"role": "system", "content": combined_system_prompt}] + short_term_memory + [{"role": "user", "content": final_user_message}]
 
         for msg in final_messages:
             for key, value in replacements.items():
@@ -799,7 +802,7 @@ class LocalAI:
             ) as client:
                 
                 completion = await client.chat.completions.create(
-                    model="openai/gpt-4o",
+                    model="local-model",
                     messages=messages,
                     stream=True,
                     max_tokens=max_tokens,
@@ -814,9 +817,14 @@ class LocalAI:
                     if chunk.choices and chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
 
+        except asyncio.CancelledError:
+            logger.info("Local AI generation was cancelled.")
+            raise
         except Exception as e:
-            logger.error(f"Request error: {e}")
-            yield f"\nGeneration stopped."
+            logger.error(f"Local AI Request error: {e}")
+            yield f"\n⚠️ Local AI Generation Error: {str(e)}"
+        finally:
+            await client.close()
     
     async def generate_summary(self, current_summary, new_messages, character_name, user_name):
         """
@@ -902,7 +910,7 @@ class LocalAI:
             ) as client:
                 
                 completion = await client.chat.completions.create(
-                    model="openai/gpt-4o",
+                    model="local-model",
                     messages=messages,
                     stream=True,
                     max_tokens=1000,
