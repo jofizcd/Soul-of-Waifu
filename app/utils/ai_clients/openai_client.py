@@ -1,6 +1,7 @@
 import json
 import yaml
 import httpx
+import asyncio
 import logging
 import requests
 import numpy as np
@@ -701,12 +702,10 @@ class OpenAI:
         repeat_penalty = self.configuration_settings.get_main_setting("repeat_penalty")
 
         if conversation_method == "Open AI":
-            base_url = base_url.rstrip('/')
-            base_url = base_url if base_url.endswith('/v1') else f"{base_url}/v1"
-            
-            if base_url:
-                base_url = base_url.rstrip('/')
-                base_url = base_url if base_url.endswith('/v1') else f"{base_url}/v1"
+            if base_url and base_url.strip():
+                base_url = base_url.strip().rstrip('/')
+                if not base_url.endswith('/v1'):
+                    base_url = f"{base_url}/v1"
             else:
                 base_url = "https://api.openai.com/v1"
 
@@ -732,21 +731,28 @@ class OpenAI:
 
             self.log_prompt_structure(messages)
 
-            completion = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=True,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                frequency_penalty=repeat_penalty,
-                presence_penalty=0.7,
-                stop=["<|im_end|>"]
-            )
+            try:
+                completion = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=True,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    frequency_penalty=repeat_penalty,
+                    presence_penalty=0.7,
+                    stop=["<|im_end|>"]
+                )
 
-            async for chunk in completion:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                async for chunk in completion:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+
+            except Exception as e:
+                logger.error(f"OpenAI Request error: {e}")
+                yield f"\n⚠️ OpenAI API Error: {str(e)}"
+            finally:
+                await client.close()
         
         elif conversation_method == "OpenRouter":
             api_token = self.configuration_api.get_token("OPENROUTER_API_TOKEN")
@@ -789,6 +795,9 @@ class OpenAI:
                     if chunk.choices and chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
 
+            except asyncio.CancelledError:
+                logger.info("OpenRouter generation was cancelled.")
+                raise
             except Exception as e:
                 logger.error(f"OpenRouter Request error: {e}")
                 yield f"\n⚠️ OpenRouter API Error: {str(e)}"
@@ -811,10 +820,12 @@ class OpenAI:
         if conversation_method == "Open AI":
             open_ai_api = self.configuration_api.get_token("OPEN_AI_API_TOKEN")
             model = self.configuration_settings.get_main_setting("openai_model")
+            base_url = self.configuration_api.get_token("CUSTOM_ENDPOINT_URL")
 
-            if base_url:
-                base_url = base_url.rstrip('/')
-                base_url = base_url if base_url.endswith('/v1') else f"{base_url}/v1"
+            if base_url and base_url.strip():
+                base_url = base_url.strip().rstrip('/')
+                if not base_url.endswith('/v1'):
+                    base_url = f"{base_url}/v1"
             else:
                 base_url = "https://api.openai.com/v1"
             
