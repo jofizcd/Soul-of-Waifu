@@ -448,7 +448,7 @@ typingIndicator_text: "{character_name} <span style='color: #888;'>печата�
 
 creator_label: "Разработал"
 simple_version_label: "Версия"
-version_label: "Soul of Waifu v2.3.0"
+version_label: "Soul of Waifu v2.3.1"
 
 about_program: "О Soul of Waifu"
 nsfw_checkbox: "NSFW"
@@ -456,7 +456,7 @@ nsfw_checkbox: "NSFW"
 update_available_title: "Обновление Доступно"
 update_available_body: "Доступна новая версия: "
 update_available_info: "Вы хотите обновить программу?"
-update_current_version: "Текущая версия: v2.3.0b"
+update_current_version: "Текущая версия: v2.3.1"
 update_available_close: "Закрыть"
 update_available_link: "Перейти на GitHub"
 language_changed_title: "Требуется перезагрузка"
