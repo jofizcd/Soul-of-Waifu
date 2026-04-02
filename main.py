@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_models_hub.setText(self.translations.get("models_hub_button", " Models Hub"))
         self.ui.pushButton_rp_editors.setText(self.translations.get("rp_editors_button", " RP Editors"))
         self.ui.pushButton_options.setText(self.translations.get("options_button", " Options"))
-        self.ui.version_label.setText(self.translations.get("version_label", "v2.3.0"))
+        self.ui.version_label.setText(self.translations.get("version_label", "v2.3.1"))
         
         # Main Tab Without Characters
         self.ui.main_no_characters_advice_label.setText(self.translations.get("no_characters_advice", "You haven\'t added any characters. Click on the button and create it"))
@@ -762,7 +762,7 @@ if __name__ == "__main__":
 
     main_window.show()    
 
-    current_version = "v2.3.0"
+    current_version = "v2.3.1"
 
     def deferred_update_check():
         latest_version, github_url = main_window.check_for_updates(current_version)
