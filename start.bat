@@ -1,9 +1,9 @@
 @echo off
-title Soul of Waifu v2.3.1
+title Soul of Waifu v2.4.0
 color 0A
 
 echo =============================================
-echo  Soul of Waifu v2.3.1 - Starting Application
+echo  Soul of Waifu v2.4.0 - Starting Application
 echo =============================================
 echo.
 
