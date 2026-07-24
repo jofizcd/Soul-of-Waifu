@@ -1,8 +1,14 @@
 {
-    "CHARACTER_AI_API_TOKEN": "",
     "MISTRAL_AI_API_TOKEN": "",
     "OPEN_AI_API_TOKEN": "",
     "OPENROUTER_API_TOKEN": "",
+    "ANTHROPIC_API_TOKEN": "",
+    "ZAI_API_TOKEN": "",
+    "GEMINI_API_TOKEN": "",
+    "DEEPSEEK_API_TOKEN": "",
+    "QWEN_API_TOKEN": "",
+    "GROK_API_TOKEN": "",
     "CUSTOM_ENDPOINT_URL": "http://localhost:1234/v1",
-    "ELEVENLABS_API_TOKEN": ""
+    "ELEVENLABS_API_TOKEN": "",
+    "DISCORD_BOT_TOKEN": ""
 }
