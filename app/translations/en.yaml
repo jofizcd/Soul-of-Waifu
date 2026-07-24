@@ -1,25 +1,42 @@
-# Title
+# ============================================================
+# SOUL OF WAIFU — English Localization
+# ============================================================
+
+
+# ──────────────────────────────────────────────────────────
+# PROGRAM TITLE
+# ──────────────────────────────────────────────────────────
 program_title: "Soul of Waifu"
 soul_of_waifu_system_title: "Soul of Waifu System"
 
-# Left Buttons
+
+# ──────────────────────────────────────────────────────────
+# NAVIGATION BUTTONS
+# ──────────────────────────────────────────────────────────
 main_button: " Main"
+main_button_2: "Main Hub"
 create_character_button: " Create Character"
 characters_gateway_button: " Characters Gateway"
 models_hub_button: " Models Hub"
 rp_editors_button: " RP Editors"
 options_button: " Options"
 
-# Main Tab Without Characters
+
+# ──────────────────────────────────────────────────────────
+# MAIN TAB — NO CHARACTERS
+# ──────────────────────────────────────────────────────────
 no_characters_advice: "You haven't added any characters. Click on the button and create it"
 create_character_button_2: " Create Character"
 no_characters_description: |-
   Before you begin a chat with a character, take a moment to customize the program to suit your preferences.
   Once you're ready, create your unique character and start the conversation.
 
-# Main Tab With Characters
+
+# ──────────────────────────────────────────────────────────
+# MAIN TAB — WITH CHARACTERS
+# ──────────────────────────────────────────────────────────
 welcome_label: "Welcome to Soul of Waifu, User"
-add_character_title: "<html><head/><body><p>Enter the character ID to add it to the list</p></body></html>"
+add_character_title: "Character Information"
 more_btn_tooltip: "Character Information"
 call_btn_text: "Open the Soul of Waifu System"
 voice_btn_text: "Open Text-To-Speech options"
@@ -28,38 +45,93 @@ delete_btn_text: "Delete character"
 background_changer_title: "Chat Background"
 background_changer_label_1: "Choose a background for the chat"
 background_changer_default_btn: "Default"
-
 btn_check_settings: "General Settings"
 btn_check_identity: "Identity / Personality"
 btn_check_scenario: "Scenario / Greeting"
 btn_check_examples: "Examples / Notes"
 btn_check_chats: "Chat Manager / Export"
-
 btn_general_info_text: "General Info"
 btn_identity_text: "Identity"
 btn_scenario_text: "Scenario"
 btn_examples_text: "Examples"
 btn_creator_notes_text: "Creator Notes"
 
-# Character AI Creation
-character_id_label: "Character ID:"
-placeholder_character_id: "Write Character ID"
-add_character_button: " ADD"
+greeting_morning_1: "Good morning, {user}. Ready for a new adventure?"
+greeting_morning_2: "Morning, {user}! Your companions are waiting for you."
+greeting_morning_3: "Rise and shine, {user}. Let's load up some memories and start the day."
+greeting_morning_4: "Morning, {user}! Ready to continue our digital journey?"
+greeting_morning_5: "Good morning, {user}. The interface is ready, and the souls are awake."
+greeting_morning_6: "A scent of tea and soft whispers. Your companions have opened their eyes, {user}."
+greeting_morning_7: "The sun is peeking through, and a new day begins in Soul of Waifu. Morning, {user}!"
 
-# Character Creation
+greeting_afternoon_1: "Good afternoon, {user}. Soul of Waifu is stable and ready."
+greeting_afternoon_2: "Taking an afternoon break, {user}? Let's check in on your companions."
+greeting_afternoon_3: "Hello, {user}. Need to escape reality for a bit? Your waifus are here."
+greeting_afternoon_4: "Afternoon, {user}. The portal is open, ready for some communication."
+greeting_afternoon_5: "Welcome back, {user}. Let's write another chapter of our story."
+greeting_afternoon_6: "Another step in our shared story. How is your day going, {user}?"
+greeting_afternoon_7: "The sun is at its peak, {user}. Perfect time to step away and check in on old friends."
+
+greeting_evening_1: "Good evening, {user}. Time to cozy up and chat with your favorite companion."
+greeting_evening_2: "Evening, {user}. Ready to dive back into the Soul Stage?"
+greeting_evening_3: "Welcome back, {user}. The perfect hour for a slow, deep conversation."
+greeting_evening_4: "Cozy evening vibes, {user}. Your companions have a lot to share with you."
+greeting_evening_5: "Evening, {user}. Let's see what thoughts were logged in the diary today."
+greeting_evening_6: "Warm twilight and a cup of tea. Your waifus missed you today, {user}."
+greeting_evening_7: "The daytime rush is behind us. Relax, {user}, your personal universe is ready."
+
+greeting_night_1: "Burning the midnight oil, {user}? Don't worry, digital souls don't sleep."
+greeting_night_2: "Late night session, {user}? We are here to keep you company in the quiet hours."
+greeting_night_3: "Quiet night vibes... Ready for a late-night chat, {user}?"
+greeting_night_4: "The world is asleep, but the gateway is alive. Welcome, {user}."
+greeting_night_5: "Late night, {user}. Let's have a deep, heartfelt conversation."
+greeting_night_6: "Dim light, silence, and the screen's glow. Time for the most intimate stories, {user}."
+greeting_night_7: "The stars shine only for us. Ready to peek into the deepest corners of Soul Memory, {user}?"
+
+
+# ──────────────────────────────────────────────────────────
+# AI PROVIDER SELECTOR
+# ──────────────────────────────────────────────────────────
 choose_ai_provider_title: "Choose AI Provider"
 choose_ai_provider_subtitle: "Select the engine for generating responses"
-choose_ai_provider_openai: "Industry standard, requires API Key"
-choose_ai_provider_local_llm: "Run models offline on your GPU"
-choose_ai_provider_mistralai: "Fast and open source models via API"
-choose_ai_provider_characterai: "Roleplay and entertainment focused AI"
-choose_ai_provider_openrouter: "Unified API for many providers"
 
+gateway_add_to_list: "Add to List"
+
+provider_name_local: "Local LLM"
+provider_name_openai: "Open AI"
+provider_name_anthropic: "Anthropic"
+provider_name_gemini: "Google Gemini"
+provider_name_deepseek: "DeepSeek"
+provider_name_grok: "Grok"
+provider_name_qwen: "Qwen"
+provider_name_zai: "Z.AI"
+provider_name_mistral: "Mistral AI"
+provider_name_openrouter: "OpenRouter"
+
+provider_desc_local: "Run models completely offline with maximum privacy and no censorship"
+provider_desc_openai: "Industry-leading quality and reliability for roleplay"
+provider_desc_anthropic: "Best-in-class prose, character consistency, and emotional depth"
+provider_desc_gemini: "Massive context window (1M+ tokens) — perfect for long stories and sagas"
+provider_desc_deepseek: "Extremely capable and highly cost-efficient — best price-to-performance ratio"
+provider_desc_grok: "Less censored, witty, and creative — great for unrestricted adult roleplay"
+provider_desc_qwen: "Powerful multilingual reasoning and strong narrative capabilities"
+provider_desc_zai: "Fast, coherent, and excellent at storytelling — strong Claude alternative"
+provider_desc_mistral: "High-performance open models with excellent speed and quality balance"
+provider_desc_openrouter: "Access to hundreds of top models in one place — the ultimate aggregator"
+
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER CREATOR — TOOLBAR
+# ──────────────────────────────────────────────────────────
 import_character_card_button: "Import Character Card"
 export_character_card_button: "Export Character Card"
 clean_character_card_button: "Clear All Fields"
 preview_prompt_button: "Preview Raw"
 
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER CREATOR — FIELDS
+# ──────────────────────────────────────────────────────────
 character_building_label: "Character Creation"
 character_image_building_label: "Character Image"
 character_name_building_label: "Character Name"
@@ -83,23 +155,66 @@ placeholder_card_version: "The version of the character card"
 user_persona_building_label: "User Persona"
 system_prompt_building_label: "System Prompt Preset"
 lorebook_building_label: "Lorebook"
+character_creator_desc_custom_variable: "Configure custom state variables (like trust, gold, or inventory) that the character can dynamically track during single chat sessions."
+character_creator_btn_add_custom_variable: "+ Add Custom Variable"
+var_editor_id_label: "VARIABLE ID"
+var_editor_id_placeholder: "e.g., trust"
+var_editor_name_label: "DISPLAY NAME"
+var_editor_name_placeholder: "e.g., Trust"
+var_editor_type_label: "DATA TYPE"
+var_editor_icon_label: "HUD ICON"
+var_editor_min_label: "MIN VALUE"
+var_editor_max_label: "MAX VALUE"
+var_editor_default_label: "DEFAULT VALUE"
+var_editor_default_placeholder: "e.g., 90, True, or item1"
+var_editor_prompt_label: "SYSTEM PROMPT TEMPLATE"
+var_editor_prompt_placeholder: "e.g., [Trust: {value}/100]"
+
+var_preset_custom: "Custom (None)"
+var_preset_romance: "Romance & Relationships (Affection & Trust)"
+var_preset_rpg: "RPG Adventure (HP, Mana, Gold & Inventory)"
+var_preset_survival: "Tamagotchi (Hunger, Energy & Mood)"
+var_preset_horror: "Horror Survival (Sanity, Panic & Flashlight)"
+var_preset_detective: "Detective Interrogation (Suspicion & Clues)"
+var_preset_yandere: "Anime: Yandere Obsession (Obsession & Sanity)"
+var_preset_shonen: "Anime: Shonen Battle (Spirit, Will & Demon)"
+var_preset_maid: "Anime: Maid & Master (Loyalty, Moe & Cheekiness)"
+var_preset_chuuni: "Anime: Chuunibyou Delusions (Delusion & Cringe)"
+var_preset_tsundere: "Anime: Tsundere Classic (Tsun & Dere)"
+var_preset_kuudere: "Anime: Silent Kuudere (Suppression & Connection)"
+var_preset_dandere: "Anime: Shy Dandere (Shyness & Attachment)"
+var_preset_himedere: "Anime: Noble Himedere (Entitlement & Vulnerability)"
+
+var_editor_preset_label: "LOAD PRESET:"
+var_editor_apply_preset_btn: "Apply"
+var_preset_confirm_title: "Apply Preset"
+var_preset_confirm_msg: "Applying this preset will overwrite and clear all your current custom variables. Do you want to proceed?"
+var_editor_del_btn: "Del"
 create_character_button_3: "Create Character"
 total_tokens_label: "Total Tokens: 0"
 search_placeholder: "Search"
 
+navigation_lbl: "NAVIGATION"
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER CREATOR — SIDEBAR NAV
+# ──────────────────────────────────────────────────────────
 character_creator_item_general_info: "General Information"
 character_creator_item_personality: "Personality & Scenario"
 character_creator_item_dialogues: "Dialogues & Greetings"
 character_creator_item_advanced: "Advanced Settings & Lore"
 character_creator_item_export: "Export & Tools"
-
 character_creator_title_general_info: "General Information"
 character_creator_title_personality: "Personality & Scenario"
 character_creator_title_dialogues: "Dialogues & Greetings"
 character_creator_title_advanced: "Advanced Settings & Lore"
+character_creator_title_custom_variable: "Variables & State"
 character_creator_title_export: "Export & Tools"
 
-# Models Hub
+
+# ──────────────────────────────────────────────────────────
+# MODELS HUB
+# ──────────────────────────────────────────────────────────
 models_hub_gguf_error: "GGUF models not found."
 models_hub_my_models: " My models"
 models_hub_popular: " Popular"
@@ -115,18 +230,60 @@ button_download_model: " Download model"
 models_hub_author: "Author -"
 models_hub_downloads: "Downloads -"
 models_hub_compatibility: "Compatibility: "
+models_hub_open_folder_btn: " Open Folder"
+models_hub_change_folder_btn: " Change Directory"
 
-# RP Editors
-rp_editors_title: "RolePlay Editors"
-rp_editors_subtitle: "Manage your personas, world lore, and system prompts"
+download_model_title: "Download Model"
+select_quant_title: "Select Quantization Level"
+available_files_text: "Available files for repository:"
+quant_recommendation_text: "Recommended downloading files with 'Q4_K_M' or 'Q5_K_M' for the best balance of speed and quality."
+
+status_ready_download: "Ready to download"
+status_init_download: "Initializing download..."
+status_cancelling: "Cancelling download and cleaning up..."
+status_download_complete: "Download Complete!"
+
+btn_download_model: " Download"
+btn_stop_download: "Stop"
+btn_stopping: "Stopping..."
+btn_downloaded: " Downloaded ✓"
+btn_try_again: " Try Again"
+
+error_title: "Download Error"
+error_download_failed: "Failed to download {filename}:\n\n{error_msg}"
+network_error: "Network error: "
+system_error: "System error: "
+
+time_h: "h"
+time_m: "m"
+time_s: "s"
+time_left: "left"
+
+
+# ──────────────────────────────────────────────────────────
+# RP EDITORS HUB
+# ──────────────────────────────────────────────────────────
+rp_editors_title: "Role Play Editors"
+rp_editors_subtitle: "Create characters, orchestrate scenes with Soul Stage, and manage world lore, personas, and system prompts"
+rp_card_character_editor_title: "Character Creator"
+rp_card_character_editor_desc: "Start creating your unique characters with personalities, backstories, and dialogue templates."
+rp_card_soul_stage_title: "Soul Stage"
+rp_card_soul_stage_desc: "Step into interactive storytelling with multiple characters and an AI Director."
 rp_card_lorebook_title: "Lorebooks"
 rp_card_lorebook_desc: "Create rules, places, and world events for your scenarios."
 rp_card_personas_title: "Personas"
 rp_card_personas_desc: "Manage your user profiles, avatars, and identity descriptions."
 rp_card_prompts_title: "System Prompts"
 rp_card_prompts_desc: "Configure instructions and format how the AI receives character data."
+rp_card_discord_bot_title: "Discord Gateway"
+rp_card_discord_bot_desc: "Connect your characters to Discord and chat with them anywhere."
+rp_card_image_gen_title: "Image Generation"
+rp_card_image_gen_desc: "Configure AI image generation settings for your characters and stories."
 
-# Options
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — SECTION TITLES
+# ──────────────────────────────────────────────────────────
 conversation_provider_title: "Conversation Provider"
 api_configuration_title: "API Configuration"
 user_profile_title: "User Profile"
@@ -140,6 +297,11 @@ global_editors_title: "Global Editors"
 visualizations_title: "Visualizations (Live2D / VRM)"
 sub_modules_title: "Sub-Modules"
 
+options_sidebar_title: "SETTINGS"
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — API CONFIGURATION
+# ──────────────────────────────────────────────────────────
 label_base_url: "Base URL"
 label_mistral_model: "Mistral Model"
 gpu_layers_text: "GPU Layers"
@@ -148,7 +310,6 @@ temperature_label: "Temperature"
 top_p_label: "Top P"
 repeat_penalty_label: "Repeat Penalty"
 max_tokens_label: "Max Tokens"
-
 configuration_tab: "Configuration"
 conversation_method_title: "Conversation Method"
 conversation_method_label: "Conversation method"
@@ -162,14 +323,22 @@ placeholder_mistral_model_endpoint: "Enter the API endpoint of the mistral model
 openrouter_models_label: "Model"
 placeholder_base_url: "Write your custom endpoint url (Optional)"
 placeholder_base_api: "Write API value (Optional)"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — USER PROFILE
+# ──────────────────────────────────────────────────────────
 user_building_title: "User Persona"
 choose_your_name_label: "Write your name"
 choose_your_description_label: "Write your description"
 placeholder_user_name: "Your name"
 placeholder_user_description: "Your personality"
 choose_your_avatar_label: "Choose avatar"
-support_btn: "❤ Support"
 
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — SYSTEM (Language, Devices, Translator)
+# ──────────────────────────────────────────────────────────
 system_tab: "System"
 language_title: "Language"
 program_language_label: "Program language"
@@ -192,32 +361,157 @@ mode_translator_label: "Mode"
 computer_specs_title: "Computer Specs"
 no_gpu: "GPU not detected"
 
+section_app_interface: "APP INTERFACE"
+section_message_translation: "MESSAGE TRANSLATION"
+section_audio_channels: "AUDIO I/O CHANNELS"
+section_system_resources: "SYSTEM RESOURCES"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — LOCAL LLM
+# ──────────────────────────────────────────────────────────
 local_llm_tab: "LLM Settings"
 llm_options_label: "Server Endpoint"
 llm_title: "Local LLM Settings"
-choose_llm_device_label: "Choose device"
-choose_llm_gpu_device_label: "GPU Backend"
+llm_hw_title: "Hardware & Backend"
+llm_format_title: "Prompting & Formatting"
+llm_gen_title: "General Generation Parameters"
+llm_adv_title: "Advanced Local LLM Sampling"
+choose_llm_device_label: "Compute Setup"
 enable_mlock_checkbox: "MLock"
 enable_flash_attention_checkbox: "Flash Attention"
-llm_title_label_settings: "Settings for generating responses from AI"
+chat_template_label: "Chat Template"
+chat_template_auto: "Auto"
+stop_strings_label: "Stop Strings"
+stop_strings_placeholder: "\\nUser:, </s>, <|eot_id|>, <|im_end|>"
+reasoning_mode_checkbox: "Thinking/Reasoning Mode"
+gpu_layers_text: "GPU Layers"
+context_size_text: "Context Size"
+max_tokens_text: "Max Tokens"
+temperature_text: "Temperature"
+freq_penalty_text: "Frequency Penalty"
+pres_penalty_text: "Presence Penalty"
+min_p_text: "Min-P"
+top_p_text: "Top-P"
+dyn_temp_min_text: "Dynamic Temp Min"
+dyn_temp_max_text: "Dynamic Temp Max"
+xtc_prob_text: "XTC Probability"
+xtc_thresh_text: "XTC Threshold"
+dry_mult_text: "DRY Multiplier"
+dry_base_text: "DRY Base"
+dry_length_text: "DRY Allowed Length"
+enable_adv_sampling_text: "Enable Advanced Sampling"
 
+kv_cache_label: "KV Cache Type"
+batch_size_text: "Prompt Batch Size"
+cpu_threads_text: "CPU Threads"
+
+section_hw_tuning: "PERFORMANCE & MEMORY TUNING"
+section_response_control: "RESPONSE CONTROL"
+section_creativity: "CREATIVITY & SAMPLING"
+section_penalties: "REPETITION PENALTIES"
+section_core_samplers: "CORE SAMPLERS"
+section_dyn_temp: "DYNAMIC TEMPERATURE"
+section_xtc: "XTC (ANTI-CLICHÉ)"
+section_dry: "DRY (ANTI-LOOP)"
+section_prompt_structure: "PROMPT STRUCTURE & SYNTAX"
+section_inference_engine: "INFERENCE ENGINE"
+
+llama_cpp_updater: "LLAMA CPP Updater"
+checking_current_build: "Current: Checking..."
+lbl_target_tr: "Target:"
+lbl_release_notes_tr: "Contacting GitHub API..."
+rollback_btn: "Rollback"
+rollback_btn_tooltip: "Restore previous version"
+update_now_btn: "Update Now"
+no_release_notes: "No release notes provided."
+current_ver_label: "Current:"
+github_error: "Error connecting to GitHub"
+conn_failed: "Connection failed."
+version_title: "Version"
+status_up_to_date: "You are up to date!"
+btn_reinstall: "Reinstall"
+status_ready_download: "Ready to download."
+status_no_binary: "No compatible binary found."
+status_restoring: "Restoring backup..."
+btn_done: "Done"
+update_btn: "Update"
+update_engine_tooltip: "Download and install the latest llama.cpp binaries for the selected backend."
+updater_subtitle: "BACKEND ENGINE"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — Tool Calling & MCP
+# ──────────────────────────────────────────────────────────
+tools_tab: "Tool Calling & MCP"
+tools_native_title: "Native AI Capabilities"
+section_tool_calling: "TOOL CALLING PERMISSIONS"
+enable_tool_calling_text: "Enable Native Tool Calling"
+enable_tool_calling_tooltip: "Allows the AI to execute Python functions natively during generation."
+
+# Native Tools
+tool_web_title: "WebSearchTool"
+tool_web_desc: "Search the web using a stealth DuckDuckGo API to retrieve real-time facts, weather, or news when asked."
+tool_media_title: "MediaControlTool"
+tool_media_desc: "Control media playback on your Windows PC (pause, play, next/prev tracks in Spotify, YouTube, or browser players)."
+tool_read_clipboard_title: "ClipboardReaderTool"
+tool_read_clipboard_desc: "Read the current text content copied in the user's clipboard."
+tool_url_title: "OpenURLTool"
+tool_url_desc: "Open links or websites (like YouTube or GitHub) in your default web browser on demand."
+tool_sysinfo_title: "GetSystemInfoTool"
+tool_sysinfo_desc: "Retrieve the exact system time and date from your PC to help the AI keep track of the current schedule."
+tool_vision_title: "TakeScreenshotTool [Vision]"
+tool_vision_desc: "Analyze active screen contents. Captures a quick screenshot and sends it to a multimodal AI model. Extremely performance-heavy!"
+
+# MCP Settings
+mcp_title: "Model Context Protocol (MCP)"
+section_mcp_settings: "EXTERNAL MCP SERVERS"
+mcp_description: "Connect external MCP servers (like SearXNG, GitHub, etc.) without writing native Python plugins. This acts as a proxy between Soul of Waifu and the AI. Can be used in conjunction with other built-in tools."
+enable_mcp_text: "Enable MCP Proxy Integration"
+mcp_url_label: "MCP Server URL"
+mcp_url_placeholder: "e.g., http://127.0.0.1:8000"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — SOW MODULES
+# ──────────────────────────────────────────────────────────
 sow_system_tab: "Soul of Waifu Modules"
 sow_system_title: "Soul of Waifu System"
 enable_sow_system_checkbox: "Soul of Waifu System Module"
 enable_ambient_checkbox: "Ambient Sound Module"
-enable_enhanced_memory: "Smart Memory Module"
+enable_soul_memory: "Soul Memory Module"
 enable_summary_checkbox: "Auto-Summarization Module"
 settings_summary_interval: "Interval (messages):"
+sow_system_modules_title: "Modules"
 
+section_render_engine: "RENDER ENGINE"
+section_environment_background: "ENVIRONMENT BACKGROUND"
+section_ambient_audio: "AMBIENT AUDIO"
+section_cognitive_architecture: "COGNITIVE ARCHITECTURE"
+section_web_server: "WEB INTERFACE SERVER"
+web_server_card_title: "Local Web Server"
+
+soul_memory_mode_label: "Soul Memory Mode:"
+soul_memory_batch_label: "Batch size (0 = manual):"
+
+web_server_status_stopped: "Status: Stopped"
+web_server_start_btn: "Start Server"
+web_server_stop_btn: "Stop Server"
+web_browser_open_btn: "Open in Browser"
+web_server_starting_lbl: "Status: Starting..."
+web_server_starting_lbl_2: "Status: Running on http://127.0.0.1:8000"
+web_server_error: "Status: Port 8000 busy or Error"
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — VISUALIZATIONS (Live2D / VRM)
+# ──────────────────────────────────────────────────────────
 live2d_mode_label: "Choose mode"
 live2d_mode_with_gui: "With GUI"
 live2d_mode_without_gui: "Without GUI"
-
 choose_model_fps: "Choose model FPS"
 model_fps_30: "30 FPS"
 model_fps_60: "60 FPS"
 model_fps_120: "120 FPS"
-
 choose_model_background: "Choose model background"
 model_background_1: "Color"
 model_background_2: "Image"
@@ -230,9 +524,10 @@ model_background_color_5: "Soft Purple"
 model_background_color_6: "Warm Coal Grey"
 choose_model_background_image: "Choose background image"
 
-sow_system_modules_title: "Modules"
 
-# Personas Editor
+# ──────────────────────────────────────────────────────────
+# PERSONAS EDITOR
+# ──────────────────────────────────────────────────────────
 personas_button: " Personas Editor"
 personas_editor_title: "Personas Editor"
 personas_editor_choose_avatar: "Choose Image"
@@ -251,8 +546,14 @@ personas_editor_description_placeholder: "Describe the persona's role, tone, and
 personas_editor_default_persona: "(Default Persona)"
 personas_editor_confirm_delete: "Confirm Delete"
 personas_editor_confirm_delete_text: "Are you sure you want to delete persona "
+personas_editor_library: "PERSONAS LIBRARY"
+personas_editor_default_badge: "DEFAULT"
+personas_editor_avatar_hint: "Recommended size: 256x256 px"
 
-# System Prompt Editor
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM PROMPT EDITOR
+# ──────────────────────────────────────────────────────────
 system_prompt_button: " System Prompt Editor"
 system_prompt_editor_title: "System Prompt Editor"
 system_prompt_editor_system_prompt: "System Prompt"
@@ -267,8 +568,17 @@ system_prompt_editor_delete_preset_title: "Delete Preset"
 system_prompt_editor_delete_preset_first: "Do you really want to remove the preset:"
 system_prompt_editor_delete_preset_second: "This action cannot be canceled."
 system_prompt_editor_preset_name: "Enter the preset name:"
+system_prompt_editor_header_title: "SYSTEM PROMPT EDITOR"
+system_prompt_editor_subtitle: "CONSTRUCTS & PRESETS"
+system_prompt_editor_text_label: "SYSTEM PROMPT DIRECTIVE"
+system_prompt_editor_component_label: "PROMPT CONSTRUCT ORDER (Drag & Drop to Reorder)"
+system_prompt_editor_panel_title: "PRESET CONTROL PANEL"
+preset_saved_successfully: "Preset saved successfully."
 
-# Lorebook Editor
+
+# ──────────────────────────────────────────────────────────
+# LOREBOOK EDITOR
+# ──────────────────────────────────────────────────────────
 lorebook_editor_title: "Lorebook Editor"
 lorebook_editor_select: "Current Lorebook:"
 lorebook_editor_btn_create: "Create New Lorebook"
@@ -277,6 +587,7 @@ lorebook_editor_edit_description: "Edit Description"
 lorebook_editor_import_lorebook: "Import JSON"
 lorebook_editor_export_lorebook: "Export JSON"
 lorebook_editor_delete_lorebook: "Delete Lorebook"
+lorebook_editor_delete_lorebook_confirm: "Delete {name}?"
 lorebook_editor_search: "Search entries..."
 lorebook_editor_add_entry: "+ Add New Entry"
 lorebook_editor_depth: "Scan Depth:"
@@ -312,7 +623,6 @@ lorebook_editor_lorebook_name: "Name:"
 lorebook_editor_edit_description_title: "Edit Lorebook Description"
 lorebook_editor_edit_description_label: "Description for {name}:"
 lorebook_editor_edit_description_updated: "Description for lorebook {name} updated."
-lorebook_editor_delete_lorebook: "Delete {name}?"
 lorebook_editor_export_success: "Export Success"
 lorebook_editor_export_success_desc: "Lorebook saved successfully."
 lorebook_editor_export_error: "Export Error"
@@ -323,12 +633,77 @@ lorebook_editor_import_error_desc: "Failed to parse lorebook: {error}"
 lorebook_editor_saved: "Saved"
 lorebook_editor_saved_desc: "Lorebooks saved successfully."
 lorebook_editor_scan_depth: "Scan Depth:"
+lorebook_editor_rename_lorebook: "Rename Lorebook"
+lorebook_editor_rename_label: "New name for '{name}':"
+lorebook_editor_rename_error_title: "Error"
+lorebook_editor_rename_error_exists: "A lorebook with this name already exists."
 
+# LOREBOOK ENGINE
+lorebook_engine_title: "Lorebook Engine"
+lorebook_library_label: "LIBRARY"
+lorebook_rename_btn: "Rename"
+lorebook_filter_placeholder: "Filter entries..."
+lorebook_entries_count: "{total} entries"
+lorebook_entries_shown: "{shown} of {total} entries"
+lorebook_empty_state: "Select an entry or create a new one to begin editing."
+lorebook_entry_name_placeholder: "Entry name..."
+lorebook_trigger_type_label: "TRIGGER TYPE"
+lorebook_injection_label: "INJECTION"
+lorebook_trigger_config_label: "TRIGGER CONFIGURATION"
+lorebook_content_label: "LORE CONTENT / SCENARIO TEXT"
+lorebook_sticky_label: "STICKY"
+lorebook_cooldown_label: "COOLDOWN"
+lorebook_delay_label: "DELAY"
+lorebook_probability_label: "PROBABILITY"
+lorebook_apply_changes_btn: "APPLY CHANGES"
+lorebook_include_keywords_label: "INCLUDE KEYWORDS (comma-separated)"
+lorebook_include_keywords_placeholder: "dragon, ancient, fire..."
+lorebook_exclude_keywords_label: "EXCLUDE KEYWORDS (comma-separated)"
+lorebook_exclude_keywords_placeholder: "exception words..."
+lorebook_semantic_label: "SCENE DESCRIPTION FOR AI SEMANTIC MATCH"
+lorebook_semantic_placeholder: "Describe the scene or situation for the AI to recognize..."
+lorebook_always_on_hint: "Always active — injected into every context window, every turn."
+lorebook_random_hint: "Fires randomly each turn, controlled by the Probability setting below."
+lorebook_parent_uid_label: "PARENT ENTRY UID (-1 = any)"
+lorebook_chain_delay_label: "CHAIN DELAY (messages after parent)"
+lorebook_first_msg_label: "FIRST MESSAGE (inclusive)"
+lorebook_last_msg_label: "LAST MESSAGE (inclusive)"
+lorebook_any_value: "any (-1)"
+lorebook_delete_entry_confirm: "Delete this entry? This cannot be undone."
+lorebook_delete_lb_confirm: "Delete \"{name}\" and all its entries?"
+lorebook_export_success_toast: "\"{name}\" saved to disk."
+lorebook_injection_passive: "Passive"
+lorebook_injection_active: "Active"
+lorebook_depth_suffix: "messages"
+lorebook_editor_suffix_entries: "entries"
+lorebook_trig_keyword: "Keywords"
+lorebook_trig_semantic: "Semantic"
+lorebook_trig_always_on: "Always On"
+lorebook_trig_random: "Random"
+lorebook_trig_chain: "Chain"
+lorebook_trig_scenario: "Scenario"
+lorebook_trig_title_keyword: "KEYWORD MATCHING"
+lorebook_trig_title_semantic: "SEMANTIC SITUATION"
+lorebook_trig_title_always_on: "ALWAYS ACTIVE"
+lorebook_trig_title_random: "RANDOM TRIGGER"
+lorebook_trig_title_chain: "CHAIN DEPENDENCY"
+lorebook_trig_title_scenario: "SCENARIO RANGE"
+
+
+# ──────────────────────────────────────────────────────────
+# LOREBOOK SELECTOR
+# ──────────────────────────────────────────────────────────
+lorebook_selector_title: "Select Lorebooks"
+lorebook_selector_search: "Search lorebooks..."
+lorebook_selector_apply: "Apply Lorebooks"
 import_lorebook_title: "Import Lorebook?"
 import_lorebook_text: "This card contains an embedded lorebook '{book_name}'. Do you want to add it to your library?"
 import_lorebook_added_text: "Lorebook '{final_name}' added to library."
 
-# Appearance
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — UI THEME
+# ──────────────────────────────────────────────────────────
 appearance_wtheme_default: "Default"
 appearance_wtheme_obsidian: "Obsidian"
 appearance_wtheme_graphite: "Graphite"
@@ -343,7 +718,13 @@ appearance_wtheme_coffee: "Coffee"
 appearance_wtheme_amber: "Amber"
 appearance_wtheme_slate: "Slate"
 appearance_wtheme_dracula: "Dracula"
+appearance_wtheme_cyberpunk: "Cyberpunk"
+appearance_wtheme_tokyo_night: "Tokyo Night"
 
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — CHAT PRESETS
+# ──────────────────────────────────────────────────────────
 appearance_preset_default: "Default"
 appearance_preset_nord: "Nord"
 appearance_preset_dracula: "Dracula"
@@ -351,7 +732,14 @@ appearance_preset_onedark: "One Dark"
 appearance_preset_material: "Material"
 appearance_preset_sakura: "Sakura"
 appearance_preset_abyss: "Abyss"
+appearance_preset_midnight: "Midnight"
+appearance_preset_emerald: "Emerald"
+appearance_preset_crimson: "Crimson"
 
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — COLOR PALETTE
+# ──────────────────────────────────────────────────────────
 appearance_color_white: "White"
 appearance_color_soft: "Soft"
 appearance_color_dimmed: "Dimmed"
@@ -361,23 +749,18 @@ appearance_color_cream: "Cream"
 appearance_color_arctic: "Arctic"
 appearance_color_lavender: "Lavender"
 appearance_color_sage: "Sage"
-
 appearance_color_amber: "Amber"
 appearance_color_gold: "Gold"
 appearance_color_coral: "Coral"
-appearance_color_arctic: "Arctic"
 appearance_color_sky: "Sky"
-appearance_color_lavender: "Lavender"
 appearance_color_lilac: "Lilac"
 appearance_color_sakura: "Sakura"
 appearance_color_muted: "Muted"
-
 appearance_color_gray: "Gray"
 appearance_color_nord_green: "Nord Green"
 appearance_color_dracula_orange: "Orange"
 appearance_color_rose: "Rose"
 appearance_color_dim: "Dim"
-
 appearance_color_blue: "Blue"
 appearance_color_green: "Green"
 appearance_color_dark: "Dark"
@@ -390,12 +773,15 @@ appearance_color_bright: "Bright"
 appearance_color_cool: "Cool"
 appearance_color_accent: "Accent"
 
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — CONTROLS & LABELS
+# ──────────────────────────────────────────────────────────
 appearance_tooltip_custom: "Custom Color"
 appearance_lbl_custom: "Custom"
 appearance_dlg_user_bubble: "User Bubble Color"
 appearance_dlg_char_bubble: "Character Bubble Color"
 appearance_dlg_pick_color: "Pick Color"
-
 appearance_header_theme: "Theme"
 appearance_header_text_color: "Text Color"
 appearance_header_quotes: "Quotes"
@@ -403,6 +789,7 @@ appearance_header_italic: "Italic"
 appearance_lbl_corner_radius: "Corner Radius"
 appearance_lbl_bubble_opacity: "Bubble Opacity"
 appearance_lbl_font_size: "Font Size"
+appearance_lbl_max_width: "Max Width"
 appearance_btn_reset: "Reset"
 appearance_btn_save: "Save"
 appearance_header_preview: "Preview"
@@ -414,15 +801,20 @@ appearance_header_ui_text: "Button Text Color"
 appearance_tab_name: "Appearance"
 
 
-# Author Notes
-author_notes_editor_title: "Author Notes Editor"
-author_notes_editor_description: "Editing author's notes"
-author_notes_editor_placeholder: "Enter your instructions or hints for the character..."
-author_notes_editor_save: "Save"
-author_notes_saved: "Author Notes Saved"
-author_notes_saved_body: "The author's notes were saved successfully."
+# ──────────────────────────────────────────────────────────
+# AUTHOR NOTES EDITOR
+# ──────────────────────────────────────────────────────────
+author_notes_header_title: "AUTHOR NOTES EDITOR"
+author_notes_subtitle: "GLOBAL NARRATIVE DIRECTIVES"
+author_notes_hint: "These instructions are injected dynamically into the context window. Use them to guide the character's behavior, enforce a specific writing style, or set overarching scenario goals."
+author_notes_input_label: "DIRECTIVES CONTENT"
+author_notes_editor_cancel: "CANCEL"
+author_notes_editor_save: "SAVE DIRECTIVES"
+author_notes_editor_placeholder: "Enter your instructions or hints for the character here..."
 
-# Summary Editor
+# ──────────────────────────────────────────────────────────
+# SUMMARY / STORY MEMORY EDITOR
+# ──────────────────────────────────────────────────────────
 summary_editor_title: "Story Memory Editor"
 summary_editor_heading: "Story Memory"
 summary_editor_covered_history: "Covered History: Messages 1-{last_seq}"
@@ -440,88 +832,49 @@ summary_editor_update_text: "Update signal sent. The memory will refresh shortly
 summary_editor_generating: "Generating..."
 model_generate_summary: "Generating summary..."
 
-# Chat
+summary_editor_header_title: "STORY MEMORY EDITOR"
+summary_editor_subtitle: "ARCHIVE & COMPRESSION"
+summary_editor_covered_badge: "History: 1-{last_seq}"
+summary_editor_current_memory_label: "CURRENT MEMORY ARCHIVE"
+summary_editor_prompt_label: "SUMMARIZATION DIRECTIVES (PROMPT)"
+summary_editor_saved_toast: "Memory and directives saved successfully."
+
+
+# ──────────────────────────────────────────────────────────
+# CHAT INTERFACE
+# ──────────────────────────────────────────────────────────
 character_name_chat: "Character name"
 write_user_message_placeholder: "Write your message to character"
-typingIndicator_text: "{character_name} <span style='color: #888;'>typing {dots}</span>"
-
-creator_label: "Developed by"
-simple_version_label: "Version"
-version_label: "Soul of Waifu v2.3.1"
-
-nsfw_checkbox: "NSFW"
-update_available_title: "Update Available"
-update_available_body: "A new version is available: "
-update_available_info: "Would you like to update the program?"
-update_current_version: "Current version: v2.3.1"
-update_available_close: "Close"
-update_available_link: "Go to GitHub"
-language_changed_title: "Restart Required"
-language_changed_body: "The program needs to be restarted for the changes to take effect."
-language_changed_question: "Would you like to restart the program now?"
-language_changed_yes: "Yes"
-language_changed_no: "No"
+typingIndicator_text: "Thinking"
+model_generate_text: "Generating text..."
 user_message_textEdit: "Write your message as {user_name}"
 user_message_textEdit_default: "Write your message as User"
-model_loading_step_1: "Starting loading the model"
-model_loading_step_2: "Checking the file format"
-model_loading_step_3: "Loading model tensors"
-model_loading_step_4: "Constructing llama context"
-model_loading_step_5: "Model is almost loaded"
-model_loading_step_6: "Model is ready to work"
+input_placeholder: "Direct the story or speak to someone..."
 
-# Interface Signals
-about_program_description: "<b>Soul of Waifu</b> — is a powerful and feature-rich platform for interacting with AI-driven characters. It combines ease of use with deep customization, making the application suitable for both beginners and advanced users.<br><br>Take the unique opportunity to create your own characters from scratch, or import ready-made character cards in the V2 format. Customize their personality, habits, behavior, voice, appearance, and even the world they inhabit using the lorebook system. The app supports all popular LLM platforms: Character AI, Mistral AI, OpenAI, proxies, and OpenRouter — or you can load your own local language model in GGUF format directly into Soul of Waifu.<br><br>If you want to deepen your interaction with a character, enable the Soul of Waifu System mode. This unlocks advanced features that elevate your experience. Call your character, assign them an avatar, optimize context handling with the built-in smart memory feature, and feel a deeper emotional connection — your character will react to your messages with a dynamic emotion system. Their facial expression, pose, and animation will change in real time, reflecting their emotional state in the conversation.<br><br>Manage everything in one place: create characters in the full-featured editor, discover and add new ones in the Characters Gateway, manage and download local language models in the Models Hub, create user personas, lorebooks, prompt presets, and much more!"
-about_program_sub_description: "If you encounter an error or have an idea to improve the app, don't hesitate to join our <a href='https://discord.gg/6vFtQGVfxM'>Discord server</a>! There, fellow enthusiasts share their experiences, exchange character cards, and discuss exciting topics. Your involvement directly shapes the future of the project. Together, we're building a place where dreams come to life!"
-about_program_title: "About Soul of Waifu"
 
-persona_error_title: "Change persona"
-persona_error_body: "A non-existent person has been selected, please change it."
-
-add_character_text_1: "was successfully added!"
-add_character_text_2: "You can now interact with the character in your character list."
-add_character_text_3: "There was an error while adding the character."
-add_character_text_4: "Please try again."
-add_character_error: "Set a name and the first message for your character."
-add_character_title: "Character Information"
-add_character_title_error: "Error adding a character"
-
-creator_info_close_button: "Close"
-
-welcome_message: "Welcome to Soul of Waifu, "
-
-delete_message_1: "Delete Character"
-delete_message_2: "Are you sure you want to delete "
-
-create_character_title: "Character Creation Selector"
-radio_character_ai": " Character AI"
-radio_mistral_ai: " Mistral AI"
-radio_open_ai: " Open AI or Custom"
-radio_openrouter: " OpenRouter"
-radio_local_llm: " Local LLM"
-create_character_title_2: "Choose Character Creation Method"
-
-value: "Value: "
-
+# ──────────────────────────────────────────────────────────
+# TTS SELECTOR
+# ──────────────────────────────────────────────────────────
 tts_selector_title: "Text-To-Speech Selector"
+tts_selector_title_2: "SPEECH ENGINES"
 tts_selector_title_label: "Choose Text-To-Speech Method"
 tts_selector_save_button: "Save Selection"
 tts_selector_title_2: "Character Voice"
 tts_selector_save_information: "Voice successfully saved"
 tts_selector_save_information_error: "Choose a voice for the character!"
-tts_selector_character_ai: "Your character voice name is "
-tts_selector_character_ai_2: "Choose voice for your character"
-tts_selector_character_ai_3: "Enter a voice name for the character"
-tts_selector_character_ai_search: "Search"
-tts_selector_character_ai_listen: "Listen"
 tts_selector_select_button: "Select voice"
-tts_selector_elevenlabs: "Write your API Token from ElevenLabs"
+
+tts_selector_elevenlabs: "ElevenLabs Configuration"
 tts_selector_elevenlabs_2: "Enter your ElevenLabs API token..."
 tts_selector_elevenlabs_3: "Enter Voice ID from ElevenLabs"
-tts_selector_xttsv2: "Choose voice type for XTTSv2"
+tts_selector_elevenlabs_lbl_1: "ELEVENLABS API KEY"
+
+tts_selector_xttsv2: "XTTSv2 Configuration"
 tts_selector_xttsv2_male: "Male"
 tts_selector_xttsv2_female: "Female"
 tts_selector_xttsv2_calm_female: "Female Calm"
+tts_selector_xttsv2_lbl_1: "SELECT SPEAKER MODEL"
+
 tts_selector_enable_rvc: "Enable RVC"
 tts_selector_invalid_rvc: "Invalid RVC directory"
 tts_selector_no_folders: "No folders found"
@@ -529,15 +882,38 @@ tts_selector_no_folder: "No Folder"
 tts_selector_rvc_no_folder: "RVC is enabled, but no folder selected"
 tts_selector_no_pth: "No PTH File"
 tts_selector_no_pth_in_folder: "No .pth file found in folder: "
-tts_selector_edge: "Choose voice type for Edge TTS"
+
+tts_selector_edge: "Edge TTS Configuration"
+tts_selector_edge_tts_lbl_1: "LANGUAGE"
+tts_selector_edge_tts_lbl_2: "SPEAKER VOICE"
+
 tts_selector_error: "Input Error"
 tts_selector_error_2: "Please enter a valid voice name."
 tts_selector_error_3: "No Voices"
 tts_selector_error_4: "No voices found for the given name."
 tts_selector_error_5: "Fetch Error"
 tts_selector_error_6: "Failed to fetch voices: "
-tts_selector_kokoro: "Choose voice for Kokoro TTS"
 
+tts_selector_kokoro: "Kokoro TTS Configuration"
+tts_selector_kokoro_lbl_1: "SELECT KOKORO SPEAKER"
+
+tts_selector_silero: "Silero RU Configuration"
+tts_selector_silero_lbl_1: "SELECT RUSSIAN SPEAKER"
+
+tts_selector_qwen3: "Qwen 3 TTS Configuration"
+tts_selector_qwen3_lbl_1: "MODEL SIZE"
+tts_selector_qwen3_lbl_2: "LANGUAGE"
+tts_selector_qwen3_lbl_device: "COMPUTE DEVICE"
+tts_qwen_mode: "GENERATION MODE"
+tts_selector_qwen3_lbl_3: "CHOOSE PRESET VOICE"
+tts_selector_qwen3_lbl_4: "DESCRIBE VOICE IN ENGLISH (PROMPT)"
+tts_selector_qwen3_lbl_5: "REFERENCE AUDIO FILE (.WAV)"
+tts_selector_qwen3_lbl_6: "No reference audio selected"
+
+
+# ──────────────────────────────────────────────────────────
+# EXPRESSIONS SELECTOR
+# ──────────────────────────────────────────────────────────
 expressions_selector_title: "Expressions Selector"
 expressions_selector_choose_method: "Choose Expression Method"
 expressions_selector_nothing: "Nothing to display here yet."
@@ -546,37 +922,77 @@ expressions_selector_mode_saved_title: "Expression Mode Saved"
 expressions_selector_mode_saved_body: "Expression mode successfully saved"
 expressions_selector_select_folder: "Select an emotion folder"
 expressions_selector_no_folders: "No folders found"
-
 expressions_selector_invalid_directory: "Invalid expressions directory"
 expressions_selector_folder_saved_title: "Expression Folder Saved"
 expressions_selector_foler_saved_body: "Expression folder successfully saved"
-
 expressions_selector_select_folder_live2d: "Select folder with Live2D Model"
 expressions_selector_live2d_folder_saved_title: "Live2D Folder Saved"
 expressions_selector_live2d_folder_saved_body: "Live2D folder successfully saved"
-
 expressions_selector_select_file_vrm: "Select VRM model file"
 expressions_vrm_selector_no_files: "No VRM files found"
 expressions_vrm_selector_invalid_directory: "Invalid VRM model directory"
 expressions_selector_vrm_file_saved_title: "VRM File Saved"
 expressions_selector_vrm_file_saved_body: "VRM file successfully saved"
 
-characters_gateway_character_ai_error: "You don't have a token from Character AI"
+visual_engine_menu_title: "VISUALIZATION ENGINE"
+expressions_selector_nothing_desc: "Deactivate advanced visualization. Only the static character avatar card will be displayed."
+
+motion_mapper_title: "Live2D Motion Mapper"
+motion_mapper_desc: "Assign a specific body animation group to each of the 28 detected emotions."
+reset_def_btn: "Reset Defaults"
+save_mapping_btn: "Save Mapping"
+
+# ──────────────────────────────────────────────────────────
+# CHARACTERS GATEWAY
+# ──────────────────────────────────────────────────────────
 characters_gateway_trending: "Trending"
 characters_gateway_query: "Your search query: "
 characters_gateway_tab_title: "Characters Cards"
 characters_gateway_cai_add: "Add to the list"
 
+# Gateway Preview Dialog
+gw_preview_type_lorebook: "LOREBOOK"
+gw_preview_type_scene: "STAGE SCENARIO"
+gw_preview_loading: "Establishing secure uplink...\nRetrieving asset documentation data..."
+gw_preview_btn_close: "Close"
+gw_preview_btn_import: "Import to System"
+gw_preview_error: "⚠️  Database connection failed\nCould not fetch asset details:\n{error}"
+gw_preview_lorebook_summary: "Dataset contains {count} cognitive rules:"
+gw_preview_unnamed: "Unnamed Entry"
+gw_preview_trigger: "Trigger"
+gw_preview_keys: "Keys"
+gw_preview_header_context: "WORLD CONTEXT & SCENARIO"
+gw_preview_header_narration: "OPENING NARRATION"
+gw_preview_header_style: "NARRATOR STYLE"
+gw_preview_tone: "Tone"
+gw_preview_time: "Time"
+
+gw_card_author_prefix: "by {author}"
+gw_card_entries: "📖  {count} entries"
+gw_card_location: "📍  {location}"
+gw_card_add_lorebook: "Add to Library"
+gw_card_add_scene: "Add to Stages"
+
+# ──────────────────────────────────────────────────────────
+# CHAT — MESSAGE ACTIONS
+# ──────────────────────────────────────────────────────────
 chat_edit_message: "Edit Message"
 chat_save_message: "Save"
 chat_delete_message: "Delete"
 chat_edit_message_2: "Edit"
 chat_continue_message: "Continue from this message"
 chat_regenerate_message: "Regenerate"
+msg_action_translate: "Translate"
+msg_action_generate_image: "Generate Image"
 
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER INFO PANEL
+# ──────────────────────────────────────────────────────────
 creator_info_button: "Creator Notes"
 creator_info_window_title: "Creator Notes"
 creator_info_title: "Title from Creator:"
+creator_info_close_button: "Close"
 export_card_button: "Export character"
 character_edit_settings: "Character Settings: "
 character_edit_description: "Character Description:"
@@ -596,20 +1012,27 @@ character_edit_saved_error_2: "Character was not found in the configuration."
 character_edit_start_new_dialogue: "Start new chat"
 character_edit_start_new_dialogue_sure: "Are you sure you want to start a new chat?"
 character_edit_start_new_dialogue_success: "A new chat has been successfully started."
+character_settings_engine: "SETTINGS ENGINE"
+character_settings_subtitle: "META & PROMPTS"
+character_settings_name_label: "CHARACTER NAME"
+character_settings_nav_label: "CONFIGURATION"
+character_settings_new_chat_btn: "START NEW CHAT"
+character_settings_save_btn: "SAVE CHANGES"
+character_settings_close_btn: "CLOSE"
+character_card_label: "Character Card"
+export_card_dialog_title: "Export Character Card"
+chat_manager_label: "Chat History Manager"
+character_edit_conv_method: "Conversation Method"
+character_edit_persona: "Persona"
+character_edit_prompt_preset: "System Prompt Preset"
+character_edit_lorebooks: "Lorebooks"
+character_settings_none: "None"
+character_settings_selected_count: "Selected: {count}"
 
-llm_error_title: "No Local LLM"
-llm_error_body: "Choose Local LLM in the Models Hub."
 
-voice_error_title: "Voice Error"
-voice_error_body: "Assign a character voice before you go on to the call."
-
-sow_system_status_speak: "Speak..."
-sow_system_status_stop: "Start a conversation"
-
-no_gui_error_title: "Incorrect expression type"
-no_gui_error_body: "Select Live2D or VRM to use the non-interface mode."
-
-# Character information menu
+# ──────────────────────────────────────────────────────────
+# CHAT MANAGER (Import/Export)
+# ──────────────────────────────────────────────────────────
 invalid_sowchat_file: "This file is not a valid .sowchat file."
 import_chat_mismatch_title: "Character Mismatch"
 import_chat_mismatch: "This chat was created for {exported_from}, but you're trying to import it into {character_name}. Would you like to proceed anyway?"
@@ -623,17 +1046,483 @@ rename_chat_button: ""
 delete_chat_button: ""
 export_chat_button: ""
 import_chat_button: ""
+btn_duplicate_character: "Duplicate"
 
-# Tooltips
-smart_memory_tooltip: |-
-  <b>💡 Smart Memory Module</b><br><br>
-  This feature enables characters to <b>remember important details</b> from your conversation.<br><br>
-  The system <b>intelligently analyzes</b> your chat history and retrieves only the information that's semantically relevant to your current message.
-  This way, you don't need to worry about context window limitations, while text generation speed remains high and unaffected.<br><br>
 
-  <b>Example:</b><br>
-  If you said: <i>"I don't like cats"</i>, the character will remember this information later, 
-  even if it was mentioned 100 messages ago.
+# ──────────────────────────────────────────────────────────
+# FOLDER MANAGER
+# ──────────────────────────────────────────────────────────
+new_folder_btn:             "New folder"
+folder_create_title:        "New folder"
+folder_create_subtitle:     "Organize your characters into a custom folder"
+folder_name_label:          "Folder name:"
+folder_name_placeholder:    "Enter folder name..."
+folder_select_chars_label:  "Select characters:"
+folder_create_btn:          "Create folder"
+folder_create_btn_with_count: "Create Folder ({group_count})"
+folder_created:             "Folder created!"
+folder_name_empty:          "Folder name cannot be empty"
+folder_name_exists:         "A folder with this name already exists"
+folder_editor_title:        "Edit folder"
+folder_members_label:       "Characters in folder:"
+folder_add_char:            "Add character"
+folder_remove_char:         "Remove selected"
+folder_add_char_title:      "Add character"
+folder_add_char_prompt:     "Select:"
+folder_drag_tip:            "Drag to reorder"
+folder_save_btn:            "Save"
+folder_saved:               "Folder saved!"
+folder_delete_btn:          "Delete folder"
+folder_delete_confirm_title: "Delete folder"
+folder_delete_confirm_msg: "Delete this folder?"
+folder_delete_detail:      "Characters will return to main list."
+folder_characters_label:    "characters"
+folder_edit_btn:            "Edit folder"
+move_to_folder_btn:         "Move to folder"
+remove_from_folder:         "Remove from folder"
+no_folders_title:           "No folders"
+no_folders_prompt:          "No folders yet. Create one?"
+folder_select_hint: "Click to select"
+selected_label: "selected"
+
+
+# ──────────────────────────────────────────────────────────
+# DRAG & DROP OVERLAY
+# ──────────────────────────────────────────────────────────
+drag_and_drop_overlay: "Drag and drop a .png or .json file right here\nto import it into Soul of Waifu"
+
+
+# ──────────────────────────────────────────────────────────
+# IMAGE GENERATION SETTINGS
+# ──────────────────────────────────────────────────────────
+image_gen_editor_title: "Image Generation Settings"
+image_gen_enable: "Enable Image Generation"
+image_gen_grp_connection: "Connection"
+image_gen_provider: "Provider:"
+image_gen_api_url: "API URL (Local only):"
+image_gen_grp_prompts: "Prompt Injection"
+image_gen_prefix: "Prefix Prompt (always added):"
+image_gen_negative: "Negative Prompt:"
+image_gen_grp_dimensions: "Generation Parameters"
+image_gen_width: "Width:"
+image_gen_height: "Height:"
+image_gen_steps: "Steps:"
+image_gen_warning: "⚠ Warning: Running Local LLM + Local Image Gen simultaneously requires high VRAM. You may encounter Out-of-Memory crashes if your GPU lacks capacity."
+image_gen_save: "Save && Close"
+image_gen_subtitle: "LOCAL & CLOUD DIFFUSION"
+image_gen_api_key_placeholder: "Enter API Key here..."
+
+
+# ──────────────────────────────────────────────────────────
+# DISCORD GATEWAY
+# ──────────────────────────────────────────────────────────
+discord_gateway_title: "Discord Gateway"
+discord_info: "Enter your Discord Bot Token to connect your currently active character to Discord. The bot will reply to messages in servers it has access to."
+discord_status_stopped: "Status: Stopped"
+discord_status_running: "Status: Running"
+discord_start_btn: "Start Bot"
+discord_stop_btn: "Stop Bot"
+discord_gateway_header: "DISCORD GATEWAY"
+discord_gateway_subtitle: "BOT INTEGRATION"
+discord_token_label: "BOT TOKEN"
+discord_gateway_status: "Current Status:"
+discord_status_running: "RUNNING"
+discord_status_stopped: "STOPPED"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL MEMORY
+# ──────────────────────────────────────────────────────────
+soul_memory_title: "Soul Memory Archive"
+soul_memory_subtitle: "The Soul Memory Agent analyzes conversations and updates this database in the background. You can manually edit facts here."
+soul_memory_placeholder: "Memory file contents will appear here..."
+soul_memory_tab_db: "Memory Database"
+soul_memory_tab_user: "User Profile"
+soul_memory_tab_diary: "Diary"
+soul_memory_tab_logs: "Self-Healing Logs"
+soul_memory_btn_save: "Save Changes"
+soul_memory_btn_delete: "Delete File"
+soul_memory_btn_refresh: " Refresh"
+soul_memory_btn_open: " Open .soul Folder"
+soul_memory_btn_edit: "Edit"
+soul_memory_btn_preview: "Preview"
+soul_memory_save_success: "Successfully saved"
+soul_memory_save_error: "Save error"
+soul_memory_del_title: "Confirm Deletion"
+soul_memory_del_text: "Are you sure you want to permanently delete this memory file?"
+soul_memory_del_success: "File deleted"
+soul_memory_del_error: "Delete error"
+soul_memory_logs_empty: "Agent log is empty. Chat with the character to trigger memory analysis."
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — LOBBY & SCENE CARDS
+# ──────────────────────────────────────────────────────────
+soul_stage_title: "Soul Stage"
+new_scene: "＋ New Scene"
+search_scenes: "Search scenes..."
+no_scenes: "No scenes yet.\nClick  ＋ New Scene  to start your first story."
+export_scene: "Export"
+import_scene: "Import"
+export_all: "Export All"
+import_file: "Import Scene"
+play: "Play"
+edit: "Edit"
+delete: "Delete"
+new_adventure: "New Adventure"
+no_description: "No description set."
+export_title: "Export Scene"
+import_title: "Import Scene"
+export_success: "Scene exported successfully!"
+import_success: "Scene imported successfully!"
+import_error: "Failed to import scene. Invalid file format."
+select_file: "Select Scene File"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — SCENE EDITOR
+# ──────────────────────────────────────────────────────────
+back: "← Back"
+edit_scene: "Edit Scene"
+save_launch: "Save & Launch  ▶"
+save_changes: "Save Changes"
+section_identity: "I.  SCENE IDENTITY"
+section_world: "II.  WORLD STATE & ENVIRONMENT"
+section_opening: "III.  STORY OPENING"
+section_party: "IV.  PARTY MEMBERS"
+section_engine: "V.  ENGINE SETTINGS"
+title: "Title  *"
+short_description: "Short Description"
+world_context: "World Context / Scenario  *"
+world_context_hint: "Injected into every AI prompt as background truth."
+starting_location: "Starting Location"
+time_of_day: "Time of Day"
+gm_tone: "GM Tone"
+starting_background: "Starting Background"
+starting_background_hint: "The Planner can change this dynamically during the scene."
+starting_ambient: "Starting Ambient"
+starting_ambient_hint: "Background audio for this scene. The Planner can switch it dynamically."
+opening_narration: "Opening Narration  *"
+opening_narration_hint: "The Narrator's first words — places the player in the scene."
+first_message: "First Character Message  (optional)"
+select_characters: "Select characters for this scene"
+no_characters: "No characters found."
+conversation_method: "Conversation Method"
+user_persona: "User Persona"
+user_persona_hint: "Name and avatar shown in the chat for your messages."
+lorebook: "Lorebook  (optional)"
+title_placeholder: "e.g. The Obsidian Citadel"
+desc_placeholder: "Brief summary for the list"
+world_placeholder: "Lore, current tension, rules of magic or physics..."
+location_placeholder: "e.g. The Golden Dragon Tavern"
+opening_placeholder: "The rain hammers cobblestones as you push open the heavy iron door..."
+first_msg_placeholder: "Optional greeting from the first party member."
+morning: "Morning"
+day: "Day"
+evening: "Evening"
+night: "Night"
+epic_fantasy: "Epic Fantasy"
+slice_of_life: "Slice of Life"
+mystery_noir: "Mystery & Noir"
+romance: "Romance"
+horror: "Horror"
+comedy: "Comedy"
+sci_fi: "Sci-Fi"
+narrator_style: "Narrator Style"
+narrator_style_hint: "Directs the specific prose style, author voice, or pacing of the narrator."
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — CHAT & UI
+# ──────────────────────────────────────────────────────────
+narrator: "⬡  NARRATOR"
+party_prefix: "✦"
+interactive_narrative: "Interactive Narrative"
+memory: "⊕ Memory"
+intervene: "⚡ Intervene"
+continue_session: "Continue"
+new_session: "New Session"
+cancel: "Cancel"
+narrator_image_generating: "⬡  GENERATING SCENE IMAGE..."
+narrator_image_done: "⬡  SCENE IMAGE"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — PLOT WISH DIALOG
+# ──────────────────────────────────────────────────────────
+plot_wish_dialog_title: "Continue Plot"
+plot_wish_label: "What should happen next? (Optional hints for AI)"
+plot_wish_placeholder: "e.g. An explosion happens outside, or someone knocks on the door..."
+plot_wish_continue_btn: "Continue Plot"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — SETUP & ERRORS
+# ──────────────────────────────────────────────────────────
+ss_setup_dialog_title: "Soul Stage — Party Setup"
+ss_setup_header: "⬡ Soul Stage"
+ss_setup_sub: "Select characters for the party. <b>{name}</b> is added automatically."
+ss_setup_btn_launch: "⬡ Launch Soul Stage"
+ss_activated_msg: "<i>Soul Stage activated.</i><br><i>Party: {party}</i><br><i>Describe an action — the story begins.</i>"
+ss_deactivated_msg: "<i>Soul Stage finished. Standard mode restored.</i>"
+ss_error: "ERROR"
+error_header: "⚠ ERROR"
+error_generation_header: "⚠ GENERATION ERROR"
+error_generation_failed: "Failed to generate image."
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — SESSION DIALOGS
+# ──────────────────────────────────────────────────────────
+scene_has_entries: "This scene has {} saved entries.\nContinue or start a new session?"
+delete_scene_title: "Delete Scene"
+delete_scene_confirm: "Permanently delete this scene and all its history?"
+delete_scene_detail: '"{title}" · {count} saved messages will be lost'
+open_scene_title: "Soul Stage — Open Scene"
+open_scene_has_history: "This scene has saved history"
+open_scene_continue_desc: "Load {count} saved messages and continue"
+open_scene_new_desc: "Start fresh — history will be cleared"
+memory_select_title: "Soul Memory — Select Character"
+memory_select_query: "Whose memories would you like to view?"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — INVENTORY
+# ──────────────────────────────────────────────────────────
+inventory: "Inventory"
+inventory_full_title: "Inventory — Soul Stage"
+inventory_empty: "Your inventory is empty."
+items_count: "{count} items"
+category_weapons: "Weapons"
+category_consumables: "Consumables"
+category_tools: "Tools"
+category_valuables: "Valuables"
+category_quest_items: "Quest Items"
+category_other: "Other"
+btn_use: "Use"
+btn_drop: "Drop"
+tooltip_drop: "Drop item"
+tooltip_open_inventory: "Open full inventory"
+tooltip_use_item: "Use: {item}"
+more_items: "+{count} more"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — CHOICES BAR
+# ──────────────────────────────────────────────────────────
+choice_hint_none: "CHOOSE YOUR ACTION  —  OR TYPE YOUR OWN"
+choice_hint_encounter: "REACT TO THE THREAT  —  OR TYPE YOUR OWN"
+choice_hint_discovery: "WHAT DO YOU DO?  —  OR TYPE YOUR OWN"
+choice_hint_visitor: "HOW DO YOU RESPOND?  —  OR TYPE YOUR OWN"
+choice_hint_twist: "YOUR MOVE  —  OR TYPE YOUR OWN"
+choice_hint_romance: "CHOOSE YOUR RESPONSE  —  OR TYPE YOUR OWN"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — WORLD STATE WINDOW
+# ──────────────────────────────────────────────────────────
+world_state_title: "World State — Soul Stage"
+tab_scene: "Scene"
+tab_facts: "Key Facts"
+tab_inventory: "Inventory"
+tab_status: "Status"
+tab_npcs: "Active NPCs"
+section_environment: "Environment Setup"
+section_memory: "World Memory"
+section_player_items: "Player Items"
+section_player_conditions: "Player Conditions"
+section_npcs: "Characters in Scene"
+field_location: "Location"
+field_time: "Time of day"
+field_atmosphere: "Atmosphere"
+field_facts_hint: 'Format: "key: value" (one per line)'
+field_inventory_hint: "One item per line"
+field_status_hint: "One condition per line"
+field_status_effects: "Status Effects"
+hint_npc_readonly: "NPCs currently spawned by the engine (read-only)"
+no_active_npcs: "No active NPCs in this scene"
+btn_apply_changes: "Apply Changes"
+unknown: "Unknown"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — TOOLTIPS & BUTTONS
+# ──────────────────────────────────────────────────────────
+tooltip_soul_memory: "Soul Memory"
+tooltip_world_state: "World State"
+tooltip_continue_plot: "Continue Plot"
+tooltip_intervene: "Intervene (stop AI turn)"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — EVENT CARDS
+# ──────────────────────────────────────────────────────────
+event_encounter: "ENCOUNTER"
+event_discovery: "DISCOVERY"
+event_visitor: "VISITOR"
+event_twist: "PLOT TWIST"
+event_moment: "MOMENT"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — NARRATOR MODE (Legacy)
+# ──────────────────────────────────────────────────────────
+soul_stage_mode_title: "Soul Stage: Narrative Orchestration"
+soul_stage_narrator_name: "Narrator"
+soul_stage_active_actors: "Active on Stage"
+soul_stage_backstage: "Backstage / Roster"
+soul_stage_btn_interrupt: "Interrupt / Step In"
+soul_stage_btn_spawn: "Summon NPC"
+soul_stage_wait_user: "Waiting for player action..."
+soul_stage_log_spawn: "Narrator summoned a new NPC: "
+soul_stage_log_remove: "Character left the stage: "
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — NOTIFICATIONS & ERRORS
+# ──────────────────────────────────────────────────────────
+llm_error_title: "No Local LLM"
+llm_error_body: "Choose Local LLM in the Models Hub."
+voice_error_title: "Voice Error"
+voice_error_body: "Assign a character voice before you go on to the call."
+sow_system_status_speak: "Speak..."
+sow_system_status_stop: "Start a conversation"
+no_gui_error_title: "Incorrect expression type"
+no_gui_error_body: "Select Live2D or VRM to use the non-interface mode."
+persona_error_title: "Change persona"
+persona_error_body: "A non-existent person has been selected, please change it."
+add_character_text_1: "was successfully added!"
+add_character_text_2: "You can now interact with the character in your character list."
+add_character_text_3: "There was an error while adding the character."
+add_character_text_4: "Please try again."
+add_character_error: "Set a name and the first message for your character."
+add_character_title_error: "Error adding a character"
+delete_message_1: "Delete Character"
+delete_message_2: "Are you sure you want to delete "
+welcome_message: "Welcome to Soul of Waifu, "
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — MODEL LOADING
+# ──────────────────────────────────────────────────────────
+model_loading_step_1: "ENGINE INIT..."
+model_loading_step_2: "VERIFYING GGUF..."
+model_loading_step_3: "LOADING TENSORS..."
+model_loading_step_4: "ALLOCATING CONTEXT..."
+model_loading_step_5: "FINALIZING..."
+model_loading_step_6: "MODEL ONLINE"
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — UPDATE & LANGUAGE
+# ──────────────────────────────────────────────────────────
+update_available_title: "Update Available"
+update_available_body: "A new version is available: "
+update_available_info: "Would you like to update the program?"
+update_current_version: "Current version: v2.4.0"
+update_available_close: "Close"
+update_available_link: "Go to GitHub"
+language_changed_title: "Restart Required"
+language_changed_body: "The program needs to be restarted for the changes to take effect."
+language_changed_question: "Would you like to restart the program now?"
+language_changed_yes: "Yes"
+language_changed_no: "No"
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — ABOUT & MISC
+# ──────────────────────────────────────────────────────────
+about_program: "About Soul of Waifu"
+about_program_title: "About Soul of Waifu"
+about_program_description: "<b>Soul of Waifu</b> is an advanced AI-powered role-playing game platform. Build unique characters from scratch, or instantly drag-and-drop standard V2 character cards. Run models with complete privacy on your own hardware via GGUF (optimized for CPU, CUDA, Vulkan, AMD HIP, and Intel SYCL) or connect seamlessly to leading cloud APIs, including OpenAI, Anthropic, DeepSeek, and Google Gemini.<br><br>Our proprietary cognitive architecture reshapes the boundaries of AI interaction. With <b>Soul Memory</b>, characters form genuine, self-healing long-term memories and private diary entries, moving far beyond static database lookups (RAG). Engage in fluid, real-time conversations featuring reactive Live2D and VRM avatars, synced with ultra-low-latency streaming audio powered by multiple Text-to-Speech engines.<br><br>Shape your journey across multiple modes: guide rich, tabletop-style RPGs in <b>Soul Stage</b> under the control of an AI Game Master, or host a <b>Soul Companion</b> overlay on your desktop. Driven by a dynamic neurohormonal system, the Companion proactively reacts to your active workspace, reads your clipboard, searches the web, and integrates custom MCP tools. Chat your way—directly on your desktop, via Discord, or from your phone using the built-in local web client!"
+support_btn: "Support"
+creator_label: "Developed by"
+simple_version_label: "Version"
+version_label: "Soul of Waifu v2.4.0"
+nsfw_checkbox: "NSFW"
+value: "Value: "
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — TOAST NOTIFICATIONS
+# ──────────────────────────────────────────────────────────
+duplicate_title: "Character Duplicated"
+character_edit_title: "Character Settings"
+add_character_error_title: "Creation Error"
+duplicate_character_error_title: "Duplicate Name"
+system_error_title: "System Error"
+new_chat_toast_title: "Chat System"
+toast_folder_title: "Folder Management"
+toast_folder_error_title: "Folder Error"
+soul_memory_no_chat: "Please open a chat with a character first."
+soul_memory_empty: "Chat history is empty."
+soul_memory_manual_start: "Manual memory update started..."
+toast_voice_settings_title: "Voice Settings"
+toast_search_title: "Voice Search"
+toast_connection_error_title: "Connection Error"
+toast_visual_settings_title: "Visual Settings"
+toast_llm_error_title: "Configuration Error"
+toast_translate_error_title: "Translator Error"
+toast_image_gen_title: "Image Generation"
+toast_image_gen_prompt_error: "Failed to generate image prompt."
+toast_image_gen_creating: "Generating image..."
+toast_image_gen_failed: "Image generation failed."
+toast_message_editor_title: "Message Editor"
+toast_character_editor_title: "Character Editor"
+toast_call_system_title: "Call System"
+toast_profile_error_title: "Profile Error"
+toast_companion_error_title: "Companion Error"
+toast_persona_exist: "Persona with this name already exists"
+toast_success: "Success"
+toast_saved_successfully: "Saved successfully"
+
+# ──────────────────────────────────────────────────────────
+# TOOLTIPS — MODULES & FEATURES
+# ──────────────────────────────────────────────────────────
+soul_memory_tooltip: |-
+  <b>🧠 Soul Memory</b><br><br>
+  Transform your character from a simple AI into a living digital entity with a <b>continuous, lifelong memory</b>. This is the cognitive core of the Soul of Waifu Ecosystem.<br><br>
+  Instead of relying on flawed raw-text search, Soul Memory uses an advanced <b>multi-agent architecture</b>:<br>
+  • <b>Dual-Core Indexing:</b> Separates the character's psychology (<i>MEMORY.md</i>) from your user profile and relationship metadata (<i>USER.md</i>). This prevents role confusion and optimizes prompt caching.<br>
+  • <b>Archivist & Diary:</b> Background agents autonomously compile dense episodic lore topics and write intimate, <i>first-person emotional diaries</i> about your interactions.<br>
+  • <b>Self-Healing & Decay:</b> Automatically detects and resolves logical inconsistencies in memory over time while managing natural emotional transitions.<br><br>
+  The result? Zero context bloat and absolute personality consistency. Whether you are in a Soul Stage adventure or relaxing with your Soul Companion, <b>they will remember everything</b>.
+
+sm_mode_full: "Full Synchronization"
+sm_mode_soul_link: "Soul Link"
+sm_mode_mind_spark: "Mind Spark"
+sm_mode_reflection_flow: "Reflection Flow"
+
+sm_mode_full_tooltip: |-
+  <b>🌌 Full Synchronization</b><br><br>
+  Complete cognitive link. Every aspect of the character is active:<br><br>
+  • <b>Psychological Index:</b> Real-time mood tracking.<br>
+  • <b>Lore Topics:</b> Deep world-building and facts.<br>
+  • <b>Diary:</b> First-person emotional reflections.<br><br>
+  <i>The ultimate experience. Requires a powerful system or API.</i>
+
+sm_mode_soul_link_tooltip: |-
+  <b>🔗 Soul Link</b><br><br>
+  Focuses on personality and emotions.<br><br>
+  • Updates the <b>MEMORY.md</b> index to keep the character's mood and goals consistent.<br>
+  • The <b>Diary Agent</b> records their private feelings about you.<br><br>
+  <b>What is skipped:</b> The system does not create or update Lore Topics.<br><br>
+  <i>Best for: Maintaining a deep bond without heavy CPU/GPU load.</i>
+
+sm_mode_mind_spark_tooltip: |-
+  <b>⚡ Mind Spark</b><br><br>
+  Tactical memory for maximum performance.<br><br>
+  • Updates <b>ONLY</b> the <b>MEMORY.md</b> index.<br><br>
+  Ensures the character remembers who they are, how they feel, and what they want right now.<br><br>
+  <b>What is skipped:</b> No diaries or lore files are generated.<br><br>
+  <i>Best for: Slow systems or fast-paced roleplay where only logic matters.</i>
+
+sm_mode_reflection_flow_tooltip: |-
+  <b>📓 Reflection Flow</b><br><br>
+  Emotional logging with zero impact on chat logic.<br><br>
+  • Only the <b>Diary Agent</b> is active.<br><br>
+  The character won't update their "internal state" in the index, but will still write emotional entries in their daily diary.<br><br>
+  <b>What is skipped:</b> No psychological index or lore updates.<br><br>
+  <i>Best for: Maximum speed while keeping a history of the character's feelings.</i>
 
 ambient_sound_tooltip: |-
   <b>🎵 Ambient Sound Module</b><br><br>
@@ -652,86 +1541,7 @@ sow_system_tooltip: |-
   You can:<br>
   • Assign avatars to characters — static or gif images, animated Live2D models or volumetric VRM models;<br>
   • Call characters — communicate through a microphone in a special interface made specifically for this mode;<br>
-  • Connect additional modules: smart memory, ambient, translator and many others.
-
-gpu_layers_tooltip: |-
-  <b>GPU Layer Offloading</b><br><br>
-  This setting lets you <b>control how much of LLM</b> runs directly on your GPU, balancing <b>speed</b> and <b>video memory usage</b>.<br><br>
-  The more layers loaded into VRAM, the faster the model responds — but the higher the GPU memory demand.<br>
-  You can manually adjust how many layers are offloaded, making it possible to run large models even on mid-range or entry-level GPUs.<br><br>
-
-  <b>Example:</b><br>
-  If you have a <i>GPU with 8GB VRAM</i>, you can offload 20 out of 32 layers — 
-  enough for smooth performance without overloading your system.<br><br>
-
-  💡 <i>Especially useful for large models (13B and above). The stronger your GPU, the more layers you can assign.</i>
-
-context_size_tooltip: |-
-  <b>Context Window</b><br><br>
-  This is the <b>memory capacity</b> the language model uses when generating a response. 
-  It includes your chat history, author's notes, character information, and entries from your lorebooks.<br><br>
-  A larger context window means the character can <b>remember more of the conversation</b>, 
-  but it increases memory usage and may slow down response speed.<br><br>
-
-  💡 <i>Recommended to reduce on weaker PCs. 
-  Maximum value depends on the model and available memory. 
-  But using the Smart Memory module, you can optimize work with the chat context.</i>
-
-mlock_tooltip: |-
-  <b>MLock (Memory Lock)</b><br><br>
-  This feature <b>prevents the language model</b> from being unloaded from RAM, even when the system tries to free up memory.<br><br>
-  When enabled, the model stays fully loaded in memory, ensuring the <b>fastest possible response time</b> for every new message.<br><br>
-  However, it increases overall RAM usage, and memory is only freed when you fully close the application or just disable the model.
-
-flashattention_tooltip: |-
-  <b>Flash Attention</b><br><br>
-  This technology <b>speeds up the language model</b> and <b>reduces VRAM usage</b> when processing long conversations.<br><br>
-  It optimizes internal computations, making text generation <b>faster and more efficient</b>, especially with large context windows (4K, 8K and above).<br><br>
-
-  <b>Important:</b><br>
-  This feature works <b>only with NVIDIA GPUs</b> (via CUDA technology).<br>
-  It is <b>automatically disabled</b> on AMD, Intel graphics, or when running on CPU.<br><br>
-
-  💡 <i>Works best with features like Smart Memory or long chat histories. 
-  If you have an NVIDIA GPU, enable it for maximum performance.</i>
-
-temperature_tooltip: |-
-  <b>Model Temperature</b><br><br>
-  This setting controls how <b>creative or predictable</b> the character responses will be.<br><br>
-  • <b>Low (0.1–0.5)</b> — precise, logical, textbook-style answers.<br>
-  • <b>Medium (0.6–0.8)</b> — balanced mix of sense and spontaneity.<br>
-  • <b>High (0.9–1.5)</b> — surprising, emotional, witty, or sarcastic replies.<br><br>
-
-  💡 <i>Recommended: 0.7–0.9 for natural conversation. Lower it if the character starts "making things up".</i>
-
-top_p_tooltip: |-
-  <b>Top P (Response Flexibility)</b><br><br>
-  This setting controls <b>how broadly the model chooses words</b> when generating a response.<br><br>
-  Model "thinking" about the next word. Top P decides <b>how many options it considers</b>:<br>
-  • <b>Low (0.1–0.5)</b> — picks only the most obvious words. Responses are predictable, but can feel flat.<br>
-  • <b>Medium (0.7–0.9)</b> — balanced between sense and natural flow. Great for conversations.<br>
-  • <b>High (0.95–1.0)</b> — includes rare or surprising words. Speech feels alive, but may get weird.<br><br>
-
-  💡 <i>Recommended: 0.8–0.95. Combine with temperature.</i>
-
-repeat_penalty_tooltip: |-
-  <b>Repeat Penalty</b><br><br>
-  This setting helps the character <b>avoid repeating the same words, phrases, or ideas</b> over and over.<br><br>
-  The higher the value, the more the model <b>penalizes itself for repeating</b> what's already been said.<br>
-  This makes responses more varied and natural, especially in longer answers.<br><br>
-
-  <b>Example:</b><br>
-  Without penalty, the character might say:<br>
-  <i>"It's important, it's important, it's important..."</i><br>
-  With high penalty:<br>
-  <i>"It's important—not just because survival is at stake, but because we've already lost too much."</i>
-
-max_tokens_tooltip: |-
-  <b>Max Response Length</b><br><br>
-  This setting controls <b>how long the character reply can be</b>.<br><br>
-  
-  💡 <i>Very long responses eat up context space. 
-  Recommended: 200–400 tokens for answers. Only increase when deeper answers are needed.</i>
+  • Connect additional modules: soul memory, ambient, translator and many others.
 
 personas_button_tooltip: "<b>Opens personas editor</b><br><br>Allows you to create, edit, select and delete personas - information about the user who will communicate with the characters."
 
@@ -766,3 +1576,178 @@ lorebook_editor_button_tooltip: |-
   • <i>Text:</i> "Soul of Waifu is a program that allows you to communicate with AI."<br>
   • <i>Keywords:</i> Soul of Waifu, AI<br>
   When you say: <i>"What is Soul of Waifu?"</i>, the character will remember and respond with information about this entry.
+
+
+# ──────────────────────────────────────────────────────────
+# TOOLTIPS — LLM PARAMETERS
+# ──────────────────────────────────────────────────────────
+gpu_layers_tooltip: |-
+  <b>GPU Layer Offloading</b><br><br>
+  This setting lets you <b>control how much of the LLM</b> runs directly on your GPU, balancing <b>speed</b> and <b>video memory usage</b>.<br><br>
+  The more layers loaded into VRAM, the faster the model responds — but the higher the GPU memory demand.<br>
+  You can manually adjust how many layers are offloaded, making it possible to run large models even on mid-range GPUs.<br><br>
+  💡 <i>Especially useful for large models. The stronger your GPU, the more layers you can assign.</i>
+
+context_size_tooltip: |-
+  <b>Context Window</b><br><br>
+  This is the <b>memory capacity</b> the language model uses when generating a response. Choose Max Index for Unlimited (API).
+  It includes your chat history, author's notes, and lorebook entries.<br><br>
+  A larger context window means the character can <b>remember more</b>, but it drastically increases VRAM usage.<br><br>
+  💡 <i>Reduce this on weaker PCs. For long-term memory, keep the 'Soul Memory' module enabled instead of maxing this out.</i>
+
+mlock_tooltip: |-
+  <b>MLock (Memory Lock)</b><br><br>
+  This feature <b>prevents the language model from being unloaded</b> from RAM into the swap file.<br><br>
+  When enabled, the model stays fully loaded, ensuring the <b>fastest possible response time</b> without micro-stutters.
+
+flashattention_tooltip: |-
+  <b>Flash Attention</b><br><br>
+  This technology <b>speeds up the AI</b> and <b>reduces VRAM usage</b> when processing long conversations.<br><br>
+  It optimizes computations, making text generation highly efficient with large context windows.<br><br>
+  💡 <i>Highly recommended to keep enabled for maximum performance.</i>
+
+max_tokens_tooltip: |-
+  <b>Max Response Length</b><br><br>
+  Controls <b>how long the character's reply can be</b>.<br><br>
+  💡 <i>Very long responses eat up context space. Recommended: 300–500 tokens.</i>
+
+chat_template_tooltip: |-
+  <b>Chat Template</b><br><br>
+  Determines how the system formats your conversation before sending it to the AI. Different models are trained on specific formats.<br><br>
+  If the wrong template is used, the AI might hallucinate or output weird symbols (like <code>&lt;|im_end|&gt;</code>).<br><br>
+  💡 <i>'Auto' reads the template directly from the GGUF file. If the model acts weirdly, try forcing a specific template like 'ChatML' or 'Llama-3'.</i>
+
+stop_strings_tooltip: |-
+  <b>Stop Strings</b><br><br>
+  A list of words or symbols that force the AI to <b>instantly stop generating text</b>.<br><br>
+  This is a crucial tool to prevent the AI from speaking or acting on your behalf (e.g., generating <code>\nUser:</code> and answering for you).<br><br>
+  💡 <i>Separate with commas. Example: <code>\nUser:, &lt;/s&gt;, &lt;|eot_id|&gt;</code></i>
+
+reasoning_mode_tooltip: |-
+  <b>Thinking / Reasoning Mode</b><br><br>
+  Designed for advanced models like <i>DeepSeek-R1</i> or <i>QwQ</i> that generate internal thoughts before answering.<br><br>
+  When enabled, the UI intercepts <code>&lt;think&gt;</code> tags. It hides the AI's raw thought process behind a stylish visual block and <b>prevents the Voice (TTS) from reading the thoughts aloud</b>.<br><br>
+  💡 <i>Keep disabled for standard models (like Llama-3 or Mistral).</i>
+
+temperature_tooltip: |-
+  <b>Temperature (Creativity)</b><br><br>
+  Controls the basic randomness of the AI's responses.<br><br>
+  • <b>Low (0.1–0.5):</b> Logical and predictable. Boring for roleplay.<br>
+  • <b>High (0.8–1.5):</b> Highly creative, expressive, and unpredictable.<br><br>
+  💡 <i>Recommended: 0.8–1.0. For higher values, be sure to use <b>Min-P</b> to cut off nonsensical words.</i>
+
+freq_penalty_tooltip: |-
+  <b>Frequency Penalty</b><br><br>
+  Penalizes words based on <b>how many times they have already appeared</b> in the text.<br><br>
+  This forces the AI to use a richer vocabulary and search for synonyms rather than repeating the same adjectives.<br><br>
+  💡 <i>Too high values will break grammar. Recommended: 0.0 - 0.5.</i>
+
+pres_penalty_tooltip: |-
+  <b>Presence Penalty</b><br><br>
+  Applies a flat penalty to a word if it has appeared <b>at least once</b>.<br><br>
+  Unlike Frequency Penalty, this encourages the AI to <b>change the subject</b> and introduce new concepts, preventing the conversation from getting stuck in a loop.<br><br>
+  💡 <i>High values make the AI jump between topics erratically. Recommended: 0.0 - 0.4.</i>
+
+min_p_tooltip: |-
+  <b>Min-P (Smart Cutoff)</b><br><br>
+  The new gold standard for Roleplay. It cuts off garbage words dynamically based on the probability of the best possible word.<br><br>
+  If the AI is confident, it ruthlessly cuts out nonsense. If it needs to be creative, it lowers the barrier to let good synonyms in.<br><br>
+  💡 <i>Replaces Top-P. Set Top-P to 1.0 and use Min-P at <b>0.05 - 0.10</b> for perfect logic with high Temperature.</i>
+
+top_p_tooltip: |-
+  <b>Top-P</b><br><br>
+  An older sampling method that limits word choices to a cumulative percentage.<br><br>
+  💡 <i>If you are using <b>Min-P</b>, it is highly recommended to disable Top-P by setting it to <b>1.0</b>.</i>
+
+dyn_temp_min_tooltip: |-
+  <b>Dynamic Temperature (Min/Max)</b><br><br>
+  Instead of a fixed value, the Temperature shifts dynamically between the Min and Max bounds based on the AI's confidence.<br><br>
+  When stating facts, the temperature drops to remain logical. When describing emotions, it spikes to become creative.
+
+dyn_temp_max_tooltip: |-
+  <b>Dynamic Temperature (Min/Max)</b><br><br>
+  Instead of a fixed value, the Temperature shifts dynamically between the Min and Max bounds based on the AI's confidence.<br><br>
+  When stating facts, the temperature drops to remain logical. When describing emotions, it spikes to become creative.
+
+xtc_prob_tooltip: |-
+  <b>XTC (Exclude Top Choices)</b><br><br>
+  A revolutionary feature for roleplayers. It forcibly <b>removes the most obvious, cliché words</b> from the AI's choices.<br><br>
+  Sick of the AI saying <i>"shivers sent down my spine"</i> or <i>"predatory smirk"</i>? XTC forces the model to find unique, literary alternatives, making the speech incredibly lifelike.<br><br>
+  💡 <i><b>Probability:</b> The chance XTC triggers (Try 0.3 - 0.5).</i>
+
+xtc_thresh_tooltip: |-
+  <b>XTC Threshold</b><br><br>
+  Determines how "popular" a word must be before XTC is allowed to remove it.<br><br>
+  💡 <i>Recommended: 0.1 (Only words with >10% probability can be removed).</i>
+
+dry_mult_tooltip: |-
+  <b>DRY (Don't Repeat Yourself)</b><br><br>
+  Unlike older penalties that target single words, DRY recognizes and penalizes <b>entire repeating sequences and sentence structures</b>.<br><br>
+  If your Waifu keeps starting every message with <i>"I sigh and look at you"</i>, DRY will catch this pattern and force her to act differently.<br><br>
+  💡 <i><b>Multiplier:</b> Penalty strength (Try 0.8).</i>
+
+dry_base_tooltip: |-
+  <b>DRY Base</b><br><br>
+  The scaling factor for the DRY algorithm. Determines how aggressively the penalty scales with sequence length.<br><br>
+  💡 <i>Recommended: 1.75</i>
+
+dry_length_tooltip: |-
+  <b>DRY Allowed Length</b><br><br>
+  The number of tokens allowed to repeat before the DRY penalty activates.<br><br>
+  💡 <i>Recommended: 2 (Prevents penalizing common two-word phrases like "I am").</i>
+
+kv_cache_tooltip: "Quantize Context Cache to save massive amounts of VRAM on long contexts."
+
+batch_size_tooltip: |-
+  Tokens processed at once during prompt evaluation.<br><br>
+  512 is safe. Higher = faster load, more VRAM.
+
+cpu_threads_tooltip: |-
+  0 = Auto.<br><br>
+  Set to your physical CPU core count for optimal inference speed on CPU.
+
+cpu_moe_layers_tooltip: "0 = Disabled. How many Mixture of Experts (MoE) layers to keep in CPU RAM. Essential for huge MoE models."
+
+# ──────────────────────────────────────────────────────────
+# SOUL COMPANION CONTEXT MENU
+# ──────────────────────────────────────────────────────────
+sc_menu_quick_actions: "⚡  Quick Actions"
+sc_menu_vision: "📸  Look at my Screen (Vision)"
+sc_menu_clipboard: "📋  Read Clipboard (Analyze)"
+sc_menu_mind: "🧠  What is on your Mind?"
+sc_menu_mic_on: "Turn on the microphone"
+sc_menu_mic_off: "Turn off the microphone"
+sc_menu_pet: "🤚  Pet"
+sc_menu_play_animation: "🎭  Play Animation"
+sc_menu_motions: "motions"
+sc_menu_click_through_on: "👁‍🗨  Click-Through: ON"
+sc_menu_click_through_off: "👁‍🗨  Click-Through: OFF"
+sc_menu_aot_on: "📌  Always on Top: ON"
+sc_menu_aot_off: "📌  Always on Top: OFF"
+sc_menu_eye_on: "👁  Eye Tracking: ON"
+sc_menu_eye_off: "👁  Eye Tracking: OFF"
+sc_menu_react_on: "💬  Window Reactions: ON"
+sc_menu_react_off: "💬  Window Reactions: OFF"
+sc_menu_sub_on: "📝  Subtitles: ON"
+sc_menu_sub_off: "📝  Subtitles: OFF"
+sc_menu_settings: "⚙️  Companion Settings"
+sc_menu_proactive: "🗓  Proactive Interval"
+sc_menu_sleep: "😴  Sleep After"
+sc_menu_speed: "👁  Tracking Speed"
+sc_menu_speed_slow: "Slow"
+sc_menu_speed_normal: "Normal"
+sc_menu_speed_fast: "Fast"
+sc_menu_size: "📐  Model Size"
+sc_menu_size_small: "Small  (200 × 300)"
+sc_menu_size_medium: "Medium (400 × 600)"
+sc_menu_size_large: "Large  (600 × 900)"
+sc_menu_hud: "📊  Show Hormones HUD"
+sc_menu_center: "📍  Center on Screen"
+sc_menu_reset: "🔄  Reset Size"
+sc_menu_hide: "❌  Hide Companion"
+sc_menu_min_3: "3 minutes"
+sc_menu_min_5: "5 minutes"
+sc_menu_min_10: "10 minutes"
+sc_menu_min_15: "15 minutes"
+sc_menu_min_30: "30 minutes"
+sc_menu_min_60: "60 minutes"
