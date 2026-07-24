@@ -1,8 +1,10 @@
 import os
+import requests
 import logging
 import urllib.request
 import ssl
 import json
+import time
 
 from datetime import datetime, timedelta
 
@@ -13,6 +15,8 @@ from PyQt6.QtWidgets import (
     QListWidget, QLabel, QDialog, 
     QVBoxLayout as QVBox, QListWidgetItem
 )
+
+from app.gui.custom_widgets import sow_toast, SowConfirmDialog
 
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 from huggingface_hub import HfApi, hf_hub_download
@@ -259,11 +263,13 @@ class RecommendedModelItemWidget(QWidget):
         self.show_model_info_method = show_model_info_method
         self.is_compatible = is_compatible
 
+        self.setFixedHeight(85)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 5, 0, 5)
+        main_layout.setContentsMargins(5, 2, 5, 2) 
+        main_layout.setSpacing(0)
 
         self.glass_card = QtWidgets.QFrame(self)
         self.glass_style_normal = """
@@ -289,7 +295,7 @@ class RecommendedModelItemWidget(QWidget):
         self.glass_card.setGraphicsEffect(shadow)
 
         card_layout = QHBoxLayout(self.glass_card)
-        card_layout.setContentsMargins(20, 15, 20, 15)
+        card_layout.setContentsMargins(12, 10, 12, 10) 
         card_layout.setSpacing(15)
 
         info_layout = QVBoxLayout()
@@ -387,34 +393,23 @@ class RecommendedModelItemWidget(QWidget):
         self.btn_download.setIcon(icon_download)
         self.btn_download.setFixedSize(150, 36)
 
-        if not is_compatible and "❌" in compatibility_text:
-            self.btn_download.setEnabled(False)
-            self.btn_download.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(255, 255, 255, 0.02);
-                    color: rgba(255, 255, 255, 0.2);
-                    border: 1px solid rgba(255, 255, 255, 0.05);
-                    border-radius: 8px;
-                }
-            """)
-        else:
-            self.btn_download.setStyleSheet("""
-                QPushButton {
-                    background-color: rgba(33, 150, 243, 0.15);
-                    color: #64B5F6;
-                    border: 1px solid rgba(33, 150, 243, 0.3);
-                    border-radius: 8px;
-                    padding: 0px 15px;
-                }
-                QPushButton:hover {
-                    background-color: rgba(33, 150, 243, 0.35);
-                    border: 1px solid rgba(33, 150, 243, 0.6);
-                    color: #ffffff;
-                }
-                QPushButton:pressed {
-                    background-color: rgba(33, 150, 243, 0.1);
-                }
-            """)
+        self.btn_download.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(33, 150, 243, 0.15);
+                color: #64B5F6;
+                border: 1px solid rgba(33, 150, 243, 0.3);
+                border-radius: 8px;
+                padding: 0px 15px;
+            }
+            QPushButton:hover {
+                background-color: rgba(33, 150, 243, 0.35);
+                border: 1px solid rgba(33, 150, 243, 0.6);
+                color: #ffffff;
+            }
+            QPushButton:pressed {
+                background-color: rgba(33, 150, 243, 0.1);
+            }
+        """)
 
         try:
             self.btn_download.clicked.disconnect()
@@ -498,11 +493,13 @@ class ModelItemWidget(QWidget):
         self.model_id = model_id
         self.show_model_info_method = show_model_info_method
 
+        self.setFixedHeight(85)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 5, 0, 5)
+        main_layout.setContentsMargins(5, 2, 5, 2) 
+        main_layout.setSpacing(0)
 
         self.glass_card = QtWidgets.QFrame(self)
         self.glass_style_normal = """
@@ -528,7 +525,7 @@ class ModelItemWidget(QWidget):
         self.glass_card.setGraphicsEffect(shadow)
 
         card_layout = QHBoxLayout(self.glass_card)
-        card_layout.setContentsMargins(20, 15, 20, 15)
+        card_layout.setContentsMargins(12, 10, 12, 10) 
         card_layout.setSpacing(15)
 
         info_layout = QVBoxLayout()
@@ -727,88 +724,85 @@ class ModelRepoFiles(QThread):
             self.error.emit(str(e))
 
 class FileSelectorDialog(QDialog):
-    def __init__(self, files_with_size, download_button_translation, model_id):
+    def __init__(self, files_with_size, translations, model_id):
         super().__init__()
-        self.setWindowTitle("File Selector")
+        self.translations = translations if translations else {}
+        self.setWindowTitle(self.translations.get("download_model_title", "Download Model"))
+        
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("app/gui/icons/logotype.ico"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
         self.setWindowIcon(icon)
-        self.setMinimumSize(1000, 580)
+        self.setMinimumSize(950, 650)
         self.selected_file = None
+        self.active_downloaders = [] 
         
         self.setStyleSheet("""
             QDialog {
-                background-color: #1e1e24;
-                color: #e0e0e0;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #0F0F13, stop:1 #1A1A24);
+                color: #E2E8F0;
+                font-family: 'Segoe UI Variable', 'Segoe UI', 'Inter', sans-serif;
             }
         """)
 
-        layout = QVBoxLayout()
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+        
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(5)
+        
+        title_label = QLabel(self.translations.get("select_quant_title", "Select Quantization Level"))
+        font_title = QtGui.QFont("Inter Tight SemiBold", 16, QtGui.QFont.Weight.Bold)
+        font_title.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        title_label.setFont(font_title)
+        title_label.setStyleSheet("color: #FFFFFF;")
+        
+        avail_text = self.translations.get("available_files_text", "Available files for repository:")
+        rec_text = self.translations.get("quant_recommendation_text", "We recommend downloading files with 'Q4_K_M' or 'Q5_K_M' for the best balance of speed and quality.")
+        
+        subtitle_label = QLabel(f"{avail_text} <span style='color: #60A5FA;'>{model_id}</span><br>"
+                                f"<span style='color: #64748B;'>{rec_text}</span>")
+        
+        font_sub = QtGui.QFont("Inter Tight Medium", 10)
+        font_sub.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        subtitle_label.setFont(font_sub)
+        subtitle_label.setTextFormat(Qt.TextFormat.RichText)
+        
+        header_layout.addWidget(title_label)
+        header_layout.addWidget(subtitle_label)
+        layout.addLayout(header_layout)
         
         self.file_list = QListWidget()
         self.file_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.file_list.setSpacing(12)
         self.file_list.setStyleSheet("""
-            QListWidget {
-                background: transparent;
-                outline: 0px;
-                border: none;
-            }
-            QListWidget::item {
-                background: transparent;
-                border: none;
-                padding: 5px 10px;
-            }
-            QListWidget::item:selected {
-                background: transparent;
-                border: none;
-            }
-            QListWidget::item:hover {
-                background: transparent;
-            }
-            QScrollBar:vertical {
-                background: transparent;
-                width: 6px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(255, 255, 255, 0.15);
-                border-radius: 3px;
-                min-height: 30px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: rgba(255, 255, 255, 0.25);
-            }
-            QScrollBar::handle:vertical:pressed {
-                background: rgba(255, 255, 255, 0.15);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
+            QListWidget { background: transparent; outline: 0px; border: none; }
+            QListWidget::item { background: transparent; border: none; }
+            QScrollBar:vertical { background: transparent; width: 8px; margin: 0px; }
+            QScrollBar::handle:vertical { background: rgba(255, 255, 255, 0.15); border-radius: 4px; min-height: 40px; }
+            QScrollBar::handle:vertical:hover { background: rgba(255, 255, 255, 0.3); }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
         """)
         
         for filename, size_bytes in files_with_size:
             size_str = self.human_readable_size(size_bytes)
-            item = QListWidgetItem()
             widget = FileSelectorItemWidget(
                 parent=self.file_list, 
                 filename=filename, 
                 model_size=size_str, 
-                download_button_translation=download_button_translation, 
+                translations=self.translations, 
                 model_id=model_id
             )
-            item.setSizeHint(widget.sizeHint())
+            item = QListWidgetItem()
+            item.setSizeHint(QtCore.QSize(0, 100))
             item.setData(Qt.ItemDataRole.UserRole, filename)
+            
             self.file_list.addItem(item)
             self.file_list.setItemWidget(item, widget)
 
         self.file_list.itemDoubleClicked.connect(self.accept_selection)
         layout.addWidget(self.file_list)
-
-        self.setLayout(layout)
 
     def accept_selection(self):
         selected_items = self.file_list.selectedItems()
@@ -823,220 +817,368 @@ class FileSelectorDialog(QDialog):
             size_bytes /= 1024
         return f"{size_bytes:.2f} TB"
 
-class FileSelectorItemWidget(QWidget):
-    def __init__(self, parent=None, filename="Unknown", model_size=0, download_button_translation=" Download", model_id="None"):
+    def closeEvent(self, event):
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            widget = self.file_list.itemWidget(item)
+            if isinstance(widget, FileSelectorItemWidget):
+                if hasattr(widget, 'downloader_thread') and widget.downloader_thread and widget.downloader_thread.isRunning():
+                    widget.downloader_thread.cancel()
+                    widget.downloader_thread.wait(2000)
+        super().closeEvent(event)
+
+
+class FileSelectorItemWidget(QtWidgets.QFrame):
+    def __init__(self, parent=None, filename="Unknown", model_size="0 MB", translations=None, model_id="None"):
         super().__init__(parent)
         self.model_id = model_id
         self.filename = filename
+        self.translations = translations if translations else {}
+        self.downloader_thread = None
 
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setStyleSheet("background: transparent;")
-
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 5, 0, 5)
-
-        self.glass_card = QtWidgets.QFrame(self)
-        self.glass_style_normal = """
-            QFrame {
-                background-color: rgba(25, 25, 30, 0.4);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 16px;
+        self.setObjectName("ModelCard")
+        
+        self.style_normal = """
+            QFrame#ModelCard {
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-radius: 12px;
             }
         """
-        self.glass_style_hover = """
-            QFrame {
-                background-color: rgba(35, 35, 45, 0.65);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 16px;
+        self.style_hover = """
+            QFrame#ModelCard {
+                background-color: rgba(96, 165, 250, 0.08);
+                border: 1px solid rgba(96, 165, 250, 0.3);
+                border-radius: 12px;
             }
         """
-        self.glass_card.setStyleSheet(self.glass_style_normal)
+        self.setStyleSheet(self.style_normal)
 
         shadow = QtWidgets.QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(25)
-        shadow.setColor(QtGui.QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 5)
-        self.glass_card.setGraphicsEffect(shadow)
+        shadow.setBlurRadius(15)
+        shadow.setColor(QtGui.QColor(0, 0, 0, 60))
+        shadow.setOffset(0, 4)
+        self.setGraphicsEffect(shadow)
 
-        card_layout = QHBoxLayout(self.glass_card)
-        card_layout.setContentsMargins(20, 15, 20, 15)
-        card_layout.setSpacing(15)
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(20, 15, 20, 15)
+        main_layout.setSpacing(20)
 
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(8)
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(8)
 
         self.name_label = QLabel(filename)
-        font_name = QtGui.QFont("Inter Tight SemiBold", 11, QtGui.QFont.Weight.Bold)
+        font_name = QtGui.QFont("Inter Tight SemiBold", 13, QtGui.QFont.Weight.Bold)
         font_name.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         self.name_label.setFont(font_name)
-        self.name_label.setStyleSheet("color: rgba(255, 255, 255, 0.95); background: transparent; border: none;")
-        info_layout.addWidget(self.name_label)
+        self.name_label.setStyleSheet("color: #F8FAFC; background: transparent; border: none;")
+        left_layout.addWidget(self.name_label)
 
-        meta_row_layout = QHBoxLayout()
-        meta_row_layout.setSpacing(8)
+        self.stacked_widget = QtWidgets.QStackedWidget()
+        self.stacked_widget.setFixedHeight(35)
+        self.stacked_widget.setStyleSheet("background: transparent;")
 
+        page_badges = QWidget()
+        badges_layout = QHBoxLayout(page_badges)
+        badges_layout.setContentsMargins(0, 0, 0, 0)
+        badges_layout.setSpacing(10)
+        
         self.size_badge = QLabel(f"💾 {model_size}")
-        self.size_badge.setFixedHeight(20)
+        self.size_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        font_badge = QtGui.QFont("Inter Tight Medium", 9)
+        font_badge.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.size_badge.setFont(font_badge)
         self.size_badge.setStyleSheet("""
             QLabel {
-                background-color: rgba(255, 255, 255, 0.05);
-                color: rgba(255, 255, 255, 0.6);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                padding: 4px 8px;
-                font-size: 11px;
-                font-family: 'Inter Tight Medium';
+                background-color: rgba(255, 255, 255, 0.05); color: #94A3B8;
+                border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;
+                padding: 4px 10px;
             }
         """)
-        meta_row_layout.addWidget(self.size_badge)
-        meta_row_layout.addStretch()
+        
+        format_badge = QLabel("⚙️ GGUF")
+        format_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        format_badge.setFont(font_badge)
+        format_badge.setStyleSheet("""
+            QLabel {
+                background-color: rgba(59, 130, 246, 0.1); color: #93C5FD;
+                border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px;
+                padding: 4px 10px;
+            }
+        """)
 
-        info_layout.addLayout(meta_row_layout)
-        card_layout.addLayout(info_layout, stretch=1)
+        self.status_ready = QLabel(self.translations.get("status_ready_download", "Ready to download"))
+        self.status_ready.setFont(font_badge)
+        self.status_ready.setStyleSheet("color: #64748B;")
 
-        self.btn_download = QPushButton(download_button_translation)
-        font_btn = QtGui.QFont("Inter Tight SemiBold", 9)
+        badges_layout.addWidget(self.size_badge)
+        badges_layout.addWidget(format_badge)
+        badges_layout.addWidget(self.status_ready)
+        badges_layout.addStretch()
+        self.stacked_widget.addWidget(page_badges)
+
+        page_progress = QWidget()
+        progress_layout = QVBoxLayout(page_progress)
+        progress_layout.setContentsMargins(0, 0, 0, 0)
+        progress_layout.setSpacing(4)
+        
+        self.status_label = QLabel(self.translations.get("status_init_download", "Initializing download..."))
+        font_status = QtGui.QFont("Inter Tight Medium", 9)
+        font_status.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.status_label.setFont(font_status)
+        self.status_label.setStyleSheet("color: #93C5FD; font-weight: bold;")
+        progress_layout.addWidget(self.status_label)
+
+        self.progress_bar = QtWidgets.QProgressBar()
+        self.progress_bar.setFixedHeight(6)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: rgba(0, 0, 0, 0.4);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 3px;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3B82F6, stop:1 #8B5CF6);
+                border-radius: 2px;
+            }
+        """)
+        progress_layout.addWidget(self.progress_bar)
+        self.stacked_widget.addWidget(page_progress)
+
+        left_layout.addWidget(self.stacked_widget)
+        main_layout.addLayout(left_layout, stretch=1)
+
+        download_text = self.translations.get("btn_download_model", " Download")
+        self.btn_download = QPushButton(download_text)
+        
+        font_btn = QtGui.QFont("Inter Tight SemiBold", 10)
         font_btn.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         self.btn_download.setFont(font_btn)
-        icon_download = QtGui.QIcon()
-        icon_download.addPixmap(QtGui.QPixmap("app/gui/icons/downloading.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.btn_download.setIconSize(QtCore.QSize(15, 15))
-        self.btn_download.setIcon(icon_download)
-        self.btn_download.setFixedSize(160, 36)
-        self.btn_download.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        
+        self.icon_download = QtGui.QIcon()
+        self.icon_download.addPixmap(QtGui.QPixmap("app/gui/icons/downloading.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.btn_download.setIcon(self.icon_download)
+        self.btn_download.setIconSize(QtCore.QSize(18, 18))
+        self.btn_download.setFixedSize(140, 42)
         self.btn_download.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_download.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self.btn_style_normal = """
             QPushButton {
-                background-color: rgba(33, 150, 243, 0.15);
-                color: #64B5F6;
-                border: 1px solid rgba(33, 150, 243, 0.3);
-                border-radius: 8px;
+                background-color: rgba(59, 130, 246, 0.15); color: #93C5FD;
+                border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: rgba(33, 150, 243, 0.35);
-                border: 1px solid rgba(33, 150, 243, 0.6);
-                color: #ffffff;
+                background-color: rgba(59, 130, 246, 0.3); border: 1px solid rgba(59, 130, 246, 0.6); color: #FFFFFF;
             }
-            QPushButton:pressed {
-                background-color: rgba(33, 150, 243, 0.1);
-            }
+            QPushButton:pressed { background-color: rgba(59, 130, 246, 0.1); }
         """
-        self.btn_style_downloading = """
+        self.btn_style_stop = """
             QPushButton {
-                background-color: rgba(255, 152, 0, 0.15);
-                color: #FFB74D;
-                border: 1px solid rgba(255, 152, 0, 0.3);
-                border-radius: 8px;
+                background-color: rgba(239, 68, 68, 0.15); color: #FCA5A5;
+                border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: rgba(239, 68, 68, 0.3); border: 1px solid rgba(239, 68, 68, 0.6); color: #FFFFFF;
             }
         """
         self.btn_style_success = """
             QPushButton {
-                background-color: rgba(76, 175, 80, 0.15);
-                color: #81C784;
-                border: 1px solid rgba(76, 175, 80, 0.3);
-                border-radius: 8px;
+                background-color: rgba(16, 185, 129, 0.15); color: #6EE7B7;
+                border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px;
             }
         """
         self.btn_style_error = """
             QPushButton {
-                background-color: rgba(244, 67, 54, 0.15);
-                color: #E57373;
-                border: 1px solid rgba(244, 67, 54, 0.3);
-                border-radius: 8px;
+                background-color: rgba(244, 67, 54, 0.15); color: #E57373;
+                border: 1px solid rgba(244, 67, 54, 0.3); border-radius: 8px;
             }
         """
-
+        
         self.btn_download.setStyleSheet(self.btn_style_normal)
+        self.btn_download.clicked.connect(self.start_download)
+        main_layout.addWidget(self.btn_download, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        try:
-            self.btn_download.clicked.disconnect()
-        except TypeError:
-            pass
-
-        self.btn_download.clicked.connect(self.download_model_method)
-
-        card_layout.addWidget(self.btn_download, alignment=Qt.AlignmentFlag.AlignVCenter)
-
-        main_layout.addWidget(self.glass_card)
-        self.setLayout(main_layout)
-    
     def enterEvent(self, event):
-        self.glass_card.setStyleSheet(self.glass_style_hover)
+        if self.btn_download.isEnabled():
+            self.setStyleSheet(self.style_hover)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self.glass_card.setStyleSheet(self.glass_style_normal)
+        self.setStyleSheet(self.style_normal)
         super().leaveEvent(event)
 
-    def download_model_method(self):
-        self.btn_download.setEnabled(False)
-        self.btn_download.setText(" Downloading...")
-        self.btn_download.setStyleSheet(self.btn_style_downloading)
+    def start_download(self):
+        stop_text = self.translations.get("btn_stop_download", "🛑 Stop")
+        self.btn_download.setText(stop_text)
+        self.btn_download.setIcon(QtGui.QIcon()) 
+        self.btn_download.setStyleSheet(self.btn_style_stop)
+        
+        try: self.btn_download.clicked.disconnect()
+        except TypeError: pass
+        self.btn_download.clicked.connect(self.cancel_download)
+        
+        self.stacked_widget.setCurrentIndex(1)
+        self.progress_bar.setValue(0)
 
-        self.downloader_thread = FileDownloader(self.model_id, self.filename)
+        self.downloader_thread = FileDownloader(self.model_id, self.filename, self.translations)
+        self.downloader_thread.progress.connect(self.on_download_progress)
         self.downloader_thread.finished.connect(self.on_download_finished)
         self.downloader_thread.error.connect(self.on_download_error)
+        self.downloader_thread.cancelled.connect(self.on_download_cancelled)
         self.downloader_thread.start()
 
+    def cancel_download(self):
+        self.btn_download.setEnabled(False)
+        self.btn_download.setText(self.translations.get("btn_stopping", " Stopping..."))
+        self.status_label.setText(self.translations.get("status_cancelling", "Cancelling download and cleaning up..."))
+        if self.downloader_thread:
+            self.downloader_thread.cancel()
+
+    def on_download_cancelled(self):
+        self.btn_download.setEnabled(True)
+        self.btn_download.setText(self.translations.get("btn_download_model", " Download"))
+        self.btn_download.setIcon(self.icon_download)
+        self.btn_download.setStyleSheet(self.btn_style_normal)
+        
+        try: self.btn_download.clicked.disconnect()
+        except TypeError: pass
+        self.btn_download.clicked.connect(self.start_download)
+        
+        self.stacked_widget.setCurrentIndex(0) 
+
+    def on_download_progress(self, percent, text_status):
+        self.progress_bar.setValue(percent)
+        self.status_label.setText(text_status)
+
     def on_download_finished(self, path):
-        self.btn_download.setText(" Downloaded ✓")
+        self.btn_download.setEnabled(False)
+        self.btn_download.setText(self.translations.get("btn_downloaded", " Downloaded ✓"))
         self.btn_download.setStyleSheet(self.btn_style_success)
+        
+        try: self.btn_download.clicked.disconnect()
+        except TypeError: pass
+        
+        self.progress_bar.setValue(100)
+        self.status_label.setText(self.translations.get("status_download_complete", "Download Complete!"))
+        self.status_label.setStyleSheet("color: #4ADE80; font-size: 12px; font-weight: bold;")
 
     def on_download_error(self, error_msg):
-        self.btn_download.setText(" Error")
+        self.btn_download.setEnabled(True)
+        self.btn_download.setText(self.translations.get("btn_try_again", " Try Again"))
+        self.btn_download.setIcon(self.icon_download)
         self.btn_download.setStyleSheet(self.btn_style_error)
         
-        error_box = QtWidgets.QMessageBox()
-        error_box.setWindowIcon(QtGui.QIcon("app/gui/icons/logotype.ico"))
-        error_box.setWindowTitle("Download Error")
-        error_box.setText(error_msg)
-        error_box.setStyleSheet("""
-            QMessageBox {
-                background-color: #1e1e24;
-                color: #e0e0e0;
-            }
-            QLabel {
-                color: #e0e0e0;
-            }
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.05);
-                color: white;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                padding: 5px 15px;
-                min-width: 60px;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.15);
-                border: 1px solid rgba(255, 255, 255, 0.3);
-            }
-        """)
-        error_box.setIcon(QtWidgets.QMessageBox.Icon.Critical)
-        error_box.exec()
+        try: self.btn_download.clicked.disconnect()
+        except TypeError: pass
+        self.btn_download.clicked.connect(self.start_download)
+        
+        self.stacked_widget.setCurrentIndex(0)
+        
+        error_template = self.translations.get("error_download_failed", "Failed to download {filename}:\n\n{error_msg}")
+        error_text = error_template.replace("{filename}", self.filename).replace("{error_msg}", error_msg)
+        
+        parent_win = self.window() if hasattr(self, "window") else self
+
+        sow_toast(
+            parent=parent_win,
+            title=self.translations.get("error_title", "Download Error"),
+            text=error_text,
+            msg_type="error"
+        )
+
 
 class FileDownloader(QThread):
-    progress = pyqtSignal(int)
+    progress = pyqtSignal(int, str)
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    cancelled = pyqtSignal()
 
-    def __init__(self, model_id, filename):
+    def __init__(self, model_id, filename, translations):
         super().__init__()
         self.model_id = model_id
         self.filename = filename
+        self.translations = translations
         self.save_dir = "assets/local_llm"
+        self._is_cancelled = False
+
+    def cancel(self):
+        self._is_cancelled = True
 
     def run(self):
         try:
             os.makedirs(self.save_dir, exist_ok=True)
+            local_path = os.path.join(self.save_dir, self.filename)
 
-            local_path = hf_hub_download(
-                repo_id=self.model_id,
-                filename=self.filename,
-                revision="main",
-                local_dir=self.save_dir,
-            )
+            url = f"https://huggingface.co/{self.model_id}/resolve/main/{self.filename}"
+            
+            with requests.get(url, stream=True, allow_redirects=True, timeout=10) as r:
+                r.raise_for_status()
+                total_size = int(r.headers.get('content-length', 0))
+                downloaded = 0
+                
+                start_time = time.time()
+                last_update_time = start_time
 
+                with open(local_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=1024*128):
+                        if self._is_cancelled:
+                            break
+                            
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            
+                            current_time = time.time()
+                            if current_time - last_update_time > 0.1:
+                                if total_size:
+                                    percent = int((downloaded / total_size) * 100)
+                                    elapsed_time = current_time - start_time
+                                    speed_bps = downloaded / elapsed_time if elapsed_time > 0 else 0
+                                    remaining_bytes = total_size - downloaded
+                                    eta_seconds = remaining_bytes / speed_bps if speed_bps > 0 else 0
+                                    
+                                    down_str = self.format_size(downloaded)
+                                    total_str = self.format_size(total_size)
+                                    speed_str = f"{self.format_size(speed_bps)}/s"
+                                    
+                                    tr_h = self.translations.get("time_h", "h")
+                                    tr_m = self.translations.get("time_m", "m")
+                                    tr_s = self.translations.get("time_s", "s")
+                                    tr_left = self.translations.get("time_left", "left")
+
+                                    if eta_seconds > 3600:
+                                        eta_str = f"{int(eta_seconds // 3600)}{tr_h} {int((eta_seconds % 3600) // 60)}{tr_m} {tr_left}"
+                                    elif eta_seconds > 60:
+                                        eta_str = f"{int(eta_seconds // 60)}{tr_m} {int(eta_seconds % 60)}{tr_s} {tr_left}"
+                                    else:
+                                        eta_str = f"{int(eta_seconds)}{tr_s} {tr_left}"
+
+                                    text_status = f"{down_str} / {total_str}  •  {speed_str}  •  {eta_str}"
+                                    self.progress.emit(percent, text_status)
+                                
+                                last_update_time = current_time
+            
+            if self._is_cancelled:
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+                self.cancelled.emit()
+                return
+                                
             self.finished.emit(local_path)
+            
+        except requests.exceptions.RequestException as e:
+            if not self._is_cancelled:
+                self.error.emit(self.translations.get("network_error", "Network error: ") + str(e))
         except Exception as e:
-            self.error.emit(str(e))
+            if not self._is_cancelled:
+                self.error.emit(self.translations.get("system_error", "System error: ") + str(e))
+
+    def format_size(self, size_bytes):
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024:
+                return f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024
+        return f"{size_bytes:.2f} TB"
