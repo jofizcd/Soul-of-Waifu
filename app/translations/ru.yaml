@@ -1,25 +1,43 @@
-# Title
+# ============================================================
+# SOUL OF WAIFU — Русская локализация
+# ============================================================
+
+
+# ──────────────────────────────────────────────────────────
+# PROGRAM TITLE
+# ──────────────────────────────────────────────────────────
 program_title: "Soul of Waifu"
 soul_of_waifu_system_title: "Soul of Waifu System"
 
-# Left Buttons
+
+# ──────────────────────────────────────────────────────────
+# NAVIGATION BUTTONS
+# ──────────────────────────────────────────────────────────
 main_button: " Главное"
+main_button_2: "Главный Хаб"
 create_character_button: " Создать Персонажа"
 characters_gateway_button: " Врата Персонажей"
 models_hub_button: " Хаб Моделей"
 rp_editors_button: " Редакторы RP"
 options_button: " Настройки"
 
-# Main Tab Without Characters
+
+# ──────────────────────────────────────────────────────────
+# MAIN TAB — NO CHARACTERS
+# ──────────────────────────────────────────────────────────
 no_characters_advice: "Вы еще не добавили ни одного персонажа. Нажмите на кнопку и создайте его."
-create_character_button_2: " Создать Персонажа"
+create_character_button_2: " Создать персонажа"
 no_characters_description: |-
   Прежде чем приступить к общению с персонажами, уделите немного времени настройке программы в соответствии с вашими предпочтениями.
   Как только будете готовы, можете переходить к созданию уникального персонажа и общению с ним.
 
-# Main Tab With Characters
+
+
+# ──────────────────────────────────────────────────────────
+# MAIN TAB — WITH CHARACTERS
+# ──────────────────────────────────────────────────────────
 welcome_label: "Добро пожаловать в Soul of Waifu, User"
-add_character_title: "<html><head/><body><p>Введите ID персонажа, чтобы добавить его в список</p></body></html>"
+add_character_title: "Информация о Персонаже"
 more_btn_tooltip: "Информация о персонаже"
 call_btn_text: "Открыть Soul of Waifu System"
 voice_btn_text: "Открыть настройки Text-To-Speech"
@@ -28,38 +46,93 @@ delete_btn_text: "Удалить персонажа"
 background_changer_title: "Фон Чата"
 background_changer_label_1: "Выберите фон для чата"
 background_changer_default_btn: "По умолчанию"
-
 btn_check_settings: "Основные Настройки"
 btn_check_identity: "Личность / Характер"
 btn_check_scenario: "Сценарий / Приветствие"
 btn_check_examples: "Примеры / Примечание"
 btn_check_chats: "Управление чатами / Экспорт"
-
 btn_general_info_text: "Общая информация"
 btn_identity_text: "Личность"
 btn_scenario_text: "Сценарий"
 btn_examples_text: "Примеры"
 btn_creator_notes_text: "Примечание создателя"
 
-# Character AI Creation
-character_id_label: "ID Персонажа:"
-placeholder_character_id: "Введите ID персонажа"
-add_character_button: " Добавить"
+greeting_morning_1: "Доброе утро, {user}. Самое время погрузиться в новое приключение."
+greeting_morning_2: "Утречко, {user}! Твои персонажи уже ждут тебя."
+greeting_morning_3: "Просыпайся, {user}. Давай загрузим память и начнем этот день."
+greeting_morning_4: "С добрым утром, {user}! Готовы продолжить наше виртуальное путешествие?"
+greeting_morning_5: "Доброе утро, {user}. Интерфейс готов, а души проснулись."
+greeting_morning_6: "А вот и утро. Твои спутники уже открыли глаза, {user}."
+greeting_morning_7: "Солнце заглядывает в окно, а в Soul of Waifu начинается новый день. С добрым утром, {user}!"
 
-# Character Creation
+greeting_afternoon_1: "Добрый день, {user}. Soul of Waifu готова к работе."
+greeting_afternoon_2: "Как прошло утро, {user}? Давай навестим твоих спутников."
+greeting_afternoon_3: "Привет, {user}. Хочешь ненадолго сбежать от реальности? Твои вайфу здесь."
+greeting_afternoon_4: "Добрый день, {user}. Портал в виртуальный мир открыт и ждёт тебя."
+greeting_afternoon_5: "С возвращением, {user}. Давай напишем еще одну главу нашей истории."
+greeting_afternoon_6: "Очередной шаг в нашей общей истории. Как проходит твой день, {user}?"
+greeting_afternoon_7: "Солнце в зените, {user}. Самое время отвлечься от забот и заглянуть к старым друзьям."
+
+greeting_evening_1: "Добрый вечер, {user}. Время устроиться поуютнее и поболтать с любимым спутником."
+greeting_evening_2: "Добрый вечер, {user}. Не хочешь снова погрузиться в Soul Stage?"
+greeting_evening_3: "С возвращением, {user}. Идеальное время для неторопливой глубокой беседы."
+greeting_evening_4: "Уютного вечера, {user}. Твоим спутникам есть чем поделиться с тобой."
+greeting_evening_5: "Вечер добрый, {user}. Давай посмотрим, какие мысли сегодня были записаны в дневник."
+greeting_evening_6: "Теплые сумерки и чашка чая. Твои вайфу соскучились по тебе за этот день, {user}."
+greeting_evening_7: "Дневная суета позади. Расслабься, {user}, твоя личная вселенная готова раскрыть свои тайны."
+
+greeting_night_1: "Всё еще бодрствуешь, {user}? Не переживай, цифровые души никогда не спят."
+greeting_night_2: "Ночной сеанс, {user}? Soul of Waifu здесь, чтобы составить тебе компанию в эти тихие часы."
+greeting_night_3: "Тихий ночной воздух... Самое время для полуночного чата, {user}?"
+greeting_night_4: "Весь мир спит, но персонажи продолжают жить. Добро пожаловать, {user}."
+greeting_night_5: "Поздняя ночь, {user}. Давай устроим откровенный разговор по душам."
+greeting_night_6: "Полумрак, тишина и свет экрана. Время для самых сокровенных историй, {user}."
+greeting_night_7: "Звёзды сияют только для нас. Хочешь заглянуть в самые глубокие уголки сознания вайфу, {user}?"
+
+
+# ──────────────────────────────────────────────────────────
+# AI PROVIDER SELECTOR
+# ──────────────────────────────────────────────────────────
 choose_ai_provider_title: "Выбор провайдера ИИ"
 choose_ai_provider_subtitle: "Выберите модель для генерации ответов"
-choose_ai_provider_openai: "Отраслевой стандарт, требуется ключ API"
-choose_ai_provider_local_llm: "Запуск моделей на видеокарте"
-choose_ai_provider_mistralai: "Быстрые модели через API"
-choose_ai_provider_characterai: "ИИ для ролевых игр и развлечений"
-choose_ai_provider_openrouter: "Единый API для множества провайдеров"
 
+gateway_add_to_list: "Добавить"
+
+provider_name_local: "Local LLM"
+provider_name_openai: "Open AI"
+provider_name_anthropic: "Anthropic"
+provider_name_gemini: "Google Gemini"
+provider_name_deepseek: "DeepSeek"
+provider_name_grok: "Grok"
+provider_name_qwen: "Qwen"
+provider_name_zai: "Z.AI"
+provider_name_mistral: "Mistral AI"
+provider_name_openrouter: "OpenRouter"
+
+provider_desc_local: "Запуск моделей полностью офлайн с максимальной приватностью и без цензуры"
+provider_desc_openai: "Передовое качество и надежность генерации для текстовых ролевых игр"
+provider_desc_anthropic: "Лучший в своем классе литературный слог, последовательность характера и эмоциональная глубина"
+provider_desc_gemini: "Огромное контекстное окно (1M+ токенов) — идеально для длинных историй и многотомных саг"
+provider_desc_deepseek: "Сверхпродуктивная и экономичная модель с лучшим соотношением цены и качества генерации"
+provider_desc_grok: "Меньше цензуры, больше остроумия и креативности — отлично для свободных ролевых игр"
+provider_desc_qwen: "Мощные многоязычные рассуждения и отличные повествовательные способности"
+provider_desc_zai: "Быстрая, связная речь и превосходное художественное повествование — сильная альтернатива Claude"
+provider_desc_mistral: "Высокопроизводительные открытые модели с превосходным балансом скорости и качества"
+provider_desc_openrouter: "Доступ к сотням лучших мировых моделей в одном месте — ультимативный агрегатор"
+
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER CREATOR — TOOLBAR
+# ──────────────────────────────────────────────────────────
 import_character_card_button: "Импорт Карточки Персонажа"
 export_character_card_button: "Экспорт Карточки Персонажа"
 clean_character_card_button: "Очистить Все Поля"
 preview_prompt_button: "Промпт"
 
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER CREATOR — FIELDS
+# ──────────────────────────────────────────────────────────
 character_building_label: "Создание персонажа"
 character_image_building_label: "Аватар персонажа"
 character_name_building_label: "Имя персонажа"
@@ -83,23 +156,67 @@ placeholder_card_version: "Версия созданной карточки пе
 user_persona_building_label: "Персона"
 system_prompt_building_label: "Пресет Системного Промпта"
 lorebook_building_label: "Лорбук"
+character_creator_desc_custom_variable: "Настройте пользовательские переменные состояния (например, доверие, золото или инвентарь), которые персонаж сможет динамически отслеживать во время сеанса в одиночном чате."
+character_creator_btn_add_custom_variable: "+ Добавить Новую Переменную"
+var_editor_id_label: "ID ПЕРЕМЕННОЙ"
+var_editor_id_placeholder: "напр., trust"
+var_editor_name_label: "ОТОБРАЖАЕМОЕ ИМЯ"
+var_editor_name_placeholder: "напр., Доверие"
+var_editor_type_label: "ТИП ДАННЫХ"
+var_editor_icon_label: "HUD ИКОНКА"
+var_editor_min_label: "МИН. ЗНАЧЕНИЕ"
+var_editor_max_label: "МАКС. ЗНАЧЕНИЕ"
+var_editor_default_label: "ЗНАЧЕНИЕ ПО УМОЛЧАНИЮ"
+var_editor_default_placeholder: "напр., 90, True или предмет1"
+var_editor_preset_label: "ЗАГРУЗИТЬ ПРЕСЕТ:"
+var_editor_apply_preset_btn: "Применить"
+var_preset_confirm_title: "Применение пресета"
+var_preset_confirm_msg: "Применение этого пресета перезапишет и очистит все ваши текущие кастомные переменные. Вы хотите продолжить?"
+
+var_preset_custom: "Пользовательский (Нет)"
+var_preset_romance: "Романтика и отношения (Привязанность и Доверие)"
+var_preset_rpg: "RPG Приключение (HP, Мана, Золото и Инвентарь)"
+var_preset_survival: "Тамагочи (Сытость, Энергия и Настроение)"
+var_preset_horror: "Выживание в хорроре (Рассудок, Паника и Фонарик)"
+var_preset_detective: "Детективный допрос (Подозрение и Улики)"
+var_preset_yandere: "Аниме: Яндере-одержимость (Одержимость и Рассудок)"
+var_preset_shonen: "Аниме: Сёнен сражение (Энергия, Воля и Демон)"
+var_preset_maid: "Аниме: Горничная и Господин (Верность, Неуклюжесть и Дерзость)"
+var_preset_chuuni: "Аниме: Синдром восьмиклассника (Иллюзии и Смущение)"
+var_preset_tsundere: "Аниме: Классическая Цундере (Цун и Дере)"
+var_preset_kuudere: "Аниме: Молчаливая Кудере (Сдерживание и Близость)"
+var_preset_dandere: "Аниме: Застенчивая Дандере (Скромность и Привязанность)"
+var_preset_himedere: "Аниме: Избалованная Химедере (Капризы и Ранимость)"
+
+var_editor_prompt_label: "ШАБЛОН СИСТЕМНОГО ПРОМПТА"
+var_editor_prompt_placeholder: "напр., [Доверие: {value}/100]"
+var_editor_del_btn: "X"
 create_character_button_3: "Создать Персонажа"
 total_tokens_label: "Всего токенов: 0"
 search_placeholder: "Поиск"
 
-character_creator_title_general_info: "Основная Информация"
-character_creator_title_personality: "Личность и Сценарий"
-character_creator_title_dialogues: "Диалоги и Первые Сообщения"
-character_creator_title_advanced: "Дополнительные Настройки и Лор"
-character_creator_title_export: "Инструменты и Экспорт"
+navigation_lbl: "НАВИГАЦИЯ"
 
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER CREATOR — SIDEBAR NAV
+# ──────────────────────────────────────────────────────────
 character_creator_item_general_info: "Основная Информация"
 character_creator_item_personality: "Личность и Сценарий"
 character_creator_item_dialogues: "Диалоги"
 character_creator_item_advanced: "Доп. Настройки и Лор"
 character_creator_item_export: "Инструменты и Экспорт"
+character_creator_title_general_info: "Основная Информация"
+character_creator_title_personality: "Личность и Сценарий"
+character_creator_title_dialogues: "Диалоги и Первые Сообщения"
+character_creator_title_advanced: "Дополнительные Настройки и Лор"
+character_creator_title_custom_variable: "Переменные и Состояние"
+character_creator_title_export: "Инструменты и Экспорт"
 
-# Models Hub
+
+# ──────────────────────────────────────────────────────────
+# MODELS HUB
+# ──────────────────────────────────────────────────────────
 models_hub_gguf_error: "GGUF-модели не найдены."
 models_hub_my_models: " Мои модели"
 models_hub_popular: " Популярное"
@@ -115,18 +232,60 @@ button_download_model: " Скачать модель"
 models_hub_author: "Автор -"
 models_hub_downloads: "Скачиваний -"
 models_hub_compatibility: "Совместимость: "
+models_hub_open_folder_btn: " Открыть Папку"
+models_hub_change_folder_btn: " Изменить Расположение"
 
-# RP Editors
-rp_editors_title: "Редакторы Ролевой Игры"
-rp_editors_subtitle: "Управляйте персонами, лором мира и системными промптами"
+download_model_title: "Загрузка модели"
+select_quant_title: "Выберите уровень квантования"
+available_files_text: "Доступные файлы для репозитория:"
+quant_recommendation_text: "Рекомендуется скачивать файлы с припиской 'Q4_K_M' или 'Q5_K_M' для лучшего баланса скорости и качества."
+
+status_ready_download: "Готово к загрузке"
+status_init_download: "Инициализация загрузки..."
+status_cancelling: "Отмена загрузки и удаление кэша..."
+status_download_complete: "Загрузка завершена!"
+
+btn_download_model: " Скачать"
+btn_stop_download: "Остановить"
+btn_stopping: "Остановка..."
+btn_downloaded: " Скачано ✓"
+btn_try_again: " Повторить"
+
+error_title: "Ошибка загрузки"
+error_download_failed: "Не удалось скачать файл {filename}:\n\n{error_msg}"
+network_error: "Ошибка сети: "
+system_error: "Системная ошибка: "
+
+time_h: "ч"
+time_m: "м"
+time_s: "с"
+time_left: "осталось"
+
+
+# ──────────────────────────────────────────────────────────
+# RP EDITORS HUB
+# ──────────────────────────────────────────────────────────
+rp_editors_title: "Редакторы ролевой игры"
+rp_editors_subtitle: "Создавайте персонажей, управляйте сценами в Soul Stage, настраивайте лор, персоны и системные промпты"
+rp_card_character_editor_title: "Редактор Персонажа"
+rp_card_character_editor_desc: "Начните создавать своих уникальных персонажей с личностями, предысторией и шаблонами диалогов."
+rp_card_soul_stage_title: "Soul Stage"
+rp_card_soul_stage_desc: "Вступите в интерактивное приключение с персонажами вместе с ИИ-Режиссёром."
 rp_card_lorebook_title: "Лорбуки"
-rp_card_lorebook_desc: "Создавайте правила, локации и мировые события для ваших сценариев."
+rp_card_lorebook_desc: "Создавайте локации, правила, фракции и глобальные события для ваших сценариев."
 rp_card_personas_title: "Персоны"
 rp_card_personas_desc: "Управляйте своими персонами, назначайте им аватары и описания."
 rp_card_prompts_title: "Системные промпты"
 rp_card_prompts_desc: "Настраивайте инструкции и очередь подачи данных о персонаже для ИИ."
+rp_card_discord_bot_title: "Discord Gateway"
+rp_card_discord_bot_desc: "Подключите своих персонажей к клиенту Discord и общайтесь с ними вне программы."
+rp_card_image_gen_title: "Генерация Изображения"
+rp_card_image_gen_desc: "Настройте работу генерации изображений для ваших персонажей и приключений с ними."
 
-# Options
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — SECTION TITLES
+# ──────────────────────────────────────────────────────────
 conversation_provider_title: "Провайдер LLM"
 api_configuration_title: "Настройки API"
 user_profile_title: "Профиль пользователя"
@@ -140,6 +299,11 @@ global_editors_title: "Редакторы"
 visualizations_title: "Визуализация (Live2D / VRM)"
 sub_modules_title: "Подмодули"
 
+options_sidebar_title: "НАСТРОЙКИ"
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — API CONFIGURATION
+# ──────────────────────────────────────────────────────────
 label_base_url: "Базовый URL"
 label_mistral_model: "Модель Mistral"
 gpu_layers_text: "Слои на GPU"
@@ -148,7 +312,6 @@ temperature_label: "Температура"
 top_p_label: "Top P"
 repeat_penalty_label: "Штраф за повтор"
 max_tokens_label: "Макс. токенов"
-
 configuration_tab: "Конфигурация"
 conversation_method_title: "Метод общения"
 conversation_method_label: "Метод общения"
@@ -162,14 +325,22 @@ placeholder_mistral_model_endpoint: "Введите эндпоинт модел�
 openrouter_models_label: "Модель"
 placeholder_base_url: "URL пользовательского эндпоинта (Опционально)"
 placeholder_base_api: "API токен (Опционально)"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — USER PROFILE
+# ──────────────────────────────────────────────────────────
 user_building_title: "Персона"
-placeholder_user_name: "Ваше имя"
-placeholder_user_description: "Ваша личность"
 choose_your_name_label: "Имя вашей персоны"
 choose_your_description_label: "Описание вашей персоны"
+placeholder_user_name: "Ваше имя"
+placeholder_user_description: "Ваша личность"
 choose_your_avatar_label: "Выберите аватар"
-support_btn: "❤ Поддержать"
 
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — SYSTEM (Language, Devices, Translator)
+# ──────────────────────────────────────────────────────────
 system_tab: "Система"
 language_title: "Язык"
 program_language_label: "Язык программы"
@@ -192,32 +363,155 @@ mode_translator_label: "Метод перевода"
 computer_specs_title: "Характеристики ПК"
 no_gpu: "Видеокарта не обнаружена"
 
+section_app_interface: "ИНТЕРФЕЙС ПРОГРАММЫ"
+section_message_translation: "ПЕРЕВОД ТЕКСТА"
+section_audio_channels: "АУДИО I/O КАНАЛЫ"
+section_system_resources: "ХАРАКТЕРИСТИКИ СИСТЕМЫ"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — LOCAL LLM
+# ──────────────────────────────────────────────────────────
 local_llm_tab: "Настройки LLM"
 llm_options_label: "Сервер с локальной LLM"
 llm_title: "Настройки локальной LLM"
-choose_llm_device_label: "Устройство"
-choose_llm_gpu_device_label: "GPU Бэкенд"
-gpu_layers_label: "Слои GPU"
+llm_hw_title: "Оборудование и Бэкенд"
+llm_format_title: "Шаблоны и Форматирование"
+llm_gen_title: "Базовые параметры генерации"
+llm_adv_title: "Продвинутый Local LLM Сэмплинг"
+choose_llm_device_label: "Вычислительное ядро"
 enable_mlock_checkbox: "MLock"
 enable_flash_attention_checkbox: "Flash Attention"
+chat_template_label: "Шаблон чата"
+chat_template_auto: "Auto"
+stop_strings_label: "Стоп-строки"
+stop_strings_placeholder: "Например: \\nUser:, </s>, <|eot_id|>"
+reasoning_mode_checkbox: "Режим размышлений"
+gpu_layers_text: "Слои GPU"
+context_size_text: "Размер контекста"
+max_tokens_text: "Макс. токенов"
+temperature_text: "Температура"
+freq_penalty_text: "Штраф за частоту"
+pres_penalty_text: "Штраф за присутствие"
+min_p_text: "Min-P"
+top_p_text: "Top-P"
+dyn_temp_min_text: "Мин. динам. темп."
+dyn_temp_max_text: "Макс. динам. темп."
+xtc_prob_text: "Вероятность XTC"
+xtc_thresh_text: "Порог XTC"
+dry_mult_text: "Множитель DRY"
+dry_base_text: "База DRY"
+dry_length_text: "Допуск длины DRY"
+enable_adv_sampling_text: "Включить Продвинутый Сэмплинг"
 
+kv_cache_label: "Тип KV Кэша"
+batch_size_text: "Размер Batch Prompt"
+cpu_threads_text: "Потоки CPU"
+
+section_hw_tuning: "ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ И ПАМЯТИ"
+section_response_control: "УПРАВЛЕНИЕ ОТВЕТОМ"
+section_creativity: "КРЕАТИВНОСТЬ И СЭМПЛИНГ"
+section_penalties: "ШТРАФЫ ЗА ПОВТОРЫ"
+section_core_samplers: "ОСНОВНЫЕ СЭМПЛЕРЫ"
+section_dyn_temp: "ДИНАМИЧЕСКАЯ ТЕМПЕРАТУРА"
+section_xtc: "XTC (АНТИ-КЛИШЕ)"
+section_dry: "DRY (АНТИ-ЦИКЛ)"
+section_prompt_structure: "СТРУКТУРА ПРОМПТА И СИНТАКСИС"
+section_inference_engine: "ДВИЖОК ВЫВОДА"
+
+llama_cpp_updater: "Обновления LLAMA CPP"
+checking_current_build: "Текущий: Проверяем..."
+lbl_target_tr: "Выбран:"
+lbl_release_notes_tr: "Соединение с GitHub API..."
+rollback_btn: "Откатиться"
+rollback_btn_tooltip: "Вернуть предыдущую версию, которая была ДО обновления."
+update_now_btn: "Обновить"
+no_release_notes: "Описание изменений отсутствует."
+current_ver_label: "Текущая:"
+github_error: "Ошибка подключения к GitHub"
+conn_failed: "Ошибка соединения."
+version_title: "Версия"
+status_up_to_date: "У вас установлена актуальная версия!"
+btn_reinstall: "Переустановить"
+status_ready_download: "Готово для загрузки."
+status_no_binary: "Совместимый билд не найден."
+status_restoring: "Восстановление бэкапа..."
+btn_done: "Завершить"
+update_btn: "Обновления"
+update_engine_tooltip: "Скачайте и установите последние версии llama.cpp для выбранного бэкенда."
+updater_subtitle: "ДВИЖОК БЭКЕНДА"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — Tool Calling & MCP
+# ──────────────────────────────────────────────────────────
+tools_tab: "Инструменты и MCP"
+tools_native_title: "Нативные возможности ИИ"
+section_tool_calling: "РАЗРЕШЕНИЯ ВЫЗОВА ИНСТРУМЕНТОВ"
+enable_tool_calling_text: "Включить вызов инструментов"
+enable_tool_calling_tooltip: "Позволяет ИИ нативно выполнять Python-функции во время генерации."
+
+tool_web_title: "WebSearchTool"
+tool_web_desc: "Поиск в интернете через скрытый API DuckDuckGo. Позволяет модели узнавать свежие факты, погоду или новости."
+tool_media_title: "MediaControlTool"
+tool_media_desc: "Управление медиаплеером ОС Windows (пауза, воспроизведение, переключение треков в браузере или Spotify)."
+tool_read_clipboard_title: "ClipboardReaderTool"
+tool_read_clipboard_desc: "Чтение текста, скопированного в пользовательский буфер обмена."
+tool_url_title: "OpenURLTool"
+tool_url_desc: "Запуск сайтов в стандартном браузере по умолчанию (например, быстрое открытие YouTube или GitHub по вашей просьбе)."
+tool_sysinfo_title: "GetSystemInfoTool"
+tool_sysinfo_desc: "Получение точного времени и даты вашего ПК. Помогает модели ориентироваться во времени суток и днях недели."
+tool_vision_title: "TakeScreenshotTool [Зрение]"
+tool_vision_desc: "Анализ происходящего на экране. Делает скриншот и отправляет его в мультимодальную ИИ-модель. Ресурсоемкая функция!"
+
+mcp_title: "Model Context Protocol (MCP)"
+section_mcp_settings: "ВНЕШНИЕ СЕРВЕРЫ MCP"
+mcp_description: "Подключение внешних серверов MCP (таких как SearXNG, GitHub и др.) без написания нативных плагинов на Python. Можно использовать вместе с встроенными инструментами Soul of Waifu."
+enable_mcp_text: "Включить прокси-интеграцию MCP"
+mcp_url_label: "URL сервера MCP"
+mcp_url_placeholder: "например, http://127.0.0.1:8000"
+
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — SOW MODULES
+# ──────────────────────────────────────────────────────────
 sow_system_tab: "Soul of Waifu Модули"
 sow_system_title: "Soul of Waifu System"
 enable_sow_system_checkbox: "Модуль Soul of Waifu System"
-enable_ambient_checkbox: "Модуль Эмбиента"
-enable_enhanced_memory: "Модуль Умной Памяти"
+enable_ambient_checkbox: "Модуль Ambient"
+enable_soul_memory: "Модуль Soul Memory"
 enable_summary_checkbox: "Модуль Авто-Суммаризации"
 settings_summary_interval: "Интервал (сообщения):"
+sow_system_modules_title: "Модули"
 
+section_render_engine: "ДВИЖОК РЕНДЕРА"
+section_environment_background: "ЗАДНИЙ ФОН МОДЕЛИ"
+section_ambient_audio: "ЭМБИЕНТ АУДИО"
+section_cognitive_architecture: "КОГНИТИВНАЯ АРХИТЕКТУРА"
+section_web_server: "ВЕБ ИНТЕРФЕЙС СЕРВЕР"
+web_server_card_title: "Локальный Веб Сервер"
+
+soul_memory_mode_label: "Режим Soul Memory:"
+soul_memory_batch_label: "Кол-во сообщений (0 = Вручную):"
+
+web_server_status_stopped: "Статус: Остановлено"
+web_server_start_btn: "Запустить Сервер"
+web_server_stop_btn: "Остановить Сервер"
+web_browser_open_btn: "Открыть в браузере"
+web_server_starting_lbl: "Статус: В процессе запуска..."
+web_server_starting_lbl_2: "Статус: Работает по адресу http://127.0.0.1:8000"
+web_server_error: "Статус: Порт 8000 занят или возникла ошибка"
+
+# ──────────────────────────────────────────────────────────
+# OPTIONS — VISUALIZATIONS (Live2D / VRM)
+# ──────────────────────────────────────────────────────────
 live2d_mode_label: "Режим работы"
 live2d_mode_with_gui: "С GUI"
 live2d_mode_without_gui: "Без GUI"
-
 choose_model_fps: "FPS модели"
 model_fps_30: "30 FPS"
 model_fps_60: "60 FPS"
 model_fps_120: "120 FPS"
-
 choose_model_background: "Фон модели"
 model_background_1: "Цвет"
 model_background_2: "Свое изображение"
@@ -230,11 +524,12 @@ model_background_color_5: "Бархатный Пурпурный"
 model_background_color_6: "Теплый Угольно-Серый"
 choose_model_background_image: "Изображение фона"
 
-sow_system_modules_title: "Модули"
 
-# Personas Editor
-personas_editor_title: "Редактор Персон"
+# ──────────────────────────────────────────────────────────
+# PERSONAS EDITOR
+# ──────────────────────────────────────────────────────────
 personas_button: " Редактор Персон"
+personas_editor_title: "Редактор Персон"
 personas_editor_choose_avatar: "Выбрать Изображение"
 personas_editor_default_btn: "Выбрать Персону"
 personas_editor_delete_btn: "Удалить"
@@ -251,8 +546,14 @@ personas_editor_description_placeholder: "Опишите роль, характ�
 personas_editor_default_persona: "(Основная Персона)"
 personas_editor_confirm_delete: "Подтвердите Удаление"
 personas_editor_confirm_delete_text: "Вы уверены, что хотите удалить персону "
+personas_editor_library: "БИБЛИОТЕКА ПЕРСОН"
+personas_editor_default_badge: "ОСНОВНАЯ"
+personas_editor_avatar_hint: "Рекомендуемый размер: 256x256 px"
 
-# System Prompt Editor
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM PROMPT EDITOR
+# ──────────────────────────────────────────────────────────
 system_prompt_button: " Редактор Промпта"
 system_prompt_editor_title: "Редактор Системного Промпта"
 system_prompt_editor_system_prompt: "Системный промпт"
@@ -267,8 +568,17 @@ system_prompt_editor_delete_preset_title: "Удаление пресета"
 system_prompt_editor_delete_preset_first: "Вы действительно хотите удалить пресет:"
 system_prompt_editor_delete_preset_second: "Это действие нельзя отменить."
 system_prompt_editor_preset_name: "Введите название пресета:"
+system_prompt_editor_header_title: "РЕДАКТОР СИСТЕМНЫХ ПРОМПТОВ"
+system_prompt_editor_subtitle: "КОНСТРУКТЫ И ПРЕСЕТЫ"
+system_prompt_editor_text_label: "СИСТЕМНАЯ ДИРЕКТИВА (PROMPT)"
+system_prompt_editor_component_label: "ПОРЯДОК КОНСТРУКТОВ (Перетаскивайте для изменения)"
+system_prompt_editor_panel_title: "ПАНЕЛЬ УПРАВЛЕНИЯ ПРЕСЕТАМИ"
+preset_saved_successfully: "Пресет успешно сохранен."
 
-# Lorebook Editor
+
+# ──────────────────────────────────────────────────────────
+# LOREBOOK EDITOR
+# ──────────────────────────────────────────────────────────
 lorebook_editor_title: "Редактор Лорбука"
 lorebook_editor_select: "Текущий лорбук:"
 lorebook_editor_btn_create: "Создать новый лорбук"
@@ -277,6 +587,7 @@ lorebook_editor_edit_description: "Изменить описание"
 lorebook_editor_import_lorebook: "Импорт JSON"
 lorebook_editor_export_lorebook: "Экспорт JSON"
 lorebook_editor_delete_lorebook: "Удалить лорбук"
+lorebook_editor_delete_lorebook_confirm: "Удалить {name}?"
 lorebook_editor_search: "Поиск записей..."
 lorebook_editor_add_entry: "+ Добавить новую запись"
 lorebook_editor_depth: "Глубина сканирования:"
@@ -312,23 +623,86 @@ lorebook_editor_lorebook_name: "Название:"
 lorebook_editor_edit_description_title: "Изменить описание лорбука"
 lorebook_editor_edit_description_label: "Описание для {name}:"
 lorebook_editor_edit_description_updated: "Описание для лорбука {name} обновлено."
-lorebook_editor_delete_lorebook_confirm: "Удалить {name}?"
 lorebook_editor_export_success: "Экспорт завершен"
 lorebook_editor_export_success_desc: "Лорбук успешно сохранен."
 lorebook_editor_export_error: "Ошибка экспорта"
 lorebook_editor_import_success: "Импорт завершен"
-lorebook_editor_import_success_desc: "Лорбук '{new_name}' импортирован {count} записей)."
+lorebook_editor_import_success_desc: "Лорбук '{new_name}' импортирован ({count} записей)."
 lorebook_editor_import_error: "Ошибка импорта"
 lorebook_editor_import_error_desc: "Не удалось обработать лорбук: {error}"
 lorebook_editor_saved: "Сохранено"
 lorebook_editor_saved_desc: "Лорбуки успешно сохранены."
 lorebook_editor_scan_depth: "Дальность Сканирования:"
+lorebook_editor_rename_lorebook: "Переименовать Лорбук"
+lorebook_editor_rename_label: "Новое название для '{name}':"
+lorebook_editor_rename_error_title: "Ошибка"
+lorebook_editor_rename_error_exists: "Лорбук с таким именем уже существует."
 
+lorebook_engine_title: "Движок Лорбуков"
+lorebook_library_label: "БИБЛИОТЕКА"
+lorebook_rename_btn: "Переименовать"
+lorebook_filter_placeholder: "Фильтр записей..."
+lorebook_entries_count: "{total} записей"
+lorebook_entries_shown: "{shown} из {total} записей"
+lorebook_empty_state: "Выберите запись или создайте новую, чтобы начать редактирование."
+lorebook_entry_name_placeholder: "Название записи..."
+lorebook_trigger_type_label: "ТИП ТРИГГЕРА"
+lorebook_injection_label: "ИНЪЕКЦИЯ"
+lorebook_trigger_config_label: "КОНФИГУРАЦИЯ ТРИГГЕРА"
+lorebook_content_label: "СОДЕРЖАНИЕ ЛОРА / ТЕКСТ СЦЕНАРИЯ"
+lorebook_sticky_label: "ДЛИТЕЛЬНОСТЬ"
+lorebook_cooldown_label: "ПЕРЕЗАРЯДКА"
+lorebook_delay_label: "ЗАДЕРЖКА"
+lorebook_probability_label: "ВЕРОЯТНОСТЬ"
+lorebook_apply_changes_btn: "ПРИМЕНИТЬ"
+lorebook_include_keywords_label: "ВКЛЮЧИТЬ КЛЮЧЕВЫЕ СЛОВА (через запятую)"
+lorebook_include_keywords_placeholder: "дракон, древний, огонь..."
+lorebook_exclude_keywords_label: "ИСКЛЮЧИТЬ КЛЮЧЕВЫЕ СЛОВА (через запятую)"
+lorebook_exclude_keywords_placeholder: "слова-исключения..."
+lorebook_semantic_label: "ОПИСАНИЕ СЦЕНЫ ДЛЯ СЕМАНТИЧЕСКОГО ПОИСКА ИИ"
+lorebook_semantic_placeholder: "Опишите сцену или ситуацию, чтобы ИИ мог её распознать..."
+lorebook_always_on_hint: "Всегда активно — внедряется в каждое окно контекста на каждом ходу."
+lorebook_random_hint: "Срабатывает случайно на каждом ходу, регулируется настройкой вероятности ниже."
+lorebook_parent_uid_label: "UID РОДИТЕЛЬСКОЙ ЗАПИСИ (-1 = любая)"
+lorebook_chain_delay_label: "ЗАДЕРЖКА ЦЕПОЧКИ (сообщений после родителя)"
+lorebook_first_msg_label: "ПЕРВОЕ СООБЩЕНИЕ (включительно)"
+lorebook_last_msg_label: "ПОСЛЕДНЕЕ СООБЩЕНИЕ (включительно)"
+lorebook_any_value: "любой (-1)"
+lorebook_delete_entry_confirm: "Удалить эту запись? Это действие нельзя отменить."
+lorebook_delete_lb_confirm: "Удалить «{name}» и все входящие в него записи?"
+lorebook_export_success_toast: "«{name}» успешно сохранён на диск."
+lorebook_injection_passive: "Пассивная"
+lorebook_injection_active: "Активная"
+lorebook_depth_suffix: "сообщений"
+lorebook_editor_suffix_entries: "записей"
+lorebook_trig_keyword: "Ключевые слова"
+lorebook_trig_semantic: "Семантика"
+lorebook_trig_always_on: "Всегда активно"
+lorebook_trig_random: "Случайно"
+lorebook_trig_chain: "Цепочка"
+lorebook_trig_scenario: "Сценарий"
+lorebook_trig_title_keyword: "ПОИСК ПО КЛЮЧЕВЫМ СЛОВАМ"
+lorebook_trig_title_semantic: "СЕМАНТИЧЕСКАЯ СИТУАЦИЯ"
+lorebook_trig_title_always_on: "ВСЕГДА АКТИВНО"
+lorebook_trig_title_random: "СЛУЧАЙНЫЙ ТРИГГЕР"
+lorebook_trig_title_chain: "ЗАВИСИМОСТЬ ЦЕПОЧКИ"
+lorebook_trig_title_scenario: "ДИАПАЗОН СЦЕНАРИЯ"
+
+
+# ──────────────────────────────────────────────────────────
+# LOREBOOK SELECTOR
+# ──────────────────────────────────────────────────────────
+lorebook_selector_title: "Выбор Лорбуков"
+lorebook_selector_search: "Поиск лорбуков..."
+lorebook_selector_apply: "Применить Лорбуки"
 import_lorebook_title: "Импортировать Лорбук?"
 import_lorebook_text: "Эта карта содержит встроенный лорбук '{book_name}'. Хотите добавить её в список?"
 import_lorebook_added_text: "Лорбук '{final_name}' был успешно добавлен."
 
-# Appearance
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — UI THEME
+# ──────────────────────────────────────────────────────────
 appearance_wtheme_default: "Серый"
 appearance_wtheme_obsidian: "Обсидиан"
 appearance_wtheme_graphite: "Графит"
@@ -343,7 +717,13 @@ appearance_wtheme_coffee: "Кофейная"
 appearance_wtheme_amber: "Янтарная"
 appearance_wtheme_slate: "Грифельная"
 appearance_wtheme_dracula: "Вампирская"
+appearance_wtheme_cyberpunk: "Киберпанк"
+appearance_wtheme_tokyo_night: "Токийская ночь"
 
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — CHAT PRESETS
+# ──────────────────────────────────────────────────────────
 appearance_preset_default: "Серый"
 appearance_preset_nord: "Север"
 appearance_preset_dracula: "Вампир"
@@ -351,35 +731,35 @@ appearance_preset_onedark: "Тёмная"
 appearance_preset_material: "Материал"
 appearance_preset_sakura: "Сакура"
 appearance_preset_abyss: "Бездна"
+appearance_preset_midnight: "Полночь"
+appearance_preset_emerald: "Изумруд"
+appearance_preset_crimson: "Пунцовый"
 
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — COLOR PALETTE
+# ──────────────────────────────────────────────────────────
 appearance_color_white: "Белый"
 appearance_color_soft: "Мягкий"
 appearance_color_dimmed: "Тусклый"
 appearance_color_warm_gray: "Дымчатый"
 appearance_color_cool_gray: "Свинец"
 appearance_color_cream: "Кремовый"
-appearance_color_arctic: "Арктический"
+appearance_color_arctic: "Арктика"
 appearance_color_lavender: "Лаванда"
 appearance_color_sage: "Шалфей"
-
 appearance_color_amber: "Янтарь"
 appearance_color_gold: "Золото"
 appearance_color_coral: "Коралл"
-appearance_color_arctic: "Арктика"
 appearance_color_sky: "Небо"
-appearance_color_lavender: "Лаванда"
 appearance_color_lilac: "Сирень"
 appearance_color_sakura: "Сакура"
 appearance_color_muted: "Тусклый"
-
 appearance_color_gray: "Серый"
-appearance_color_warm_gray: "Дымчатый"
-appearance_color_cool_gray: "Свинец"
 appearance_color_nord_green: "Тайга"
 appearance_color_dracula_orange: "Оранжевый"
 appearance_color_rose: "Роза"
 appearance_color_dim: "Тусклый"
-
 appearance_color_blue: "Синий"
 appearance_color_green: "Зелёный"
 appearance_color_dark: "Тёмный"
@@ -392,12 +772,15 @@ appearance_color_bright: "Яркий"
 appearance_color_cool: "Холодный"
 appearance_color_accent: "Акцентный"
 
+
+# ──────────────────────────────────────────────────────────
+# APPEARANCE — CONTROLS & LABELS
+# ──────────────────────────────────────────────────────────
 appearance_tooltip_custom: "Свой Цвет"
 appearance_lbl_custom: "Свой"
 appearance_dlg_user_bubble: "Цвет фона сообщения (пользователь)"
 appearance_dlg_char_bubble: "Цвет фона сообщения (персонаж)"
 appearance_dlg_pick_color: "Выбрать цвет"
-
 appearance_header_theme: "Тема"
 appearance_header_text_color: "Цвет текста"
 appearance_header_quotes: "Кавычки"
@@ -405,6 +788,7 @@ appearance_header_italic: "Курсив"
 appearance_lbl_corner_radius: "Скругление углов"
 appearance_lbl_bubble_opacity: "Прозрачность фона"
 appearance_lbl_font_size: "Размер шрифта"
+appearance_lbl_max_width: "Максимальная ширина"
 appearance_btn_reset: "Сбросить"
 appearance_btn_save: "Сохранить"
 appearance_header_preview: "Предпросмотр"
@@ -415,15 +799,21 @@ appearance_header_ui_hover: "Наведение (Фон кнопки)"
 appearance_header_ui_text: "Цвет текста кнопок"
 appearance_tab_name: "Внешний вид"
 
-# Author Notes
-author_notes_editor_title: "Редактор Авторских Заметок"
-author_notes_editor_description: "Редактирование авторских заметок"
-author_notes_editor_placeholder: "Введите ваши инструкции или подсказки для персонажа..."
-author_notes_editor_save: "Сохранить"
-author_notes_saved: "Авторские Заметки Сохранены"
-author_notes_saved_body: "Авторские заметки успешно сохранены."
 
-# Summary Editor
+# ──────────────────────────────────────────────────────────
+# AUTHOR NOTES EDITOR
+# ──────────────────────────────────────────────────────────
+author_notes_header_title: "РЕДАКТОР АВТОРСКИХ ЗАМЕТОК"
+author_notes_subtitle: "ГЛОБАЛЬНЫЕ ДИРЕКТИВЫ ПОВЕДЕНИЯ"
+author_notes_hint: "Эти инструкции динамически добавляются в контекст чата. Используйте их, чтобы направить поведение персонажа, закрепить определённый стиль письма или установить глобальные цели сценария."
+author_notes_input_label: "ТЕКСТ ДИРЕКТИВ"
+author_notes_editor_cancel: "ОТМЕНА"
+author_notes_editor_save: "СОХРАНИТЬ"
+author_notes_editor_placeholder: "Введите свои инструкции или подсказки для персонажа здесь..."
+
+# ──────────────────────────────────────────────────────────
+# SUMMARY / STORY MEMORY EDITOR
+# ──────────────────────────────────────────────────────────
 summary_editor_title: "Редактор памяти сюжета"
 summary_editor_heading: "Память сюжета"
 summary_editor_covered_history: "История в контексте: сообщения 1-{last_seq}"
@@ -441,91 +831,49 @@ summary_editor_update_text: "Сигнал обновления отправле�
 summary_editor_generating: "Идёт генерация..."
 model_generate_summary: "Генерируется выжимка..."
 
-# Chat
+summary_editor_header_title: "РЕДАКТОР СУММАРИЗАЦИИ"
+summary_editor_subtitle: "АРХИВАЦИЯ И СЖАТИЕ"
+summary_editor_covered_badge: "История: 1-{last_seq}"
+summary_editor_current_memory_label: "ТЕКУЩИЙ АРХИВ ПАМЯТИ"
+summary_editor_prompt_label: "ДИРЕКТИВЫ СЖАТИЯ (ПРОМПТ)"
+summary_editor_saved_toast: "Память и директивы успешно сохранены."
+
+
+# ──────────────────────────────────────────────────────────
+# CHAT INTERFACE
+# ──────────────────────────────────────────────────────────
 character_name_chat: "Имя персонажа"
 write_user_message_placeholder: "Введите сообщение для персонажа..."
-typingIndicator_text: "{character_name} <span style='color: #888;'>печатает {dots}</span>"
-
-creator_label: "Разработал"
-simple_version_label: "Версия"
-version_label: "Soul of Waifu v2.3.1"
-
-about_program: "О Soul of Waifu"
-nsfw_checkbox: "NSFW"
-
-update_available_title: "Обновление Доступно"
-update_available_body: "Доступна новая версия: "
-update_available_info: "Вы хотите обновить программу?"
-update_current_version: "Текущая версия: v2.3.1"
-update_available_close: "Закрыть"
-update_available_link: "Перейти на GitHub"
-language_changed_title: "Требуется перезагрузка"
-language_changed_body: "Программа должна быть перезапущена, чтобы изменения вступили в силу."
-language_changed_question: "Вы хотите перезапустить программу сейчас?"
-language_changed_yes: "Да"
-language_changed_no: "Нет"
-user_message_textEdit: "Введите свое сообщение как {user_name}"
+typingIndicator_text: "Размышляет"
+model_generate_text: "Генерируется текст..."
+user_message_textEdit: "Введите сообщение от имени {user_name}"
 user_message_textEdit_default: "Напишите свое сообщение как Пользователь"
-model_loading_step_1: "Начинаем загрузку модели"
-model_loading_step_2: "Проверяем формат файла"
-model_loading_step_3: "Загружаем тензоры модели"
-model_loading_step_4: "Конструируем llama контекст"
-model_loading_step_5: "Модель почти загружена"
-model_loading_step_6: "Модель готова к работе"
+input_placeholder: "Управляйте историей или обратитесь к кому-то..."
 
-# Interface Signals
-about_program_description: "<b>Soul of Waifu</b> — это мощная и многофункциональная платформа для общения с персонажами, управляемыми искусственным интеллектом. Она сочетает в себе как простоту, так и глубину настройки программы, поэтому приложение подойдет как начинающим, так и опытным пользователям.<br><br>Беритесь за уникальную возможность создавать своих персонажей с нуля, в ином случае вы можете импортировать уже готовые карточки персонажей в формате V2. Настраивайте их личность, привычки, поведение, голосовую озвучку, внешний вид и даже мир, в котором они существуют при помощи системы лорбуков. Программа поддерживает все популярные LLM-платформы: Character AI, Mistral AI, Open AI, прокси, OpenRouter. Либо же вы можете загрузить свою собственную локальную языковую модель в GGUF-формате прямо в Soul of Waifu.<br><br>Если вы хотите углубить взаимодействие с персонажем, то смело включайте режим Soul of Waifu System. Этот режим откроет вам доступ к ранее невиданным дополнениям к взаимодействию с вашими героями. Позвоните персонажу, назначьте ему аватар, оптимизируйте работу с контекстом благодаря встроенной функции умной памяти и ощутите эмоциональную связь, ведь персонаж сможет реагировать на ваши сообщения при помощи встроенной системы эмоций - изменится его лицо в зависимости от настроения в чате, поза и проиграется анимация, соответствующая текущему эмоциональному состоянию персонажа.<br><br>Управляйте всем в одном приложении: создавайте персонажей в полноценном редакторе, ищите и добавляйте персонажей во Вратах Персонажей, управляйте и скачивайте локальные языковые модели в Хабе Моделей, создавайте персоны, лорбуки, пресеты промптов для моделей и многое другое!"
-about_program_sub_description: "Если вы встретили ошибку или хотите предложить что-то интересное для улучшения программы, то не стесняйтесь переходить в наш <a href='https://discord.gg/6vFtQGVfxM'>Discord-сервер</a>, где такие же энтузиасты делятся своим опытом, обмениваются карточками персонажей и просто общаются на интересные темы. Ваше участие напрямую влияет на развитие проекта. Вместе мы создаём место, где мечты становятся реальностью!"
-about_program_title: "О Soul of Waifu"
 
-persona_error_title: "Измените персону"
-persona_error_body: "Выбрана несуществующая персона, пожалуйста, измените её."
-
-add_character_text_1: "был успешно добавлен!"
-add_character_text_2: "Теперь вы можете взаимодействовать с персонажем через список персонажей"
-add_character_text_3: "При добавлении персонажа произошла ошибка."
-add_character_text_4: "Попробуйте ещё раз."
-add_character_error: "Назначьте имя и первое сообщение вашему персонажу."
-add_character_title: "Информация о Персонаже"
-add_character_title_error: "Ошибка добавления персонажа"
-
-creator_info_close_button: "Закрыть"
-
-welcome_message: "Добро пожаловать в Soul of Waifu, "
-
-delete_message_1: "Удалить Персонажа"
-delete_message_2: "Вы уверены, что хотите удалить "
-
-create_character_title: "Выбор метода общения"
-radio_character_ai": " Character AI"
-radio_mistral_ai: " Mistral AI"
-radio_open_ai: " Open AI или Open AI-like"
-radio_openrouter: " OpenRouter"
-radio_local_llm: " Локальный LLM"
-create_character_select_button: "Выбрать"
-create_character_title_2: "Выбор метода общения"
-
-value: "Значение: "
-
+# ──────────────────────────────────────────────────────────
+# TTS SELECTOR
+# ──────────────────────────────────────────────────────────
 tts_selector_title: "Выбор Text-To-Speech"
+tts_selector_title_2: "ДВИЖКИ ОЗВУЧКИ"
 tts_selector_title_label: "Выберите метод Text-To-Speech"
 tts_selector_save_button: "Сохранить выбор"
 tts_selector_title_2: "Озвучка персонажа"
 tts_selector_save_information: "Озвучка была сохранена"
 tts_selector_save_information_error: "Вы не выбрали голос персонажу!"
-tts_selector_character_ai: "Голос персонажа: "
-tts_selector_character_ai_2: "Выберите голос вашему персонажу"
-tts_selector_character_ai_3: "Введите имя голоса для персонажа"
-tts_selector_character_ai_search: "Поиск"
-tts_selector_character_ai_listen: "Прослушать"
 tts_selector_select_button: "Выбрать голос"
-tts_selector_elevenlabs: "Введите ваш API-токен от ElevenLabs"
-tts_selector_elevenlabs_2: "Введите ваш API-токен"
-tts_selector_elevenlabs_3: "Введите ваш ID голоса"
-tts_selector_xttsv2: "Выберите тип голоса для XTTSv2"
+
+tts_selector_elevenlabs: "Конфигурация ElevenLabs"
+tts_selector_elevenlabs_2: "Введите ElevenLabs API-токен"
+tts_selector_elevenlabs_3: "Введите Voice ID из ElevenLabs"
+tts_selector_elevenlabs_lbl_1: "ELEVENLABS API КЛЮЧ"
+
+tts_selector_xttsv2: "Конфигурация XTTSv2"
 tts_selector_xttsv2_male: "Male"
 tts_selector_xttsv2_female: "Female"
 tts_selector_xttsv2_calm_female: "Female Calm"
+tts_selector_xttsv2_lbl_1: "ВЫБЕРИТЕ ГОЛОС ОЗВУЧКИ"
+
 tts_selector_enable_rvc: "Включить RVC"
 tts_selector_invalid_rvc: "Неверная директория RVC"
 tts_selector_no_folders: "Не найдены папки"
@@ -533,15 +881,38 @@ tts_selector_no_folder: "Нет папок"
 tts_selector_rvc_no_folder: "RVC активирован, но не выбрана папка"
 tts_selector_no_pth: "Нет PTH файла"
 tts_selector_no_pth_in_folder: "Не найден .pth файл: "
-tts_selector_edge: "Выберите тип голоса для Edge TTS"
+
+tts_selector_edge: "Конфигурация Edge TTS"
+tts_selector_edge_tts_lbl_1: "ЯЗЫК"
+tts_selector_edge_tts_lbl_2: "ГОЛОС ОЗВУЧКИ"
+
 tts_selector_error: "Ошибка ввода"
 tts_selector_error_2: "Пожалуйста, введите корректное имя голоса."
 tts_selector_error_3: "Нет голосов"
 tts_selector_error_4: "Голоса с указанным именем не найдены."
 tts_selector_error_5: "Ошибка получения данных."
 tts_selector_error_6: "Не удалось получить голоса: "
-tts_selector_kokoro: "Выберите голос для Kokoro TTS"
 
+tts_selector_kokoro: "Конфигурация Kokoro TTS"
+tts_selector_kokoro_lbl_1: "ВЫБЕРИТЕ ОЗВУЧКУ KOKORO"
+
+tts_selector_silero: "Конфигурация Silero RU"
+tts_selector_silero_lbl_1: "ВЫБЕРИТЕ РУССКУЮ ОЗВУЧКУ"
+
+tts_selector_qwen3: "Конфигурация Qwen 3 TTS"
+tts_selector_qwen3_lbl_1: "РАЗМЕР МОДЕЛИ"
+tts_selector_qwen3_lbl_2: "ЯЗЫК"
+tts_selector_qwen3_lbl_device: "УСТРОЙСТВО ВЫЧИСЛЕНИЙ"
+tts_qwen_mode: "РЕЖИМ ГЕНЕРАЦИИ"
+tts_selector_qwen3_lbl_3: "ВЫБЕРИТЕ ГОЛОС ИЗ СПИСКА"
+tts_selector_qwen3_lbl_4: "ОПИШИТЕ ГОЛОС НА АНГЛИЙСКОМ (ПРОМПТ)"
+tts_selector_qwen3_lbl_5: "ПРИМЕР АУДИОФАЙЛА (.WAV)"
+tts_selector_qwen3_lbl_6: "Не выбрано ни одного примерного аудио"
+
+
+# ──────────────────────────────────────────────────────────
+# EXPRESSIONS SELECTOR
+# ──────────────────────────────────────────────────────────
 expressions_selector_title: "Выбор выражения"
 expressions_selector_choose_method: "Выбор метода выражения"
 expressions_selector_nothing: "Кромешная пустота"
@@ -550,37 +921,78 @@ expressions_selector_mode_saved_title: "Метод выражения сохра
 expressions_selector_mode_saved_body: "Метод выражения успешно сохранён"
 expressions_selector_select_folder: "Выберите папку с эмоциями"
 expressions_selector_no_folders: "Папок не найдено"
-
 expressions_selector_invalid_directory: "Недопустимая директория для выражений"
 expressions_selector_folder_saved_title: "Директория с выражениями сохранена"
 expressions_selector_foler_saved_body: "Директория с выражениями успешно сохранена"
-
 expressions_selector_select_folder_live2d: "Выберите директорию с моделью Live2D"
 expressions_selector_live2d_folder_saved_title: "Директория с Live2D моделью сохранена"
 expressions_selector_live2d_folder_saved_body: "Live2D директория успешно сохранена"
-
 expressions_selector_select_file_vrm: "Выберите файл с VRM"
 expressions_vrm_selector_no_files: "No VRM files found"
 expressions_vrm_selector_invalid_directory: "Неверная директория VRM файлов"
 expressions_selector_vrm_file_saved_title: "VRM файл сохранен"
 expressions_selector_vrm_file_saved_body: "VRM файл успешно сохранен"
 
-characters_gateway_character_ai_error: "У вас нет токена от Character AI"
+visual_engine_menu_title: "МЕТОД ВИЗУАЛИЗАЦИИ"
+expressions_selector_nothing_desc: "Отключите расширенную визуализацию. Будет отображаться только аватарка персонажа."
+
+motion_mapper_title: "Выбор анимаций Live2D"
+motion_mapper_desc: "Присвойте каждой из 28 эмоций определённую группу анимации модели Live2D."
+reset_def_btn: "Сбросить"
+save_mapping_btn: "Сохранить"
+
+
+# ──────────────────────────────────────────────────────────
+# CHARACTERS GATEWAY
+# ──────────────────────────────────────────────────────────
 characters_gateway_trending: "В тренде"
 characters_gateway_query: "Ваш поисковый запрос: "
 characters_gateway_tab_title: "Карточки Персонажей"
 characters_gateway_cai_add: "Добавить в список"
 
+# Gateway Preview Dialog
+gw_preview_type_lorebook: "КНИГА ЗНАНИЙ"
+gw_preview_type_scene: "СЦЕНАРИЙ СЦЕНЫ"
+gw_preview_loading: "Установка безопасного канала связи...\nПолучение метаданных ассета..."
+gw_preview_btn_close: "Закрыть"
+gw_preview_btn_import: "Импортировать"
+gw_preview_error: "⚠️  Ошибка подключения к базе данных\nНе удалось получить информацию об ассете:\n{error}"
+gw_preview_lorebook_summary: "База данных содержит {count} когнитивных правил:"
+gw_preview_unnamed: "Безымянная запись"
+gw_preview_trigger: "Триггер"
+gw_preview_keys: "Ключи"
+gw_preview_header_context: "КОНТЕКСТ МИРА И СЦЕНАРИЙ"
+gw_preview_header_narration: "ВВОДНАЯ РЕЧЬ РАССКАЗЧИКА"
+gw_preview_header_style: "СТИЛЬ РАССКАЗЧИКА"
+gw_preview_tone: "Тон"
+gw_preview_time: "Время"
+
+gw_card_author_prefix: "от {author}"
+gw_card_entries: "📖  Записей: {count}"
+gw_card_location: "📍  {location}"
+gw_card_add_lorebook: "Добавить"
+gw_card_add_scene: "Добавить"
+
+# ──────────────────────────────────────────────────────────
+# CHAT — MESSAGE ACTIONS
+# ──────────────────────────────────────────────────────────
 chat_edit_message: "Редактировать сообщение"
 chat_save_message: "Сохранить"
 chat_delete_message: "Удалить"
 chat_edit_message_2: "Редактировать"
 chat_continue_message: "Продолжить с этого сообщения"
 chat_regenerate_message: "Перегенерировать"
+msg_action_translate: "Перевести"
+msg_action_generate_image: "Сгенерировать Изображение"
 
+
+# ──────────────────────────────────────────────────────────
+# CHARACTER INFO PANEL
+# ──────────────────────────────────────────────────────────
 creator_info_button: "Заметки автора"
 creator_info_window_title: "Заметки автора"
 creator_info_title: "Заголовок от автора:"
+creator_info_close_button: "Закрыть"
 export_card_button: "Экспортировать персонажа"
 character_edit_settings: "Настройки Персонажа: "
 character_edit_description: "Описание персонажа:"
@@ -600,20 +1012,26 @@ character_edit_saved_error_2: "Персонаж не был найден в ко
 character_edit_start_new_dialogue: "Создать новый чат"
 character_edit_start_new_dialogue_sure: "Вы уверены, что хотите начать новый чат?"
 character_edit_start_new_dialogue_success: "Новый чат успешно создан"
+character_settings_engine: "НАСТРОЙКИ ПЕРСОНАЖА"
+character_settings_subtitle: "МЕТАДАННЫЕ И ПРОМПТЫ"
+character_settings_name_label: "ИМЯ ПЕРСОНАЖА"
+character_settings_nav_label: "КОНФИГУРАЦИЯ"
+character_settings_new_chat_btn: "НОВЫЙ ЧАТ"
+character_settings_save_btn: "СОХРАНИТЬ ИЗМЕНЕНИЯ"
+character_settings_close_btn: "ЗАКРЫТЬ"
+character_card_label: "Карточка персонажа"
+export_card_dialog_title: "Экспортировать карточку персонажа"
+chat_manager_label: "Управление историей чатов"
+character_edit_conv_method: "Метод общения"
+character_edit_persona: "Персона пользователя"
+character_edit_prompt_preset: "Пресет системного промпта"
+character_edit_lorebooks: "Лорбуки"
+character_settings_none: "Нет"
+character_settings_selected_count: "Выбрано: {count}"
 
-llm_error_title: "Нет локальной LLM"
-llm_error_body: "Выберите локальную LLM в Хабе Моделей."
-
-voice_error_title: "Нет озвучки"
-voice_error_body: "Назначьте озвучку персонажу перед тем, как начать звонок."
-
-sow_system_status_speak: "Говорите..."
-sow_system_status_stop: "Начать разговор"
-
-no_gui_error_title: "Некорректный выбор отображения персонажа"
-no_gui_error_body: "Выберите Live2D или VRM модель для работы режима без интерфейса."
-
-# Character information menu
+# ──────────────────────────────────────────────────────────
+# CHAT MANAGER (Import/Export)
+# ──────────────────────────────────────────────────────────
 invalid_sowchat_file: "Файл должен иметь расширение .sowchat"
 import_chat_mismatch_title: "Конфликт импорта чатов"
 import_chat_mismatch: "Этот чат был создан для {exported_from}, но вы пытается добавить его {character_name}. Все равно продолжить?"
@@ -627,18 +1045,494 @@ rename_chat_button: ""
 delete_chat_button: ""
 export_chat_button: ""
 import_chat_button: ""
+btn_duplicate_character: "Дублировать"
 
-# Tooltips
-smart_memory_tooltip: |-
-  <b>💡 Модуль Умной Памяти</b><br><br>
 
-  Эта функция позволяет персонажам <b>помнить важные моменты</b> из вашего чата.<br><br>
-  Система <b>грамотно анализирует</b>, о чём вы говорили ранее, и вспоминает только то, что подходит по смыслу к вашему отправленному сообщению.
-  Таким образом вы можете не беспокоиться об ограниченности контекстного окна, а скорость генерации текста останется на прежнем уровне и не будет замедляться.<br><br>
+# ──────────────────────────────────────────────────────────
+# FOLDER MANAGER
+# ──────────────────────────────────────────────────────────
+new_folder_btn:             "Новая папка"
+folder_create_title:        "Новая папка"
+folder_create_subtitle:     "Сгруппируйте своих персонажей в отдельную папку"
+folder_name_label:          "Название папки:"
+folder_name_placeholder:    "Введите название..."
+folder_select_chars_label:  "Выберите персонажей:"
+folder_create_btn:          "Создать папку"
+folder_create_btn_with_count: "Создать папку ({group_count})"
+folder_created:             "Папка создана!"
+folder_name_empty:          "Введите название папки"
+folder_name_exists:         "Папка с таким именем уже есть"
+folder_editor_title:        "Редактировать папку"
+folder_members_label:       "Персонажи в папке:"
+folder_add_char:            "Добавить персонажа"
+folder_remove_char:         "Убрать выбранного"
+folder_add_char_title:      "Добавить персонажа"
+folder_add_char_prompt:     "Выберите:"
+folder_drag_tip:            "Перетащите для сортировки"
+folder_save_btn:            "Сохранить"
+folder_saved:               "Папка сохранена!"
+folder_delete_btn:          "Удалить папку"
+folder_delete_confirm_title: "Удалить папку"
+folder_delete_confirm_msg: "Удалить эту папку?"
+folder_delete_detail:      "Персонажи вернутся в основной список."
+folder_characters_label:    "персонажей"
+folder_edit_btn:            "Редактировать"
+move_to_folder_btn:         "Переместить в папку"
+remove_from_folder:         "Убрать из папки"
+no_folders_title:           "Нет папок"
+no_folders_prompt:          "Папок пока нет. Создать?"
+folder_select_hint: "Нажмите, чтобы выбрать"
+selected_label: "выбрано"
 
-  <b>Пример:</b><br>
-  Если вы сказали: <i>«Мне не нравятся коты»</i>, персонаж вспомнит эту информацию позже, 
-  даже если это было озвучено 100 сообщений назад.
+
+# ──────────────────────────────────────────────────────────
+# DRAG & DROP OVERLAY
+# ──────────────────────────────────────────────────────────
+drag_and_drop_overlay: "Перетащите карточку в формате .png или .json прямо сюда,\nчтобы импортировать в Soul of Waifu"
+
+# ──────────────────────────────────────────────────────────
+# IMAGE GENERATION SETTINGS
+# ──────────────────────────────────────────────────────────
+image_gen_editor_title: "Настройки генерации изображений"
+image_gen_enable: "Включить генерацию изображений"
+image_gen_grp_connection: "Подключение"
+image_gen_provider: "Провайдер:"
+image_gen_api_url: "URL API (только локальный):"
+image_gen_grp_prompts: "Внедрение промптов"
+image_gen_prefix: "Префикс промпт (добавляется всегда):"
+image_gen_negative: "Негативный промпт:"
+image_gen_grp_dimensions: "Параметры генерации"
+image_gen_width: "Ширина:"
+image_gen_height: "Высота:"
+image_gen_steps: "Шаги:"
+image_gen_warning: "⚠ Внимание: Одновременная работа локальной LLM и локальной генерации изображений требует большого объема VRAM. Вы можете столкнуться с ошибками нехватки памяти (Out-of-Memory), если вашей видеокарте не хватит мощности."
+image_gen_save: "Сохранить && Закрыть"
+image_gen_subtitle: "ЛОКАЛЬНАЯ И ОБЛАЧНАЯ ДИФФУЗИЯ"
+image_gen_api_key_placeholder: "Введите API-ключ здесь..."
+
+
+# ──────────────────────────────────────────────────────────
+# DISCORD GATEWAY
+# ──────────────────────────────────────────────────────────
+discord_gateway_title: "Discord Gateway"
+discord_info: "Введите токен вашего Discord-бота, чтобы подключить текущего активного персонажа к Discord. Бот будет отвечать на сообщения на серверах, к которым у него есть доступ."
+discord_status_stopped: "Статус: Остановлен"
+discord_status_running: "Статус: Запущен"
+discord_start_btn: "Запустить бота"
+discord_stop_btn: "Остановить бота"
+discord_gateway_header: "DISCORD GATEWAY"
+discord_gateway_subtitle: "ИНТЕГРАЦИЯ БОТА"
+discord_token_label: "ТОКЕН БОТА"
+discord_gateway_status: "Текущий статус:"
+discord_status_running: "ЗАПУЩЕН"
+discord_status_stopped: "ОСТАНОВЛЕН"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL MEMORY
+# ──────────────────────────────────────────────────────────
+soul_memory_title: "Soul Memory Archive"
+soul_memory_subtitle: "Агент Soul Memory анализирует диалоги и обновляет базу данных в фоне. Вы можете редактировать факты вручную."
+soul_memory_placeholder: "Содержимое файла памяти появится здесь..."
+soul_memory_tab_db: "База данных"
+soul_memory_tab_user: "Профиль Пользователя"
+soul_memory_tab_diary: "Дневник"
+soul_memory_tab_logs: "Журнал самоисцеления"
+soul_memory_btn_save: "Сохранить изменения"
+soul_memory_btn_delete: "Удалить файл"
+soul_memory_btn_refresh: " Обновить"
+soul_memory_btn_open: " Открыть папку .soul"
+soul_memory_btn_edit: "Редактировать"
+soul_memory_btn_preview: "Предпросмотр"
+soul_memory_save_success: "Успешно сохранено"
+soul_memory_save_error: "Ошибка сохранения"
+soul_memory_del_title: "Подтверждение удаления"
+soul_memory_del_text: "Вы уверены, что хотите навсегда удалить этот файл памяти?"
+soul_memory_del_success: "Файл удален"
+soul_memory_del_error: "Ошибка удаления"
+soul_memory_logs_empty: "Журнал пуст. Пообщайтесь с персонажем, чтобы запустить анализ памяти."
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — LOBBY & SCENE CARDS
+# ──────────────────────────────────────────────────────────
+soul_stage_title: "Soul Stage"
+new_scene: "＋ Новая сцена"
+search_scenes: "Поиск сцен..."
+no_scenes: "Сцен пока нет.\nНажмите  ＋ Новая сцена  чтобы начать историю."
+export_scene: "Экспорт"
+import_scene: "Импорт"
+export_all: "Экспорт всех"
+import_file: "Импорт сцены"
+play: "Играть"
+edit: "Редакт."
+delete: "Удалить"
+new_adventure: "Новое приключение"
+no_description: "Описание отсутствует."
+export_title: "Экспорт сцены"
+import_title: "Импорт сцены"
+export_success: "Сцена успешно экспортирована!"
+import_success: "Сцена успешно импортирована!"
+import_error: "Не удалось импортировать сцену. Неверный формат файла."
+select_file: "Выберите файл сцены"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — SCENE EDITOR
+# ──────────────────────────────────────────────────────────
+back: "← Назад"
+edit_scene: "Редактировать сцену"
+save_launch: "Сохранить и запустить  ▶"
+save_changes: "Сохранить изменения"
+section_identity: "I.  ИДЕНТИФИИКАЦИЯ СЦЕНЫ"
+section_world: "II.  МИР И ОКРУЖЕНИЕ"
+section_opening: "III.  НАЧАЛО ИСТОРИИ"
+section_party: "IV.  УЧАСТНИКИ ПАТИ"
+section_engine: "V.  НАСТРОЙКИ ДВИЖКА"
+title: "Название  *"
+short_description: "Краткое описание"
+world_context: "Контекст мира / Сценарий  *"
+world_context_hint: "Внедряется в каждый AI-промпт как базовая истина."
+starting_location: "Начальная локация"
+time_of_day: "Время суток"
+gm_tone: "Тон ГМ"
+starting_background: "Начальный фон"
+starting_background_hint: "Планировщик может менять это динамически во время сцены."
+starting_ambient: "Начальный эмбиент"
+starting_ambient_hint: "Фоновый аудио для этой сцены. Планировщик может переключать его динамически."
+opening_narration: "Открывающая речь  *"
+opening_narration_hint: "Первые слова Рассказчика — помещает игрока в сцену."
+first_message: "Первое сообщение персонажа  (опционально)"
+select_characters: "Выберите персонажей для этой сцены"
+no_characters: "Персонажи не найдены."
+conversation_method: "Метод общения"
+user_persona: "Персона пользователя"
+user_persona_hint: "Имя и аватар, отображаемые в чате для ваших сообщений."
+lorebook: "Лорбук  (опционально)"
+title_placeholder: "напр. Обсидиановая Цитадель"
+desc_placeholder: "Краткое описание для списка"
+world_placeholder: "Лор, текущее напряжение, правила магии или физики..."
+location_placeholder: "напр. Таверна Золотой Дракон"
+opening_placeholder: "Дождь бьёт по брусчатке, когда вы толкаете тяжёлую железную дверь..."
+first_msg_placeholder: "Опциональное приветствие от первого участника пати."
+morning: "Утро"
+day: "День"
+evening: "Вечер"
+night: "Ночь"
+epic_fantasy: "Эпическое фэнтези"
+slice_of_life: "Повседневность"
+mystery_noir: "Мистика и Нуар"
+romance: "Романтика"
+horror: "Ужасы"
+comedy: "Комедия"
+sci_fi: "Научная фантастика"
+narrator_style: "Стиль Рассказчика"
+narrator_style_hint: "Определяет конкретный стиль изложения, авторский голос или темп повествования."
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — CHAT & UI
+# ──────────────────────────────────────────────────────────
+narrator: "⬡  РАССКАЗЧИК"
+party_prefix: "✦"
+interactive_narrative: "Интерактивный нарратив"
+memory: "⊕ Память"
+intervene: "⚡ Вмешаться"
+continue_session: "Продолжить"
+new_session: "Новая сессия"
+cancel: "Отмена"
+narrator_image_generating: "⬡  ГЕНЕРАЦИЯ ИЗОБРАЖЕНИЯ СЦЕНЫ..."
+narrator_image_done: "⬡  ИЗОБРАЖЕНИЕ СЦЕНЫ"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — PLOT WISH DIALOG
+# ──────────────────────────────────────────────────────────
+plot_wish_dialog_title: "Продолжить сюжет"
+plot_wish_label: "Что должно произойти дальше? (Опциональные подсказки для ИИ)"
+plot_wish_placeholder: "напр. Снаружи раздается взрыв или кто-то стучит в дверь..."
+plot_wish_continue_btn: "Продолжить сюжет"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — SETUP & ERRORS
+# ──────────────────────────────────────────────────────────
+ss_setup_dialog_title: "Soul Stage — Настройка пати"
+ss_setup_header: "⬡ Soul Stage"
+ss_setup_sub: "Выберите персонажей для пати. <b>{name}</b> добавлен автоматически."
+ss_setup_btn_launch: "⬡ Запустить Soul Stage"
+ss_activated_msg: "<i>Soul Stage активирован.</i><br><i>Пати: {party}</i><br><i>Опишите действие — история начнётся.</i>"
+ss_deactivated_msg: "<i>Soul Stage завершён. Обычный режим восстановлен.</i>"
+ss_error: "ОШИБКА"
+error_header: "⚠ ОШИБКА"
+error_generation_header: "⚠ ОШИБКА ГЕНЕРАЦИИ"
+error_generation_failed: "Не удалось сгенерировать изображение."
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — SESSION DIALOGS
+# ──────────────────────────────────────────────────────────
+scene_has_entries: "Эта сцена содержит {} сохранённых записей.\nПродолжить или начать новую сессию?"
+delete_scene_title: "Удалить сцену"
+delete_scene_confirm: "Навсегда удалить эту сцену и всю её историю?"
+delete_scene_detail: '"{title}" · {count} сохранённых сообщений будет потеряно.'
+open_scene_title: "Soul Stage — Открыть сцену"
+open_scene_has_history: "Эта сцена содержит сохранённую историю"
+open_scene_continue_desc: "Загрузить {count} сообщ. и продолжить"
+open_scene_new_desc: "Начать заново — история будет очищена"
+memory_select_title: "Soul Memory — Выбор персонажа"
+memory_select_query: "Чьи воспоминания вы хотите просмотреть?"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — INVENTORY
+# ──────────────────────────────────────────────────────────
+inventory: "Инвентарь"
+inventory_full_title: "Инвентарь — Soul Stage"
+inventory_empty: "Ваш инвентарь пуст."
+items_count: "Предметов: {count}"
+category_weapons: "Оружие"
+category_consumables: "Расходники"
+category_tools: "Инструменты"
+category_valuables: "Ценности"
+category_quest_items: "Квестовые предметы"
+category_other: "Прочее"
+btn_use: "Исп."
+btn_drop: "Выбр."
+tooltip_drop: "Выбросить предмет"
+tooltip_open_inventory: "Открыть полный инвентарь"
+tooltip_use_item: "Использовать: {item}"
+more_items: "ещё +{count}"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — CHOICES BAR
+# ──────────────────────────────────────────────────────────
+choice_hint_none: "ВЫБЕРИТЕ ДЕЙСТВИЕ — ИЛИ НАПИШИТЕ СВОЁ"
+choice_hint_encounter: "РЕАГИРУЙТЕ НА УГРОЗУ — ИЛИ НАПИШИТЕ СВОЁ"
+choice_hint_discovery: "ЧТО ВЫ СДЕЛАЕТЕ? — ИЛИ НАПИШИТЕ СВОЁ"
+choice_hint_visitor: "КАК ВЫ ОТВЕТИТЕ? — ИЛИ НАПИШИТЕ СВОЁ"
+choice_hint_twist: "ВАШ ХОД — ИЛИ НАПИШИТЕ СВОЁ"
+choice_hint_romance: "ВЫБЕРИТЕ ОТВЕТ — ИЛИ НАПИШИТЕ СВОЁ"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — WORLD STATE WINDOW
+# ──────────────────────────────────────────────────────────
+world_state_title: "Состояние мира — Soul Stage"
+tab_scene: "Сцена"
+tab_facts: "Ключевые факты"
+tab_inventory: "Инвентарь"
+tab_status: "Статус"
+tab_npcs: "Активные NPC"
+section_environment: "Настройка окружения"
+section_memory: "Память мира"
+section_player_items: "Предметы игрока"
+section_player_conditions: "Состояние игрока"
+section_npcs: "Персонажи на сцене"
+field_location: "Локация"
+field_time: "Время суток"
+field_atmosphere: "Атмосфера"
+field_facts_hint: 'Формат: "ключ: значение" (по одному на строку)'
+field_inventory_hint: "Один предмет на строку"
+field_status_hint: "Одно состояние на строку"
+field_status_effects: "Эффекты Состояния"
+hint_npc_readonly: "NPC, созданные движком (только чтение)"
+no_active_npcs: "В этой сцене нет активных NPC"
+btn_apply_changes: "Применить"
+unknown: "Неизвестно"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — TOOLTIPS & BUTTONS
+# ──────────────────────────────────────────────────────────
+tooltip_soul_memory: "Soul Memory"
+tooltip_world_state: "Состояние мира"
+tooltip_continue_plot: "Продолжить сюжет"
+tooltip_intervene: "Вмешаться (остановить ход ИИ)"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — EVENT CARDS
+# ──────────────────────────────────────────────────────────
+event_encounter: "СТОЛКНОВЕНИЕ"
+event_discovery: "ОТКРЫТИЕ"
+event_visitor: "ПОСЕТИТЕЛЬ"
+event_twist: "ПОВОРОТ СЮЖЕТА"
+event_moment: "МОМЕНТ"
+
+
+# ──────────────────────────────────────────────────────────
+# SOUL STAGE — NARRATOR MODE
+# ──────────────────────────────────────────────────────────
+soul_stage_mode_title: "Soul Stage: Оркестрация сюжета"
+soul_stage_narrator_name: "Рассказчик"
+soul_stage_active_actors: "Сейчас на сцене"
+soul_stage_backstage: "За кулисами / Ростер"
+soul_stage_btn_interrupt: "Вмешаться в разговор"
+soul_stage_btn_spawn: "Призвать NPC"
+soul_stage_wait_user: "Ожидание действий игрока..."
+soul_stage_log_spawn: "Рассказчик призвал нового персонажа: "
+soul_stage_log_remove: "Персонаж покинул сцену: "
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — NOTIFICATIONS & ERRORS
+# ──────────────────────────────────────────────────────────
+llm_error_title: "Нет локальной LLM"
+llm_error_body: "Выберите локальную LLM в Хабе Моделей."
+voice_error_title: "Нет озвучки"
+voice_error_body: "Назначьте озвучку персонажу перед тем, как начать звонок."
+sow_system_status_speak: "Говорите..."
+sow_system_status_stop: "Начать разговор"
+no_gui_error_title: "Некорректный выбор отображения персонажа"
+no_gui_error_body: "Выберите Live2D или VRM модель для работы режима без интерфейса."
+persona_error_title: "Измените персону"
+persona_error_body: "Выбрана несуществующая персона, пожалуйста, измените её."
+add_character_text_1: "был успешно добавлен!"
+add_character_text_2: "Теперь вы можете взаимодействовать с персонажем через список персонажей"
+add_character_text_3: "При добавлении персонажа произошла ошибка."
+add_character_text_4: "Попробуйте ещё раз."
+add_character_error: "Назначьте имя и первое сообщение вашему персонажу."
+add_character_title_error: "Ошибка добавления персонажа"
+delete_message_1: "Удалить Персонажа"
+delete_message_2: "Вы уверены, что хотите удалить "
+welcome_message: "Добро пожаловать в Soul of Waifu, "
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — CREATE CHARACTER DIALOG
+# ──────────────────────────────────────────────────────────
+create_character_title: "Выбор метода общения"
+create_character_title_2: "Выбор метода общения"
+create_character_select_button: "Выбрать"
+radio_mistral_ai: " Mistral AI"
+radio_open_ai: " Open AI или Open AI-like"
+radio_openrouter: " OpenRouter"
+radio_local_llm: " Локальный LLM"
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — MODEL LOADING
+# ──────────────────────────────────────────────────────────
+model_loading_step_1: "ИНИЦИАЛИЗАЦИЯ..."
+model_loading_step_2: "АНАЛИЗ GGUF..."
+model_loading_step_3: "ЗАГРУЗКА ТЕНЗОРОВ..."
+model_loading_step_4: "ВЫДЕЛЕНИЕ ПАМЯТИ..."
+model_loading_step_5: "ФИНАЛИЗАЦИЯ..."
+model_loading_step_6: "МОДЕЛЬ ЗАГРУЖЕНА"
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — UPDATE & LANGUAGE
+# ──────────────────────────────────────────────────────────
+update_available_title: "Обновление Доступно"
+update_available_body: "Доступна новая версия: "
+update_available_info: "Вы хотите обновить программу?"
+update_current_version: "Текущая версия: v2.4.0"
+update_available_close: "Закрыть"
+update_available_link: "Перейти на GitHub"
+language_changed_title: "Требуется перезагрузка"
+language_changed_body: "Программа должна быть перезапущена, чтобы изменения вступили в силу."
+language_changed_question: "Вы хотите перезапустить программу сейчас?"
+language_changed_yes: "Да"
+language_changed_no: "Нет"
+
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — ABOUT & MISC
+# ──────────────────────────────────────────────────────────
+about_program: "О Soul of Waifu"
+about_program_title: "О Soul of Waifu"
+about_program_description: "<b>Soul of Waifu</b> — это продвинутая платформа для ведения ролевых игр с искуственным интеллектом, созданная для воплощения виртуальных личностей в жизнь внутри полноценной экосистемы. Создавайте уникальных персонажей с нуля или мгновенно импортируйте их простым перетаскиванием (Drag-and-Drop) стандартных карточек V2. Запускайте модели с полной конфиденциальностью на собственном оборудовании через GGUF (с аппаратным ускорением под CPU, CUDA, Vulkan, AMD HIP и Intel SYCL) или подключайтесь к ведущим облачным API, включая OpenAI, Anthropic, DeepSeek и Google Gemini.<br><br>Наша уникальная когнитивная архитектура полностью переосмысляет границы общения с ИИ. Благодаря модулю <b>Soul Memory</b> персонажи формируют настоящие, самоисцеляющиеся долгосрочные воспоминания и ведут личные дневники, выходя далеко за рамки классического векторного поиска (RAG). Наслаждайтесь бесшовным живым общением с интерактивными Live2D и VRM аватарами, речь которых генерируется на лету через множество движков Text-to-Speech.<br><br>Управляйте своим опытом в разных режимах: ведите глубокие настольные ролевые игры в режиме <b>Soul Stage</b> под руководством виртуального Мастера Игры, или выведите на рабочий стол полупрозрачный виджет <b>Soul Companion</b>. Спутник управляется динамической нейрогормональной системой, реагирует на вашу активность на экране, читает буфер обмена, ищет информацию в сети и поддерживает кастомные MCP-инструменты. Общайтесь так, как удобно именно вам — на ПК, в Discord или со смартфона через встроенный локальный веб-клиент!"
+support_btn: "Поддержать"
+creator_label: "Разработал"
+simple_version_label: "Версия"
+version_label: "Soul of Waifu v2.4.0"
+nsfw_checkbox: "NSFW"
+value: "Значение: "
+
+# ──────────────────────────────────────────────────────────
+# SYSTEM — TOAST NOTIFICATIONS
+# ──────────────────────────────────────────────────────────
+duplicate_title: "Персонаж дублирован"
+character_edit_title: "Настройки персонажа"
+add_character_error_title: "Ошибка создания"
+duplicate_character_error_title: "Дублирование имени"
+system_error_title: "Ошибка системы"
+new_chat_toast_title: "Чат"
+toast_folder_title: "Управление папками"
+toast_folder_error_title: "Ошибка папки"
+soul_memory_no_chat: "Откройте чат с персонажем."
+soul_memory_empty: "История чата пустая."
+soul_memory_manual_start: "Началось ручное обновление памяти..."
+toast_voice_settings_title: "Настройки озвучки"
+toast_search_title: "Поиск озвучки"
+toast_connection_error_title: "Ошибка подключения"
+toast_visual_settings_title: "Настройки визуализации"
+toast_llm_error_title: "Ошибка конфигурации"
+toast_translate_error_title: "Ошибка перевода"
+toast_image_gen_title: "Генерация изображения"
+toast_image_gen_prompt_error: "Не удалось сгенерировать промпт для изображения."
+toast_image_gen_creating: "Генерация изображения..."
+toast_image_gen_failed: "Не удалось сгенерировать изображение."
+toast_message_editor_title: "Редактирование сообщения"
+toast_character_editor_title: "Редактор персонажа"
+toast_call_system_title: "Голосовой режим"
+toast_profile_error_title: "Ошибка персоны"
+toast_companion_error_title: "Ошибка режима компаньона"
+toast_persona_exist: "Персона с таким именем уже существует"
+toast_success: "Успех"
+toast_saved_successfully: "Успешно сохранено"
+
+# ──────────────────────────────────────────────────────────
+# TOOLTIPS — MODULES & FEATURES
+# ──────────────────────────────────────────────────────────
+soul_memory_tooltip: |-
+  <b>🧠 Soul Memory</b><br><br>
+  Превратите своего персонажа из обычного ИИ в живую цифровую личность с <b>непрерывной бесконечной памятью</b>. Это когнитивное ядро всей экосистемы Soul of Waifu.<br><br>
+  Вместо того чтобы полагаться на несовершенный поиск по тексту, Soul Memory использует продвинутую <b>многоагентную архитектуру</b>:<br>
+  • <b>Двухконтурный индекс:</b> Изолирует внутренний мир и психологию персонажа (<i>MEMORY.md</i>) от профиля пользователя и метаданных отношений (<i>USER.md</i>). Это предотвращает «размытие ролей» и оптимизирует кэширование промптов (Prompt Caching).<br>
+  • <b>Архивариус и Дневники:</b> Фоновые агенты автоматически формируют сжатые тематические статьи о мире и пишут глубокие <i>личные эмоциональные дневники от первого лица</i> о вашем общении.<br>
+  • <b>Самоисцеление и угасание:</b> Система самостоятельно обнаруживает и устраняет логические противоречия в памяти, а также плавно и естественно сглаживает неактивные эмоции со временем.<br><br>
+  Результат? Никакого раздувания контекста мусором и абсолютная стабильность личности. Где бы вы ни находились — в приключении Soul Stage или в уютной обстановке с компаньоном на рабочем столе — <b>ваш персонаж вспомнит всё</b>.
+
+sm_mode_full: "Полная Синхронизация"
+sm_mode_soul_link: "Связь Души"
+sm_mode_mind_spark: "Искра Разума"
+sm_mode_reflection_flow: "Поток Рефлексии"
+
+sm_mode_full_tooltip: |-
+  <b>🌌 Полная Синхронизация</b><br><br>
+  Полная когнитивная связь. Активирован каждый аспект персонажа:<br><br>
+  • <b>Психологический индекс:</b> Отслеживание настроения в реальном времени.<br>
+  • <b>Темы лора:</b> Глубокая проработка мира и фактов персонажа.<br>
+  • <b>Дневники:</b> Эмоциональные размышления от первого лица.<br><br>
+  <i>Максимальное погружение. Требует мощной системы или API.</i>
+
+sm_mode_soul_link_tooltip: |-
+  <b>🔗 Связь Души</b><br><br>
+  Фокус на личности и чувствах.<br><br>
+  • Обновляет индекс <b>MEMORY.md</b>, чтобы сохранять настроение и цели персонажа.<br>
+  • <b>Агент-Дневник</b> записывает его мысли о вас в файл дневника.<br><br>
+  <b>Что отключено:</b> Система не тратит ресурсы на создание или обновление энциклопедии (Топиков).<br><br>
+  <i>Лучший выбор для: Поддержания глубокой связи без лишней нагрузки на ПК.</i>
+
+sm_mode_mind_spark_tooltip: |-
+  <b>⚡ Искра Разума</b><br><br>
+  Тактическая память для максимальной скорости.<br><br>
+  • Обновляет <b>ТОЛЬКО</b> психологический индекс <b>MEMORY.md</b>.<br><br>
+  Гарантирует, что персонаж помнит, кто он, что чувствует и чего хочет прямо сейчас.<br><br>
+  <b>Что отключено:</b> Дневники и записи о мире не генерируются.<br><br>
+  <i>Лучший выбор для: Слабых систем или динамичного экшен-РП.</i>
+
+sm_mode_reflection_flow_tooltip: |-
+  <b>📓 Поток Рефлексии</b><br><br>
+  Эмоциональный лог с около-нулевым влиянием на скорость диалога.<br><br>
+  • Активен только <b>Агент-Дневник</b>.<br><br>
+  Персонаж не меняет свое состояние "в моменте", но подводит эмоциональный итог общения с вами.<br><br>
+  <b>Что отключено:</b> Никаких правок в индексе или лоре.<br><br>
+  <i>Лучший выбор для: Максимальной плавности чата при сохранении истории чувств.</i>
 
 ambient_sound_tooltip: |-
   <b>🎵 Модуль Эмбиента</b><br><br>
@@ -659,87 +1553,6 @@ sow_system_tooltip: |-
   • Назначать персонажам аватары — статичные или гиф-изображения, анимированные модели Live2D или объёмные VRM-модели;<br>
   • Звонить персонажам — общаться через микрофон в специальном интерфейсе, сделанном специально под этот режим;<br>
   • Подключать дополнительные модули: умную память, эмбиент, переводчик и многие другие.
-
-gpu_layers_tooltip: |-
-  <b>Регулировка слоёв видеокарты</b><br><br>
-  Эта настройка позволяет <b>управлять загрузкой локальной языковой модели</b> на вашей видеокарте, чтобы найти баланс между <b>скоростью работы</b> и <b>нагрузкой на GPU</b>.<br><br>
-  Чем больше слоёв модели работает на видеокарте, тем быстрее генерируется ответ, но выше потребление видеопамяти.<br>
-  Вы можете вручную указать, сколько слоёв загружать в VRAM — это помогает запускать модели даже на слабых или средних видеокартах.<br><br>
-
-  <b>Пример:</b><br>
-  Если у вас <i>видеокарта с 8 ГБ памяти</i>, вы можете загрузить 20 из 32 слоёв — 
-  этого хватит для плавной работы, но система при этом не будет испытывать серьезной нагрузки.<br><br>
-
-  💡 <i>Особенно полезно при запуске больших моделей (13B и выше). Чем мощнее GPU — тем больше слоёв можно выделить.</i>
-
-context_size_tooltip: |-
-  <b>Контекстное окно</b><br><br>
-  Это — <b>объём памяти</b>, который языковая модель использует при генерации ответа. 
-  Он включает в себя как ваш диалог, так и авторские заметки, информацию о персонаже и записи из лорбуков.<br><br>
-  Чем больше контекстное окно, тем <b>дольше персонаж может помнить</b> детали разговора, 
-  но при этом увеличивается нагрузка на память и может замедляться генерация.<br><br>
-
-  💡 <i>Рекомендуется уменьшить значение контекстного окна для слабых ПК. 
-  Максимальное значение зависит от модели и объёма памяти. Однако при использовании модуля "Умной Памяти", 
-  можно оптимизировать работу с контекстом чата.</i>
-
-mlock_tooltip: |-
-  <b>MLock (Memory Lock)</b><br><br>
-  Эта функция <b>предотвращает выгрузку языковой модели</b> из оперативной памяти (RAM), даже если система пытается её освободить.<br><br>
-  Это означает, что модель остаётся в памяти полностью, что обеспечивает <b>максимально быстрый отклик</b> при каждом новом запросе.<br><br>
-  Однако это увеличивает общее потребление оперативной памяти, и освободить её можно только отключением модели или полной остановкой программы.
-
-flashattention_tooltip: |-
-  <b>Flash Attention</b><br><br>
-  Эта технология <b>ускоряет работу языковой модели</b> и <b>снижает потребление видеопамяти</b> при обработке длинных чатов.<br><br>
-  Она оптимизирует внутренние вычисления, делая генерацию ответов <b>быстрее и эффективнее</b>, особенно при большом контексте (4K, 8K и выше).<br><br>
-
-  <b>Важно:</b><br>
-  Функция работает <b>только с видеокартами NVIDIA</b> (через технологию CUDA).<br>
-  На видеокартах AMD, Intel или при использовании CPU — <b>автоматически отключается</b>.<br><br>
-
-  💡 <i>Лучше всего проявляет себя при включённых функциях вроде "Умной Памяти" или при больших чатах. 
-  Если у вас видеокарта NVIDIA — обязательно включите для максимальной производительности.</i>
-
-temperature_tooltip: |-
-  <b>Температура модели</b><br><br>
-  Этот параметр определяет, насколько <b>креативным или предсказуемым</b> будет ответ персонажа.<br><br>
-  • <b>Низкая (0.1–0.5)</b> — персонаж говорит чётко и сухо.<br>
-  • <b>Средняя (0.6–0.8)</b> — баланс между смыслом и спонтанностью.<br>
-  • <b>Высокая (0.9–1.5)</b> — ответы креативные, добавляют элемент неожиданности.<br><br>
-
-  💡 <i>Рекомендуется 0.7–0.9 для интересного и живого диалога. Уменьшайте, если персонаж начинает бредить.</i>
-
-
-top_p_tooltip: |-
-  <b>Top P</b><br><br>
-  Этот параметр определяет, <b>насколько широко модель выбирает слова</b> при генерации ответа.<br><br>
-  Предположим, что модель "думает", какое следующее слово подставить в текст. Параметр Top P отвечает за количество вариантов этих слов.<br>
-  • <b>Низкое (0.1–0.5)</b> — выбирает только самые очевидные слова. Речь предсказуемая, но может быть сухой.<br>
-  • <b>Среднее (0.7–0.9)</b> — баланс между смыслом и естественностью. Идеально для диалогов.<br>
-  • <b>Высокое (0.95–1.0)</b> — учитывает редкие и неожиданные слова. Речь живая, но может быть странной.<br><br>
-
-  💡 <i>Рекомендуется 0.8–0.95. Сочетайте с температурой. Низкая температура при высоком значении Top P может предотвратить бредовость ответов персонажа.</i>
-
-repeat_penalty_tooltip: |-
-  <b>Штраф за повторение</b><br><br>
-  Этот параметр помогает персонажу <b>не повторять одно и то же</b> — слова, фразы или целые сообщения.<br><br>
-  Чем выше значение, тем сильнее модель <b>штрафует себя за повторение</b> уже сказанного.<br>
-  Это делает речь более разнообразной и естественной, особенно в длинных ответах.<br><br>
-
-  <b>Пример:</b><br>
-  При низком штрафе персонаж может сказать:<br>
-  <i>«Это важно, это важно, это важно…»</i><br>
-  С высоким штрафом он скажет:<br>
-  <i>«Это важно — и не только потому, что на кону стоит выживание, но и потому, что мы уже теряли слишком много»</i>
-
-
-max_tokens_tooltip: |-
-  <b>Максимальная длина ответа</b><br><br>
-  Этот параметр определяет, <b>насколько длинным может быть ответ</b> персонажа.<br><br>
-
-  💡 <i>Слишком длинные ответы могут засорять контекстное окно.
-  Рекомендуется 200–400 токенов для ответа. Увеличивайте только при необходимости.</i>
 
 personas_button_tooltip: "<b>Открывает редактор персон</b><br><br>Позволяет вам создавать, редактировать, выбирать и удалять персоны - информацию о пользователях, которые будут взаимодействовать с персонажами."
 
@@ -774,3 +1587,178 @@ lorebook_editor_button_tooltip: |-
   • <i>Текст:</i> «Soul of Waifu - это программа, которая позволяет общаться с ИИ.»<br>
   • <i>Ключевые слова:</i> Soul of Waifu, ИИ<br>
   Когда вы скажете: <i>«Что такое Soul of Waifu?»</i> — Персонаж вспомнит и ответит с информацией об этой записи.
+
+
+
+# ──────────────────────────────────────────────────────────
+# TOOLTIPS — LLM PARAMETERS
+# ──────────────────────────────────────────────────────────
+gpu_layers_tooltip: |-
+  <b>Загрузка слоев в GPU</b><br><br>
+  Позволяет <b>контролировать, какая часть модели</b> обрабатывается видеокартой (VRAM), а какая — процессором (RAM).<br><br>
+  Чем больше слоев в видеокарте, тем быстрее генерация, но тем выше требования к памяти.<br><br>
+  💡 <i>Особенно полезно для больших моделей (от 13B). Если у вас мощная видеокарта, выкручивайте на максимум.</i>
+
+context_size_tooltip: |-
+  <b>Окно контекста</b><br><br>
+  Это <b>объем памяти</b> нейросети для одного ответа. Выберите максимальный индекс для безграничного объема контекста (API).
+  Сюда входят: история чата, промпты, лорбуки и воспоминания.<br><br>
+  Чем больше контекст, тем <b>больше деталей помнит бот</b>, но это сильно расходует видеопамять (VRAM).<br><br>
+  💡 <i>На слабых ПК рекомендуется снижать. Для долгой памяти лучше используйте модуль "Soul Memory".</i>
+
+mlock_tooltip: |-
+  <b>MLock (Блокировка памяти)</b><br><br>
+  <b>Запрещает выгружать модель</b> из оперативной памяти в файл подкачки Windows.<br><br>
+  Гарантирует <b>максимально быстрый отклик</b> без микрофризов при отправке каждого нового сообщения.
+
+flashattention_tooltip: |-
+  <b>Flash Attention</b><br><br>
+  Новейшая технология, <b>ускоряющая генерацию</b> и <b>снижающая потребление VRAM</b> при обработке длинных чатов.<br><br>
+  Оптимизирует вычисления внутри нейросети на больших размерах контекста (4K, 8K и выше).<br><br>
+  💡 <i>Настоятельно рекомендуется всегда держать включенным.</i>
+
+max_tokens_tooltip: |-
+  <b>Макс. длина ответа</b><br><br>
+  Ограничивает <b>максимальное количество слов</b>, которое может написать персонаж за один раз.<br><br>
+  💡 <i>Слишком длинные ответы забивают контекст. Оптимально: 300–500 токенов.</i>
+
+chat_template_tooltip: |-
+  <b>Шаблон чата (Chat Template)</b><br><br>
+  Определяет, в каком формате ваш текст отправляется нейросети. Разные ИИ обучены на разных форматах.<br><br>
+  Если шаблон не совпадает с моделью, бот начнет галлюцинировать или выводить спецсимволы (например, <code>&lt;|im_end|&gt;</code>).<br><br>
+  💡 <i>'Auto' берет шаблон прямо из GGUF файла. Если модель ведет себя странно, выберите вручную 'ChatML' или 'Llama-3'.</i>
+
+stop_strings_tooltip: |-
+  <b>Стоп-строки (Stop Strings)</b><br><br>
+  Список слов или тегов, при появлении которых ИИ <b>немедленно прекращает генерацию</b>.<br><br>
+  Это важнейший инструмент, чтобы запретить ИИ говорить или действовать за вас (например, генерировать <code>\nUser:</code> и отвечать на свои же вопросы).<br><br>
+  💡 <i>Перечисляйте через запятую. Пример: <code>\nUser:, &lt;/s&gt;, &lt;|eot_id|&gt;</code></i>
+
+reasoning_mode_tooltip: |-
+  <b>Режим размышлений (Thinking Mode)</b><br><br>
+  Создан для мыслящих моделей вроде <i>DeepSeek-R1</i> или <i>QwQ</i>, которые генерируют внутренние рассуждения перед ответом.<br><br>
+  При включении интерфейс прячет теги <code>&lt;think&gt;</code> в красивый блок и <b>запрещает голосовому движку (TTS) читать мысли вслух</b>.<br><br>
+  💡 <i>Оставьте выключенным для обычных моделей (Llama-3, Mistral, обычный Qwen).</i>
+
+temperature_tooltip: |-
+  <b>Температура (Креативность)</b><br><br>
+  Контролирует базовый уровень хаоса в ответах.<br><br>
+  • <b>Низкая (0.1–0.5):</b> Логично и предсказуемо. Скучно для ролевых игр.<br>
+  • <b>Высокая (0.8–1.5):</b> Очень креативно, эмоционально и непредсказуемо.<br><br>
+  💡 <i>Рекомендуется: 0.8–1.0. При высоких значениях обязательно используйте <b>Min-P</b> для защиты от бреда.</i>
+
+freq_penalty_tooltip: |-
+  <b>Штраф за частоту (Frequency Penalty)</b><br><br>
+  Штрафует слова в зависимости от того, <b>сколько раз они уже встречались</b> в тексте.<br><br>
+  Заставляет ИИ использовать богатый словарный запас и искать синонимы, а не повторять одни и те же прилагательные.<br><br>
+  💡 <i>Слишком высокие значения ломают грамматику. Оптимально: 0.0 - 0.5.</i>
+
+pres_penalty_tooltip: |-
+  <b>Штраф за присутствие (Presence Penalty)</b><br><br>
+  Накладывает штраф на слово, если оно встретилось <b>хотя бы один раз</b>.<br><br>
+  В отличие от штрафа за частоту, это заставляет ИИ <b>менять тему разговора</b> и вводить новые концепции, не давая диалогу застрять в одной точке.<br><br>
+  💡 <i>При высоких значениях ИИ будет хаотично прыгать по темам. Оптимально: 0.0 - 0.4.</i>
+
+min_p_tooltip: |-
+  <b>Min-P (Умное отсечение)</b><br><br>
+  Новый золотой стандарт RolePlay. Динамически отсекает мусорные слова на основе вероятности самого лучшего слова.<br><br>
+  Если ИИ уверен в ответе, Min-P безжалостно режет бред. Если ИИ нужно проявить фантазию, барьер снижается, впуская красивые синонимы.<br><br>
+  💡 <i>Замена Top-P. Установите Top-P на 1.0, а Min-P на <b>0.05 - 0.10</b> для идеальной логики при высокой Температуре.</i>
+
+top_p_tooltip: |-
+  <b>Top-P</b><br><br>
+  Старый метод сэмплинга, ограничивающий выбор слов суммарным процентом вероятности.<br><br>
+  💡 <i>Если вы используете <b>Min-P</b>, обязательно отключите Top-P, установив его на <b>1.0</b>.</i>
+
+dyn_temp_min_tooltip: |-
+  <b>Динамическая Температура</b><br><br>
+  Вместо фиксированного значения, температура плавает между Мин. и Макс. границами в зависимости от уверенности ИИ.<br><br>
+  Описывая факты, температура падает для логики. Описывая эмоции, температура взлетает для креатива.
+
+dyn_temp_max_tooltip: |-
+  <b>Динамическая Температура</b><br><br>
+  Вместо фиксированного значения, температура плавает между Мин. и Макс. границами в зависимости от уверенности ИИ.<br><br>
+  Описывая факты, температура падает для логики. Описывая эмоции, температура взлетает для креатива.
+
+xtc_prob_tooltip: |-
+  <b>XTC (Удаление банальностей)</b><br><br>
+  Революция для RP. Принудительно <b>удаляет самые очевидные и клишированные слова</b> из вариантов выбора ИИ.<br><br>
+  Устали от фраз <i>"мурашки пробежали по спине"</i> или <i>"хищная ухмылка"</i>? XTC заставит модель искать уникальные, литературные альтернативы.<br><br>
+  💡 <i><b>Вероятность:</b> Шанс срабатывания алгоритма (Оптимально 0.3 - 0.5).</i>
+
+xtc_thresh_tooltip: |-
+  <b>Порог XTC (Threshold)</b><br><br>
+  Определяет, насколько "популярным" (вероятным) должно быть слово, чтобы алгоритм XTC имел право его удалить.<br><br>
+  💡 <i>Оптимально: 0.1 (Удаляются только слова с вероятностью выше 10%).</i>
+
+dry_mult_tooltip: |-
+  <b>DRY (Множитель)</b><br><br>
+  В отличие от старых алгоритмов, DRY (Don't Repeat Yourself) распознает и штрафует <b>повторения целых предложений и структур</b>.<br><br>
+  Если Вайфу постоянно начинает сообщения фразой <i>"Я вздыхаю и смотрю на тебя"</i>, DRY сломает этот паттерн и заставит ее действовать иначе.<br><br>
+  💡 <i><b>Множитель:</b> Сила штрафа (Оптимально 0.8).</i>
+
+dry_base_tooltip: |-
+  <b>DRY База</b><br><br>
+  Базовый коэффициент масштабирования алгоритма. Определяет, насколько агрессивно растет штраф от длины повторяющейся фразы.<br><br>
+  💡 <i>Оптимально: 1.75</i>
+
+dry_length_tooltip: |-
+  <b>Допуск длины DRY</b><br><br>
+  Количество токенов (слов/слогов), которым разрешено повторяться до того, как сработает штраф DRY.<br><br>
+  💡 <i>Оптимально: 2 (Чтобы не штрафовать короткие связки типа "Я есть" или "И тут").</i>
+
+kv_cache_tooltip: "Квантизируйте Context Cache, чтобы сэкономить значительный объем видеопамяти при работе с длинными контекстами."
+
+batch_size_tooltip: |-
+  Количество токенов, обрабатываемых одновременно при оценке промпта.<br><br>
+  Значение 512 является безопасным. Чем выше значение, тем быстрее загрузка и тем больше требуется VRAM.
+
+cpu_threads_tooltip: |-
+  0 = Автоматически.<br><br>
+  Укажите количество физических ядер процессора для обеспечения оптимальной скорости инференса на процессоре.
+
+cpu_moe_layers_tooltip: "0 = Отключено. Количество слоев «Mixture of Experts» (MoE), размещаемых в оперативной памяти (CPU RAM). Крайне важно для работы с моделями архитектуры MoE."
+
+# ──────────────────────────────────────────────────────────
+# SOUL COMPANION CONTEXT MENU
+# ──────────────────────────────────────────────────────────
+sc_menu_quick_actions: "⚡ Быстрые действия"
+sc_menu_vision: "📸 Посмотри на мой экран (Зрение)"
+sc_menu_clipboard: "📋 Прочитай буфер обмена (Анализ)"
+sc_menu_mind: "🧠 О чем ты думаешь?"
+sc_menu_mic_on: "Включить микрофон"
+sc_menu_mic_off: "Выключить микрофон"
+sc_menu_pet: "🤚 Погладить"
+sc_menu_play_animation: "🎭 Воспроизвести анимацию"
+sc_menu_motions: "эмоций"
+sc_menu_click_through_on: "👁‍🗨 Прохождение кликов: ВКЛ"
+sc_menu_click_through_off: "👁‍🗨 Прохождение кликов: ВЫКЛ"
+sc_menu_aot_on: "📌 Поверх всех окон: ВКЛ"
+sc_menu_aot_off: "📌 Поверх всех окон: ВЫКЛ"
+sc_menu_eye_on: "👁 Отслеживание глаз: ВКЛ"
+sc_menu_eye_off: "👁 Отслеживание глаз: ВЫКЛ"
+sc_menu_react_on: "💬 Реакции на окна: ВКЛ"
+sc_menu_react_off: "💬 Реакции на окна: ВЫКЛ"
+sc_menu_sub_on: "📝 Субтитры: ВКЛ"
+sc_menu_sub_off: "📝 Субтитры: ВЫКЛ"
+sc_menu_settings: "⚙️ Настройки Компаньона"
+sc_menu_proactive: "🗓 Интервал инициативы"
+sc_menu_sleep: "😴 Сон через"
+sc_menu_speed: "👁 Скорость взгляда"
+sc_menu_speed_slow: "Медленно"
+sc_menu_speed_normal: "Нормально"
+sc_menu_speed_fast: "Быстро"
+sc_menu_size: "📐 Размер модели"
+sc_menu_size_small: "Маленький (200 × 300)"
+sc_menu_size_medium: "Средний (400 × 600)"
+sc_menu_size_large: "Большой (600 × 900)"
+sc_menu_hud: "📊 Показать HUD гормонов"
+sc_menu_center: "📍 Отцентрировать"
+sc_menu_reset: "🔄 Сбросить размер"
+sc_menu_hide: "❌ Скрыть компаньона"
+sc_menu_min_3: "3 минуты"
+sc_menu_min_5: "5 минут"
+sc_menu_min_10: "10 минут"
+sc_menu_min_15: "15 минут"
+sc_menu_min_30: "30 минут"
+sc_menu_min_60: "60 минут"
