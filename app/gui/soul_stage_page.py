@@ -1,0 +1,3357 @@
+import os
+import json
+import uuid
+import yaml
+import datetime
+
+from pathlib import Path
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QColor, QFont, QPixmap, QPainter, QPainterPath, QIcon
+from PyQt6.QtWidgets import (
+    QWidget, QFrame, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QLabel, QPushButton, QScrollArea, QStackedWidget,
+    QLineEdit, QTextEdit, QComboBox, QFileDialog, QMessageBox,
+)
+
+SOUL_STAGE_DIR = Path(".soul_stage")
+SCENES_FILE    = SOUL_STAGE_DIR / "scenes.json"
+TRANSLATIONS_DIR = Path("app/translations")
+SOUL_STAGE_DIR.mkdir(exist_ok=True)
+if not SCENES_FILE.exists():
+    SCENES_FILE.write_text(json.dumps({"scenes": {}}, ensure_ascii=False, indent=2))
+
+COMBO_STYLE = """
+            QComboBox {
+                background-color: rgba(15, 15, 18, 0.4);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                padding: 8px 12px;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.05),
+                                            stop:1 rgba(0, 0, 0, 0.05));
+            }
+            QComboBox:hover {
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.08),
+                                            stop:1 rgba(0, 0, 0, 0.08));
+            }
+            QComboBox:focus {
+                border: 1px solid rgba(255, 255, 255, 0.6);
+                outline: none;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 20px;
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: url(:/sowInterface/arrowDown.png);
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba(30, 30, 35, 0.8);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+                selection-background-color: rgba(255, 255, 255, 0.15);
+                selection-color: #ffffff;
+                padding: 5px;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                padding: 8px 12px;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.1),
+                                            stop:1 rgba(255, 255, 255, 0.05));
+                color: #ffffff;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.15),
+                                            stop:1 rgba(255, 255, 255, 0.05));
+                color: #ffffff;
+            }
+            QScrollBar:vertical {
+                background-color: rgba(30, 30, 35, 0.8);
+                width: 12px;
+                margin: 0px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background-color: rgba(255, 255, 255, 0.2);
+                min-height: 30px;
+                border-radius: 6px;
+                margin: 2px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(255, 255, 255, 0.3);
+            }
+            QScrollBar::handle:vertical:pressed {
+                background-color: rgba(255, 255, 255, 0.25);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """
+
+def _load_translations() -> dict:
+    """Loads translation YAML based on program language setting."""
+    try:
+        from app.configuration import configuration
+        lang = configuration.ConfigurationSettings().get_main_setting("program_language") or 0
+    except Exception:
+        lang = 0
+    lang_code = {0: "en", 1: "ru"}.get(int(lang), "en")
+    path = f"app/translations/{lang_code}.yaml"
+    if os.path.exists(path) and yaml:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            pass
+    return {}
+
+def _load_scenes() -> dict:
+    try:
+        return json.loads(SCENES_FILE.read_text("utf-8"))
+    except Exception:
+        return {"scenes": {}}
+
+def _save_scenes(data: dict):
+    SCENES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), "utf-8")
+
+def _get_assets(folder: str, exts: list) -> list:
+    try:
+        return ["None"] + sorted(
+            f for f in os.listdir(folder)
+            if any(f.lower().endswith(e) for e in exts)
+        )
+    except Exception:
+        return ["None"]
+
+def append_to_scene_log(scene_id: str, entries: list):
+    d = _load_scenes()
+    if scene_id not in d["scenes"]:
+        return
+    log = d["scenes"][scene_id].setdefault("chat_log", [])
+    log.extend(entries)
+    d["scenes"][scene_id]["chat_log"] = log[-400:]
+    _save_scenes(d)
+
+def _get_char_avatar_pixmap(char_name: str) -> QPixmap:
+    try:
+        from app.configuration import configuration
+        cfg = configuration.ConfigurationCharacters()
+        data = cfg.load_configuration()
+        c_info = data.get("character_list", {}).get(char_name, {})
+        avatar_path = c_info.get("character_avatar", "")
+        if avatar_path:
+            px = QPixmap(avatar_path)
+            if not px.isNull():
+                return px
+    except Exception:
+        pass
+    return QPixmap("app/gui/icons/logotype.png")
+
+def _round_pixmap(px: QPixmap, size: int) -> QPixmap:
+    scaled = px.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                       Qt.TransformationMode.SmoothTransformation)
+    cx = (scaled.width()  - size) // 2
+    cy = (scaled.height() - size) // 2
+    cropped = scaled.copy(cx, cy, size, size)
+    result = QPixmap(size, size)
+    result.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(result)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    path = QPainterPath()
+    path.addEllipse(0, 0, size, size)
+    painter.setClipPath(path)
+    painter.drawPixmap(0, 0, cropped)
+    painter.end()
+    return result
+
+def _rpg_divider() -> QFrame:
+    line = QFrame()
+    line.setFrameShape(QFrame.Shape.HLine)
+    line.setFixedHeight(1)
+    line.setStyleSheet("""
+        QFrame {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 rgba(255,255,255,0),
+                stop:0.3 rgba(255,255,255,0.12),
+                stop:0.7 rgba(255,255,255,0.12),
+                stop:1 rgba(255,255,255,0));
+            border: none;
+        }
+    """)
+    return line
+
+def _rpg_primary_btn(text: str, color_rgb: str = "80,120,255") -> QPushButton:
+    btn = QPushButton(text)
+    btn.setFont(_font("Inter Tight SemiBold", 12))
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    btn.setFixedHeight(38)
+    r, g, b = color_rgb.split(",")
+    btn.setStyleSheet(f"""
+        QPushButton {{
+            background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+                stop:0 rgba({r},{g},{b},0.75),
+                stop:1 rgba({r},{g},{b},0.55));
+            border: 1px solid rgba({r},{g},{b},0.50);
+            border-top: 1px solid rgba({r},{g},{b},0.80);
+            border-radius: 10px;
+            color: white;
+            padding: 0 22px;
+        }}
+        QPushButton:hover {{
+            background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+                stop:0 rgba({r},{g},{b},0.90),
+                stop:1 rgba({r},{g},{b},0.70));
+            border-color: rgba({r},{g},{b},0.70);
+        }}
+        QPushButton:pressed {{ background: rgba({r},{g},{b},0.45); }}
+        QPushButton:disabled {{ background: rgba(60,60,70,0.40); color: rgba(255,255,255,0.25); border-color: transparent; }}
+    """)
+    return btn
+
+
+def _rpg_ghost_btn(text: str) -> QPushButton:
+    btn = QPushButton(text)
+    btn.setFont(_font("Inter Tight Medium", 12))
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+    btn.setFixedHeight(38)
+    btn.setStyleSheet("""
+        QPushButton {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            color: rgba(200,200,210,0.80);
+            padding: 0 18px;
+        }
+        QPushButton:hover {
+            background: rgba(255,255,255,0.09);
+            border-color: rgba(255,255,255,0.22);
+            color: #fff;
+        }
+        QPushButton:pressed { background: rgba(255,255,255,0.14); }
+    """)
+    return btn
+
+def _font(family="Inter Tight Medium", size=12, bold=False, italic=False) -> QFont:
+    f = QFont(family, size)
+    if bold:   f.setWeight(QFont.Weight.Bold)
+    if italic: f.setStyle(QFont.Style.StyleItalic)
+    f.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+    return f
+
+
+def _shadow(blur=20, y=6, alpha=100) -> QtWidgets.QGraphicsDropShadowEffect:
+    s = QtWidgets.QGraphicsDropShadowEffect()
+    s.setBlurRadius(blur); s.setOffset(0, y); s.setColor(QColor(0, 0, 0, alpha))
+    return s
+
+SCROLLBAR = """
+    QScrollArea { background: transparent; border: none; }
+    QScrollBar:vertical { background: transparent; width: 4px; margin: 0; }
+    QScrollBar::handle:vertical {
+        background: rgba(255,255,255,0.15); border-radius: 2px; min-height: 28px;
+    }
+    QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.30); }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+"""
+
+INPUT = """
+    QLineEdit, QTextEdit, QComboBox {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-top: 1px solid rgba(255,255,255,0.12);
+        border-radius: 10px;
+        color: rgba(240,240,240,0.95);
+        font-family: 'Inter Tight Medium'; font-size: 13px;
+        padding: 8px 14px;
+        selection-background-color: rgba(255,255,255,0.15);
+    }
+    QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
+        border: 1px solid rgba(255,255,255,0.25);
+        background: rgba(255,255,255,0.05);
+    }
+    QComboBox::drop-down { border: none; width: 30px; }
+    QComboBox::down-arrow { image: url(app/gui/icons/arrow_down.png); width: 12px; height: 12px; }
+    QComboBox QAbstractItemView {
+        background: #0d0d0f; border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px; color: rgba(240,240,240,0.95);
+        selection-background-color: rgba(255,255,255,0.1); padding: 4px;
+    }
+"""
+
+CB_STYLE = """
+    QCheckBox { color: rgba(200,200,200,0.9); spacing: 10px; }
+    QCheckBox::indicator {
+        width: 18px; height: 18px; border-radius: 5px;
+        border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.4);
+    }
+    QCheckBox::indicator:checked {
+        background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+    }
+"""
+
+class _Btn(QPushButton):
+    def __init__(self, text="", primary=False, danger=False, dim=False, parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setFont(_font("Inter Tight SemiBold", 11))
+        
+        if primary:
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(75, 184, 255, 0.08);
+                    border: 1px solid rgba(75, 184, 255, 0.25);
+                    border-top: 1px solid rgba(75, 184, 255, 0.45);
+                    border-radius: 10px;
+                    color: #82CDFF;
+                    padding: 8px 20px;
+                    letter-spacing: 0.5px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(75, 184, 255, 0.16);
+                    border-color: rgba(75, 184, 255, 0.55);
+                    color: #FFFFFF;
+                }
+                QPushButton:pressed {
+                    background-color: rgba(75, 184, 255, 0.04);
+                    border-color: rgba(75, 184, 255, 0.35);
+                }
+                QPushButton:disabled {
+                    background-color: rgba(255, 255, 255, 0.01);
+                    border-color: rgba(255, 255, 255, 0.03);
+                    color: rgba(255, 255, 255, 0.2);
+                }
+            """)
+        elif danger:
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(196, 64, 64, 0.08);
+                    border: 1px solid rgba(196, 64, 64, 0.20);
+                    border-top: 1px solid rgba(196, 64, 64, 0.35);
+                    border-radius: 10px;
+                    color: #EE7777;
+                    padding: 8px 20px;
+                    letter-spacing: 0.5px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(196, 64, 64, 0.16);
+                    border-color: rgba(196, 64, 64, 0.45);
+                    color: #FFFFFF;
+                }
+                QPushButton:pressed {
+                    background-color: rgba(196, 64, 64, 0.04);
+                    border-color: rgba(196, 64, 64, 0.28);
+                }
+                QPushButton:disabled {
+                    background-color: rgba(255, 255, 255, 0.01);
+                    border-color: rgba(255, 255, 255, 0.03);
+                    color: rgba(255, 255, 255, 0.2);
+                }
+            """)
+        elif dim:
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent;
+                    border: 1px solid transparent;
+                    border-radius: 8px;
+                    color: rgba(255, 255, 255, 0.35);
+                    padding: 6px 14px;
+                    letter-spacing: 0.5px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.03);
+                    border-color: rgba(255, 255, 255, 0.05);
+                    color: #FFFFFF;
+                }
+                QPushButton:pressed {
+                    background-color: rgba(255, 255, 255, 0.01);
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-top: 1px solid rgba(255, 255, 255, 0.16);
+                    border-radius: 10px;
+                    color: rgba(255, 255, 255, 0.65);
+                    padding: 8px 20px;
+                    letter-spacing: 0.5px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255, 255, 255, 0.06);
+                    border-color: rgba(255, 255, 255, 0.22);
+                    color: #FFFFFF;
+                }
+                QPushButton:pressed {
+                    background-color: rgba(255, 255, 255, 0.01);
+                    border-color: rgba(255, 255, 255, 0.12);
+                }
+                QPushButton:disabled {
+                    background-color: rgba(255, 255, 255, 0.005);
+                    border-color: rgba(255, 255, 255, 0.02);
+                    color: rgba(255, 255, 255, 0.15);
+                }
+            """)
+
+class _Divider(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFrameShape(QFrame.Shape.HLine)
+        self.setFixedHeight(1)
+        self.setStyleSheet("background: rgba(255,255,255,0.08); border: none;")
+
+class _FieldLabel(QLabel):
+    def __init__(self, text, hint=None, parent=None):
+        super().__init__(text, parent)
+        self.setFont(_font("Inter Tight Medium", 12))
+        self.setStyleSheet("color: rgba(200,200,200,0.85); background:transparent; border:none;")
+        if hint:
+            self.setToolTip(hint)
+
+class _GlassSection(QFrame):
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+            QFrame {
+                background: rgba(255,255,255,0.02);
+                border: 1px solid rgba(255,255,255,0.06);
+                border-top: 1px solid rgba(255,255,255,0.10);
+                border-radius: 16px;
+            }
+        """)
+        self.setGraphicsEffect(_shadow(30, 8, 80))
+        self._root = QVBoxLayout(self)
+        self._root.setContentsMargins(24, 18, 24, 22)
+        self._root.setSpacing(14)
+        lbl = QLabel(title)
+        lbl.setFont(_font("Inter Tight SemiBold", 10, True))
+        lbl.setStyleSheet("color: rgba(160,160,160,0.75); letter-spacing:1.5px; background:transparent; border:none;")
+        self._root.addWidget(lbl)
+
+    def section_layout(self) -> QVBoxLayout:
+        return self._root
+
+class SceneCard(QFrame):
+    play_clicked   = pyqtSignal(str)
+    edit_clicked   = pyqtSignal(str)
+    delete_clicked = pyqtSignal(str)
+    export_clicked = pyqtSignal(str)
+
+    _N = "QFrame#sc { background: rgba(28, 28, 35, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-top: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; }"
+    _H = "QFrame#sc { background: rgba(40, 40, 50, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); border-top: 1px solid rgba(255, 255, 255, 0.3); border-radius: 20px; }"
+
+    def __init__(self, scene_id: str, scene_data: dict, parent=None):
+        super().__init__(parent)
+        self.scene_id = scene_id
+        self.scene_data = scene_data
+        self.setObjectName("sc")
+        
+        self.setFixedHeight(160) 
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(self._N)
+        self.setGraphicsEffect(_shadow(35, 12, 90))
+
+        self.translations = _load_translations()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(22, 20, 22, 20)
+        root.setSpacing(10)
+
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(15)
+
+        self.scene_icon = QLabel()
+        scene_px = QPixmap("app/gui/icons/scene_main.png")
+        if scene_px.isNull():
+            self.scene_icon.setText("◈")
+            self.scene_icon.setStyleSheet("color: #50C878; font-size: 20px; font-weight: bold;")
+        else:
+            self.scene_icon.setPixmap(scene_px.scaled(22, 22, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        header_layout.addWidget(self.scene_icon)
+
+        title = QLabel(scene_data.get("title", self.translations.get("new_adventure", "New Adventure")))
+        title.setFont(_font("Inter Tight SemiBold", 15, bold=True))
+        title.setStyleSheet("color: #FFFFFF; background: transparent;")
+        header_layout.addWidget(title, 1)
+
+        actions_container = QHBoxLayout()
+        actions_container.setSpacing(8)
+
+        actions = [
+            ("app/gui/icons/export.png", self.export_clicked, "rgba(255,255,255,0.4)"),
+            ("app/gui/icons/edit.png", self.edit_clicked, "rgba(255,255,255,0.4)"),
+            ("app/gui/icons/delete.png", self.delete_clicked, "rgba(255,80,80,0.6)")
+        ]
+
+        for icon_path, signal, _ in actions:
+            btn = QPushButton()
+            btn.setFixedSize(30, 30)
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QtCore.QSize(18, 18))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn.setStyleSheet("""
+                QPushButton { background: rgba(255,255,255,0.03); border-radius: 15px; border: none; }
+                QPushButton:hover { background: rgba(255,255,255,0.12); }
+            """)
+            btn.clicked.connect(lambda _, s=signal: s.emit(self.scene_id))
+            actions_container.addWidget(btn)
+        
+        header_layout.addLayout(actions_container)
+        root.addLayout(header_layout)
+
+        desc_text = scene_data.get("description", self.translations.get("no_description", "No description set."))
+        desc = QLabel(desc_text)
+        desc.setFont(_font("Inter Tight Medium", 11))
+        desc.setStyleSheet("color: rgba(255, 255, 255, 0.45); padding: 2px 0;")
+        desc.setWordWrap(True)
+        desc.setMaximumHeight(40)
+        root.addWidget(desc)
+
+        root.addStretch()
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(10)
+
+        party = scene_data.get("party", [])
+        party_wrapper = QWidget()
+        party_layout = QHBoxLayout(party_wrapper)
+        party_layout.setContentsMargins(0, 0, 0, 0)
+        party_layout.setSpacing(-10)
+        
+        for name in party[:5]:
+            p_av = QLabel()
+            px = _get_char_avatar_pixmap(name)
+            
+            avatar_img_size = 28 
+            
+            border_thickness = 2
+            widget_size = avatar_img_size + (border_thickness * 2)
+            
+            p_av.setPixmap(_round_pixmap(px, avatar_img_size))
+            p_av.setFixedSize(widget_size, widget_size)
+            p_av.setToolTip(name)
+            
+            border_radius = widget_size // 2
+            p_av.setStyleSheet(f"""
+                QLabel {{
+                    border: {border_thickness}px solid #1c1c23; 
+                    border-radius: {border_radius}px; 
+                    background: transparent;
+                }}
+            """)
+            party_layout.addWidget(p_av)
+        
+        bottom_row.addWidget(party_wrapper)
+        bottom_row.addStretch()
+
+        self.play_btn = QPushButton(f"  {self.translations.get('play', 'Play')}")
+        self.play_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.play_btn.setIcon(QIcon("app/gui/icons/play.png"))
+        self.play_btn.setIconSize(QtCore.QSize(14, 14))
+        self.play_btn.setFixedHeight(36)
+        self.play_btn.setMinimumWidth(110)
+        self.play_btn.setFont(_font("Inter Tight SemiBold", 11))
+        
+        self.play_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+                    stop:0 rgba(80, 220, 140, 0.15), 
+                    stop:1 rgba(40, 180, 100, 0.1));
+                border: 1px solid rgba(80, 220, 140, 0.25);
+                border-top: 1px solid rgba(80, 220, 140, 0.45);
+                border-radius: 12px;
+                color: #A0FFD2;
+                padding: 0 15px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+                    stop:0 rgba(80, 220, 140, 0.25), 
+                    stop:1 rgba(40, 180, 100, 0.2));
+                border-color: rgba(80, 220, 140, 0.6);
+                color: #FFFFFF;
+            }
+        """)
+        self.play_btn.clicked.connect(lambda: self.play_clicked.emit(self.scene_id))
+        bottom_row.addWidget(self.play_btn)
+
+        root.addLayout(bottom_row)
+
+    def enterEvent(self, e):
+        self.setStyleSheet(self._H)
+        self.setGraphicsEffect(_shadow(45, 12, 120))
+
+    def leaveEvent(self, e):
+        self.setStyleSheet(self._N)
+        self.setGraphicsEffect(_shadow(35, 12, 90))
+
+class SoulStageLobbyView(QWidget):
+    create_new   = pyqtSignal()
+    open_scene   = pyqtSignal(str)
+    edit_scene   = pyqtSignal(str)
+    delete_scene = pyqtSignal(str)
+    import_scene = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent;")
+        self._cards: dict[str, SceneCard] = {}
+
+        self.translations = _load_translations()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(40, 24, 40, 20)
+        root.setSpacing(16)
+
+        hdr = QHBoxLayout()
+        title = QLabel(self.translations.get("soul_stage_title", "Soul Stage"))
+        title.setFont(_font("Inter Tight SemiBold", 22, True))
+        title.setStyleSheet("color: rgba(255,255,255,0.95); background:transparent; border:none;")
+        hdr.addWidget(title, 1)
+
+        self.btn_import = _Btn(self.translations.get("import_scene", "Import"), dim=False)
+        self.btn_import.clicked.connect(self.import_scene)
+        hdr.addWidget(self.btn_import)
+
+        self.btn_new = _Btn(self.translations.get("new_scene", "＋ New Scene"), primary=True)
+        self.btn_new.clicked.connect(self.create_new)
+        hdr.addWidget(self.btn_new)
+        root.addLayout(hdr)
+
+        self.search = QLineEdit()
+        self.search.setPlaceholderText(self.translations.get("search_scenes", "Search scenes..."))
+        self.search.setFixedHeight(36)
+        self.search.setStyleSheet(INPUT)
+        self.search.textChanged.connect(self._filter)
+        root.addWidget(self.search)
+
+        root.addWidget(_Divider())
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(SCROLLBAR)
+
+        self.grid_w = QWidget()
+        self.grid_w.setStyleSheet("background:transparent;")
+        self.grid_container = QVBoxLayout(self.grid_w)
+        self.grid_container.setContentsMargins(0, 4, 8, 20)
+        self.grid_container.setSpacing(12)
+        self.grid_container.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.grid = QGridLayout()
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setSpacing(12)
+        self.grid_container.addLayout(self.grid)
+        self.grid_container.addStretch()
+
+        scroll.setWidget(self.grid_w)
+        root.addWidget(scroll, 1)
+
+        self.empty_lbl = QLabel(self.translations.get("no_scenes", "No scenes yet.\nClick  ＋ New Scene  to start your first story."))
+        self.empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_lbl.setFont(_font("Inter Tight Medium", 14))
+        self.empty_lbl.setStyleSheet("color: rgba(120,120,120,0.5); background:transparent; border:none;")
+        self.refresh()
+
+    def refresh(self):
+        for c in list(self._cards.values()):
+            self.grid.removeWidget(c)
+            c.deleteLater()
+        self._cards.clear()
+        scenes = _load_scenes().get("scenes", {})
+        if not scenes:
+            if self.empty_lbl.parent() != self.grid_w:
+                self.grid_container.insertWidget(0, self.empty_lbl)
+            self.empty_lbl.show()
+            return
+        self.empty_lbl.hide()
+        sorted_s = sorted(scenes.items(), key=lambda kv: kv[1].get("last_played", ""), reverse=True)
+        for i, (sid, sdata) in enumerate(sorted_s):
+            card = SceneCard(sid, sdata)
+            card.play_clicked.connect(self.open_scene)
+            card.edit_clicked.connect(self.edit_scene)
+            card.delete_clicked.connect(self.delete_scene)
+            card.export_clicked.connect(self._on_export_scene)
+            self.grid.addWidget(card, i // 2, i % 2)
+            self._cards[sid] = card
+
+    def _filter(self, text: str):
+        q = text.lower().strip()
+        for sid, card in self._cards.items():
+            t = card.scene_data.get("title", "").lower()
+            d = card.scene_data.get("description", "").lower()
+            card.setVisible(not q or q in t or q in d)
+
+    def _on_export_scene(self, scene_id: str):
+        data = _load_scenes()
+        scene_data = data.get("scenes", {}).get(scene_id)
+        if not scene_data:
+            return
+
+        export_data = {
+            "title": scene_data.get("title", ""),
+            "description": scene_data.get("description", ""),
+            "world_context": scene_data.get("world_context", ""),
+            "starting_location": scene_data.get("starting_location", ""),
+            "time_of_day": scene_data.get("time_of_day", "day"),
+            "opening_narration": scene_data.get("opening_narration", ""),
+            "first_message": scene_data.get("first_message", ""),
+            "gm_tone": scene_data.get("gm_tone", "epic_fantasy"),
+            "narrator_style": scene_data.get("narrator_style", "Standard evocative present-tense prose"),
+            "conversation_method": scene_data.get("conversation_method", "Local LLM"),
+            "persona": scene_data.get("persona", "None"),
+            "lorebook": scene_data.get("lorebook", []),
+        }
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.translations.get("export_title", "Export Scene"),
+            f"{scene_data.get('title', 'scene')}.json",
+            "JSON Files (*.json)"
+        )
+        if file_path:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(export_data, f, ensure_ascii=False, indent=2)
+
+class SceneEditorView(QWidget):
+    saved    = pyqtSignal(str)
+    canceled = pyqtSignal()
+
+    def __init__(self, all_characters: list, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent;")
+        self._editing_id: str = None
+        self._char_checks: dict[str, QtWidgets.QCheckBox] = {}
+
+        self.translations = _load_translations()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(40, 24, 40, 20)
+        root.setSpacing(12)
+
+        hdr = QHBoxLayout(); hdr.setSpacing(12)
+        self.btn_back = _Btn(self.translations.get("back", "← Back"), dim=True)
+        self.btn_back.clicked.connect(self.canceled)
+        self.title_lbl = QLabel(self.translations.get("new_scene", "New Scene"))
+        self.title_lbl.setFont(_font("Inter Tight SemiBold", 18, True))
+        self.title_lbl.setStyleSheet("color: rgba(255,255,255,0.95); background:transparent; border:none;")
+        hdr.addWidget(self.btn_back); hdr.addSpacing(6); hdr.addWidget(self.title_lbl); hdr.addStretch()
+        self.btn_save = _Btn(self.translations.get("save_launch", "Save & Launch  ▶"), primary=True)
+        self.btn_save.clicked.connect(self._on_save)
+        hdr.addWidget(self.btn_save)
+        root.addLayout(hdr)
+        root.addWidget(_Divider())
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(SCROLLBAR)
+
+        form = QWidget(); form.setStyleSheet("background:transparent;")
+        fly = QVBoxLayout(form); fly.setContentsMargins(0, 4, 16, 24); fly.setSpacing(16)
+
+        sec1 = _GlassSection(self.translations.get("section_identity", "I.  SCENE IDENTITY"))
+        ly1 = sec1.section_layout()
+        r1 = QHBoxLayout(); r1.setSpacing(16)
+        c1 = QVBoxLayout(); c1.setSpacing(6)
+        c1.addWidget(_FieldLabel(self.translations.get("title", "Title  *")))
+        self.f_title = QLineEdit(); self.f_title.setPlaceholderText(self.translations.get("title_placeholder", "e.g. The Obsidian Citadel")); self.f_title.setFixedHeight(38); self.f_title.setStyleSheet(INPUT); c1.addWidget(self.f_title)
+        self.f_title.setFont(_font("Inter Tight Medium", 13))
+        c2 = QVBoxLayout(); c2.setSpacing(6)
+        c2.addWidget(_FieldLabel(self.translations.get("short_description", "Short Description")))
+        self.f_desc = QLineEdit(); self.f_desc.setPlaceholderText(self.translations.get("desc_placeholder", "Brief summary for the list")); self.f_desc.setFixedHeight(38); self.f_desc.setStyleSheet(INPUT); c2.addWidget(self.f_desc)
+        self.f_desc.setFont(_font("Inter Tight Medium", 13))
+        r1.addLayout(c1, 4); r1.addLayout(c2, 6); ly1.addLayout(r1)
+        fly.addWidget(sec1)
+
+        sec2 = _GlassSection(self.translations.get("section_world", "II.  WORLD STATE & ENVIRONMENT"))
+        ly2 = sec2.section_layout()
+        ly2.addWidget(_FieldLabel(self.translations.get("world_context", "World Context / Scenario  *"), self.translations.get("world_context_hint", "Injected into every AI prompt as background truth.")))
+        self.f_world = AutoResizingTextEdit(); self.f_world.setPlaceholderText(self.translations.get("world_placeholder", "Lore, current tension, rules of magic or physics...")); self.f_world.setFixedHeight(90); self.f_world.setStyleSheet(INPUT); ly2.addWidget(self.f_world)
+
+        r_env = QHBoxLayout(); r_env.setSpacing(16)
+        cl = QVBoxLayout(); cl.setSpacing(6); cl.addWidget(_FieldLabel(self.translations.get("starting_location", "Starting Location")))
+        self.f_location = QLineEdit(); self.f_location.setPlaceholderText(self.translations.get("location_placeholder", "e.g. The Golden Dragon Tavern")); self.f_location.setFixedHeight(38); self.f_location.setStyleSheet(INPUT); cl.addWidget(self.f_location)
+        self.f_location.setFont(_font("Inter Tight Medium", 13))
+
+        ct = QVBoxLayout(); ct.setSpacing(6); ct.addWidget(_FieldLabel(self.translations.get("time_of_day", "Time of Day")))
+        self.f_time = QComboBox(); self.f_time.addItems([self.translations.get("morning", "Morning"), self.translations.get("day", "Day"), self.translations.get("evening", "Evening"), self.translations.get("night", "Night")]); self.f_time.setCurrentIndex(1); self.f_time.setFixedHeight(38); self.f_time.setStyleSheet(INPUT); ct.addWidget(self.f_time)
+        self.f_time.setStyleSheet(COMBO_STYLE)
+
+        cn = QVBoxLayout(); cn.setSpacing(6); cn.addWidget(_FieldLabel(self.translations.get("gm_tone", "GM Tone")))
+        self.f_tone = QComboBox(); 
+        self.f_tone.addItems([self.translations.get("epic_fantasy", "Epic Fantasy"), self.translations.get("slice_of_life", "Slice of Life"), self.translations.get("mystery_noir", "Mystery & Noir"), self.translations.get("romance", "Romance"), self.translations.get("horror", "Horror"), self.translations.get("comedy", "Comedy"), self.translations.get("sci_fi", "Sci-Fi")]); 
+        self.f_tone.setFixedHeight(38); 
+        self.f_tone.setStyleSheet(INPUT); 
+        self.f_tone.setEditable(True)
+        cn.addWidget(self.f_tone)
+        self.f_tone.setStyleSheet(COMBO_STYLE)
+        r_env.addLayout(cl, 4); r_env.addLayout(ct, 2); r_env.addLayout(cn, 3)
+        ly2.addLayout(r_env)
+
+        c_style = QVBoxLayout()
+        c_style.setSpacing(6)
+        c_style.addWidget(_FieldLabel(
+            self.translations.get("narrator_style", "Narrator Style"), 
+            self.translations.get("narrator_style_hint", "Directs the specific prose style, author voice, or pacing of the narrator.")
+        ))
+        self.f_narrator_style = QComboBox()
+        self.f_narrator_style.setStyleSheet(COMBO_STYLE)
+        self.f_narrator_style.setEditable(True)
+        self.f_narrator_style.addItems([
+            "Standard evocative present-tense prose",
+            "Stephen King (suspenseful, detailed character focus)",
+            "H.P. Lovecraft (cosmic dread, archaic and complex vocabulary)",
+            "Ernest Hemingway (minimalist, short and punchy sentences, objective)",
+            "J.R.R. Tolkien (poetic, high-detailed description of nature and history)"
+        ])
+        self.f_narrator_style.setFixedHeight(38)
+        self.f_narrator_style.setFont(_font("Inter Tight Medium", 13))
+        c_style.addWidget(self.f_narrator_style)
+        ly2.addLayout(c_style)
+
+        r_env2 = QHBoxLayout(); r_env2.setSpacing(16)
+        bg_choices  = _get_assets("assets/backgrounds", [".jpg", ".png", ".jpeg"])
+        amb_choices = _get_assets("assets/ambient", [".mp3", ".wav", ".ogg"])
+
+        cb = QVBoxLayout(); cb.setSpacing(6)
+        cb.addWidget(_FieldLabel(self.translations.get("starting_background", "Starting Background"), self.translations.get("starting_background_hint", "The Planner can change this dynamically during the scene.")))
+        self.f_bg_image = QComboBox()
+        self.f_bg_image.setStyleSheet(COMBO_STYLE)
+        self.f_bg_image.addItems(bg_choices)
+        self.f_bg_image.setFixedHeight(38)
+        cb.addWidget(self.f_bg_image)
+
+        ca = QVBoxLayout(); ca.setSpacing(6)
+        ca.addWidget(_FieldLabel(self.translations.get("starting_ambient", "Starting Ambient"), self.translations.get("starting_ambient_hint", "Background audio for this scene. The Planner can switch it dynamically.")))
+        self.f_ambient = QComboBox()
+        self.f_ambient.setStyleSheet(COMBO_STYLE)
+        self.f_ambient.addItems(amb_choices)
+        self.f_ambient.setFixedHeight(38)
+        ca.addWidget(self.f_ambient)
+
+        r_env2.addLayout(cb, 5)
+        r_env2.addLayout(ca, 5)
+        ly2.addLayout(r_env2)
+        fly.addWidget(sec2)
+
+        sec3 = _GlassSection(self.translations.get("section_opening", "III.  STORY OPENING"))
+        ly3 = sec3.section_layout()
+        ly3.addWidget(_FieldLabel(self.translations.get("opening_narration", "Opening Narration  *"), self.translations.get("opening_narration_hint", "The Narrator's first words — places the player in the scene.")))
+        self.f_opening = AutoResizingTextEdit(); self.f_opening.setPlaceholderText(self.translations.get("opening_placeholder", "The rain hammers cobblestones as you push open the heavy iron door...")); self.f_opening.setFixedHeight(84); self.f_opening.setStyleSheet(INPUT); ly3.addWidget(self.f_opening)
+        ly3.addWidget(_FieldLabel(self.translations.get("first_message", "First Character Message  (optional)")))
+        self.f_first_msg = AutoResizingTextEdit(); self.f_first_msg.setPlaceholderText(self.translations.get("first_msg_placeholder", "Optional greeting from the first party member.")); self.f_first_msg.setFixedHeight(64); self.f_first_msg.setStyleSheet(INPUT); ly3.addWidget(self.f_first_msg)
+        fly.addWidget(sec3)
+
+        bot = QHBoxLayout()
+        bot.setSpacing(16)
+        bot.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        sec4a = _GlassSection(self.translations.get("section_party", "IV.  PARTY MEMBERS"))
+        ly4a = sec4a.section_layout()
+        ly4a.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        ly4a.addWidget(_FieldLabel(self.translations.get("select_characters", "Select characters for this scene")))
+
+        self.char_scroll = QScrollArea()
+        self.char_scroll.setWidgetResizable(True)
+        self.char_scroll.setMinimumHeight(120)
+
+        self.char_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+
+        self.char_scroll.setStyleSheet(SCROLLBAR + "QScrollArea { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; }")
+
+        self.char_inner = QWidget()
+        self.char_inner.setStyleSheet("background: transparent;")
+        self.char_grid = QGridLayout(self.char_inner)
+        self.char_grid.setContentsMargins(14, 10, 14, 10)
+        self.char_grid.setSpacing(12)
+        self.char_grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.char_scroll.setWidget(self.char_inner)
+
+        ly4a.addWidget(self.char_scroll, 1)
+
+        bot.addWidget(sec4a, 6)
+
+        sec4b = _GlassSection(self.translations.get("section_engine", "V.  ENGINE SETTINGS"))
+        ly4b = sec4b.section_layout()
+        ly4b.addWidget(_FieldLabel(self.translations.get("conversation_method", "Conversation Method")))
+        self.f_method = QComboBox(); 
+        self.f_method.addItems([
+            "Local LLM", 
+            "Open AI", 
+            "Anthropic", 
+            "Google Gemini", 
+            "DeepSeek", 
+            "Grok", 
+            "Qwen", 
+            "Z.AI", 
+            "Mistral AI", 
+            "OpenRouter"
+        ])
+        self.f_method.setFixedHeight(38); 
+        self.f_method.setStyleSheet(INPUT); 
+        ly4b.addWidget(self.f_method)
+        self.f_method.setStyleSheet(COMBO_STYLE)
+
+        ly4b.addWidget(_FieldLabel(self.translations.get("user_persona", "User Persona"), self.translations.get("user_persona_hint", "Name and avatar shown in the chat for your messages.")))
+        self.f_persona = QComboBox()
+        self.f_persona.setStyleSheet(COMBO_STYLE)
+        self.f_persona.setFixedHeight(38)
+        ly4b.addWidget(self.f_persona)
+
+        self._selected_lorebooks = []
+        ly4b.addWidget(_FieldLabel(self.translations.get("lorebooks", "Lorebooks  (optional)")))
+        self.btn_lorebook = QPushButton("None")
+        self.btn_lorebook.setFixedHeight(38)
+        self.btn_lorebook.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lorebook.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(15, 15, 18, 0.4);
+                color: #e0e0e0;
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                padding: 8px 12px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                background: rgba(255, 255, 255, 0.08);
+            }
+        """)
+        self.btn_lorebook.clicked.connect(self._open_lorebook_selector)
+        ly4b.addWidget(self.btn_lorebook)
+        ly4b.addStretch()
+        bot.addWidget(sec4b, 4)
+        fly.addLayout(bot)
+
+        scroll.setWidget(form)
+        root.addWidget(scroll, 1)
+        self.rebuild_char_list(all_characters)
+
+    def _update_lorebook_button_text(self):
+        selected = self._selected_lorebooks
+        if not selected:
+            self.btn_lorebook.setText("None")
+        elif len(selected) == 1:
+            self.btn_lorebook.setText(selected[0])
+        else:
+            self.btn_lorebook.setText(f"Selected: {len(selected)}")
+
+    def _open_lorebook_selector(self):
+        from app.configuration import configuration
+        from app.gui.custom_widgets import MultiSelectDialog
+        
+        config = configuration.ConfigurationSettings().load_configuration()
+        user_data = config.get("user_data", {})
+        all_lorebooks = sorted(list(user_data.get("lorebooks", {}).keys()))
+        
+        dialog = MultiSelectDialog(
+            self.translations.get("lorebook_selector_title", "Select Lorebooks"),
+            all_lorebooks,
+            self._selected_lorebooks,
+            self.translations,
+            self.window()
+        )
+        
+        if dialog.exec():
+            self._selected_lorebooks = dialog.get_selected_items()
+            self._update_lorebook_button_text()
+
+    def rebuild_char_list(self, characters: list):
+        while self.char_grid.count():
+            item = self.char_grid.takeAt(0)
+            if item.widget(): 
+                item.widget().deleteLater()
+        self._char_checks.clear()
+        
+        if not characters:
+            lbl = QLabel(self.translations.get("no_characters", "No characters found."))
+            lbl.setStyleSheet("color: rgba(120,120,120,0.6); font-size:13px; background:transparent; border:none;")
+            self.char_grid.addWidget(lbl, 0, 0)
+            return
+        
+        for i, name in enumerate(characters):
+            cb = QtWidgets.QCheckBox(name)
+            cb.setFont(_font("Inter Tight Medium", 13))
+            cb.setStyleSheet(CB_STYLE)
+            self._char_checks[name] = cb
+            self.char_grid.addWidget(cb, i, 0)
+
+    def load_scene(self, scene_id: str, scene_data: dict):
+        self._editing_id = scene_id
+        self.title_lbl.setText(self.translations.get("edit_scene", "Edit Scene"))
+        self.btn_save.setText(self.translations.get("save_changes", "Save Changes"))
+        self.f_title.setText(scene_data.get("title", ""))
+        self.f_desc.setText(scene_data.get("description", ""))
+        self.f_world.setPlainText(scene_data.get("world_context", ""))
+        self.f_location.setText(scene_data.get("starting_location", ""))
+        self.f_opening.setPlainText(scene_data.get("opening_narration", ""))
+        self.f_first_msg.setPlainText(scene_data.get("first_message", ""))
+        self.f_time.setCurrentIndex({"morning": 0, "day": 1, "evening": 2, "night": 3}.get(scene_data.get("time_of_day", "day"), 1))
+        self.f_tone.setCurrentText(scene_data.get("gm_tone", "Epic Fantasy"))
+        self.f_method.setCurrentIndex({
+            "Local LLM": 0, "Open AI": 1, "Anthropic": 2, "Google Gemini": 3,
+            "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9
+        }.get(scene_data.get("conversation_method", "Local LLM"), 0))
+        self.f_persona.setCurrentText(scene_data.get("persona", "None"))
+        self.f_narrator_style.setCurrentText(scene_data.get("narrator_style", "Standard evocative present-tense prose"))
+        
+        lb_data = scene_data.get("lorebook", [])
+        if isinstance(lb_data, str):
+            if lb_data and lb_data != "None":
+                self._selected_lorebooks = [lb_data]
+            else:
+                self._selected_lorebooks = []
+        else:
+            self._selected_lorebooks = lb_data if lb_data else []
+        self._update_lorebook_button_text()
+        
+        party = scene_data.get("party", [])
+        for name, cb in self._char_checks.items():
+            cb.setChecked(name in party)
+
+        bg_val = scene_data.get("starting_bg", "None")
+        idx = self.f_bg_image.findText(bg_val)
+        self.f_bg_image.setCurrentIndex(idx if idx >= 0 else 0)
+
+        amb_val = scene_data.get("starting_ambient", "None")
+        idx = self.f_ambient.findText(amb_val)
+        self.f_ambient.setCurrentIndex(idx if idx >= 0 else 0)
+
+    def clear_form(self):
+        self._editing_id = None
+        self.title_lbl.setText(self.translations.get("new_scene", "New Scene"))
+        self.btn_save.setText(self.translations.get("save_launch", "Save & Launch  ▶"))
+        for w in [self.f_title, self.f_desc, self.f_location]: w.clear()
+        for w in [self.f_world, self.f_opening, self.f_first_msg]: w.clear()
+        self.f_time.setCurrentIndex(1)
+        self.f_tone.setCurrentIndex(0)
+        self.f_method.setCurrentIndex(0)
+        self.f_narrator_style.setCurrentIndex(0)
+        self.f_bg_image.setCurrentIndex(0)
+        self.f_ambient.setCurrentIndex(0)
+        self._selected_lorebooks = []
+        self._update_lorebook_button_text()
+        for cb in self._char_checks.values(): cb.setChecked(False)
+
+    def load_personas(self, personas_dict):
+        self.f_persona.clear()
+        self.f_persona.addItem("None")
+        for p in personas_dict.keys():
+            self.f_persona.addItem(p)
+
+    def load_from_import(self, import_data: dict):
+        self.clear_form()
+        self._editing_id = None
+        self.title_lbl.setText(self.translations.get("import_file", "Import Scene"))
+        self.f_title.setText(import_data.get("title", ""))
+        self.f_desc.setText(import_data.get("description", ""))
+        self.f_world.setPlainText(import_data.get("world_context", ""))
+        self.f_location.setText(import_data.get("starting_location", ""))
+        self.f_opening.setPlainText(import_data.get("opening_narration", ""))
+        self.f_first_msg.setPlainText(import_data.get("first_message", ""))
+        self.f_time.setCurrentIndex({"morning": 0, "day": 1, "evening": 2, "night": 3}.get(import_data.get("time_of_day", "day"), 1))
+        self.f_tone.setCurrentText(import_data.get("gm_tone", "Epic Fantasy"))
+        self.f_method.setCurrentIndex({
+            "Local LLM": 0, "Open AI": 1, "Anthropic": 2, "Google Gemini": 3,
+            "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9
+        }.get(import_data.get("conversation_method", "Local LLM"), 0))
+        self.f_persona.setCurrentText(import_data.get("persona", "None"))
+        self.f_narrator_style.setCurrentText(import_data.get("narrator_style", "Standard evocative present-tense prose"))
+        lb_data = import_data.get("lorebook", [])
+        if isinstance(lb_data, str):
+            if lb_data and lb_data != "None":
+                self._selected_lorebooks = [lb_data]
+            else:
+                self._selected_lorebooks = []
+        else:
+            self._selected_lorebooks = lb_data if lb_data else []
+        self._update_lorebook_button_text()
+
+    def _on_save(self):
+        title   = self.f_title.text().strip()
+        opening = self.f_opening.toPlainText().strip()
+        party   = [n for n, cb in self._char_checks.items() if cb.isChecked()]
+        ok = True
+        err   = INPUT + "QLineEdit { border-color: rgba(255,60,60,0.6); }"
+        err_t = INPUT + "QTextEdit { border-color: rgba(255,60,60,0.6); }"
+        if not title:   self.f_title.setStyleSheet(err);   ok = False
+        else:           self.f_title.setStyleSheet(INPUT)
+        if not opening: self.f_opening.setStyleSheet(err_t); ok = False
+        else:           self.f_opening.setStyleSheet(INPUT)
+        if not party or not ok: return
+        tod  = ["morning", "day", "evening", "night"][self.f_time.currentIndex()]
+        now  = datetime.datetime.now().isoformat()
+        data = _load_scenes(); sid = self._editing_id or str(uuid.uuid4())
+        exist = data["scenes"].get(sid, {})
+        data["scenes"][sid] = {
+            "title":            title,
+            "description":      self.f_desc.text().strip(),
+            "world_context":    self.f_world.toPlainText().strip(),
+            "starting_location": self.f_location.text().strip() or "Unknown",
+            "time_of_day":      tod,
+            "opening_narration": opening,
+            "first_message":    self.f_first_msg.toPlainText().strip(),
+            "party":            party,
+            "gm_tone":          self.f_tone.currentText(),
+            "narrator_style": self.f_narrator_style.currentText(),
+            "conversation_method": self.f_method.currentText(),
+            "persona":          self.f_persona.currentText(),
+            "lorebook":         self._selected_lorebooks,
+            "starting_bg":      self.f_bg_image.currentText(),
+            "starting_ambient": self.f_ambient.currentText(),
+            "created_at":       exist.get("created_at", now),
+            "last_played":      exist.get("last_played", ""),
+            "chat_log":         exist.get("chat_log", []),
+        }
+        _save_scenes(data); self.saved.emit(sid)
+
+class _BaseChatBubble(QFrame):
+    def __init__(self, name: str, avatar_path: str, bg_color: str, parent=None):
+        super().__init__(parent)
+        from app.configuration import configuration
+        self.cfg = configuration.ConfigurationSettings()
+        s = self.cfg.get_main_setting("chat_appearance") or {}
+        text_color = s.get("text_color", "#DCDCDC")
+        font_size = s.get("font_size", 14)
+        r = s.get("border_radius", 15)
+        op = s.get("bubble_opacity", 100)
+        alpha = round(op / 100.0, 2)
+        
+        if bg_color.startswith("#"):
+            h = bg_color.lstrip("#")
+            try:
+                bg_color = f"rgba({int(h[0:2], 16)}, {int(h[2:4], 16)}, {int(h[4:6], 16)}, {alpha})"
+            except:
+                pass
+
+        self.setStyleSheet("background: transparent; border: none;")
+        
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(10, 5, 10, 5)
+        main_layout.setSpacing(0)
+        
+        self.bubble_frame = QFrame()
+        self.bubble_frame.setObjectName("bubble_frame")
+        
+        radius_css = (
+            f"border-top-left-radius: {r}px; border-bottom-left-radius: {r}px; border-bottom-right-radius: {r}px; border-top-right-radius: {r}px;"
+        )
+        
+        self.bubble_frame.setStyleSheet(f"""
+            QFrame#bubble_frame {{
+                background-color: {bg_color};
+                {radius_css}
+                margin: 5px;
+            }}
+        """)
+
+        self.bubble_frame.setFixedWidth(s.get("max_width", 750)) 
+        
+        bubble_layout = QVBoxLayout(self.bubble_frame)
+        bubble_layout.setContentsMargins(14, 12, 14, 12)
+        bubble_layout.setSpacing(8)
+        
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(10)
+        
+        raw_pixmap = QPixmap(avatar_path)
+        if raw_pixmap.isNull():
+            raw_pixmap = QPixmap("app/gui/icons/logotype.png")
+
+        target_size = 64
+        label_size  = 26
+
+        scaled_pixmap = raw_pixmap.scaled(
+            target_size, target_size,
+            QtCore.Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            QtCore.Qt.TransformationMode.SmoothTransformation
+        )
+        crop_x = (scaled_pixmap.width()  - target_size) // 2
+        crop_y = (scaled_pixmap.height() - target_size) // 2
+        square_pixmap = scaled_pixmap.copy(crop_x, crop_y, target_size, target_size)
+
+        final_avatar_pixmap = QPixmap(target_size, target_size)
+        final_avatar_pixmap.fill(QtCore.Qt.GlobalColor.transparent)
+
+        painter = QPainter(final_avatar_pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        path = QtGui.QPainterPath()
+        path.addEllipse(0, 0, target_size, target_size)
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, square_pixmap)
+        painter.end()
+
+        self.avatar_label = QLabel()
+        self.avatar_label.setPixmap(final_avatar_pixmap)
+        self.avatar_label.setFixedSize(label_size, label_size)
+        self.avatar_label.setScaledContents(True)
+        self.avatar_label.setStyleSheet("background: transparent; border: none;")
+        header_layout.addWidget(self.avatar_label)
+        
+        self.header_label = QLabel(name)
+        font = QtGui.QFont()
+        font.setFamily("Inter Tight SemiBold")
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.header_label.setFont(font)
+        self.header_label.setStyleSheet(f"""
+            QLabel {{
+                color: {text_color};
+                font-size: {max(11, font_size - 2)}px;
+                font-weight: bold;
+                background: transparent;
+                border: none;
+            }}
+        """)
+        header_layout.addWidget(self.header_label)
+        header_layout.addStretch()
+        
+        bubble_layout.addLayout(header_layout)
+        
+        self._text_label = QLabel()
+        self._text_label.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self._text_label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._text_label.setWordWrap(True)
+        self._text_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+        
+        font_text = QtGui.QFont()
+        font_text.setFamily("Inter Tight Medium")
+        font_text.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self._text_label.setFont(font_text)
+        
+        self._text_label.setStyleSheet(f"""
+            QLabel {{
+                color: {text_color};
+                font-size: {font_size}px;
+                background: transparent;
+                border: none;
+                line-height: 1.4;
+            }}
+        """)
+        bubble_layout.addWidget(self._text_label)
+        
+        main_layout.addStretch()
+        main_layout.addWidget(self.bubble_frame)
+        main_layout.addStretch()
+
+    def append_text(self, chunk: str):
+        self._text_label.setText(self._text_label.text() + chunk)
+
+    def set_text(self, text: str):
+        self._text_label.setText(text)
+
+    @property
+    def text_label(self):
+        return self._text_label
+
+class SoulStageNarratorBubble(_BaseChatBubble):
+    def __init__(self, parent=None):
+        translations = _load_translations()
+        super().__init__(
+            name=translations.get("narrator", "NARRATOR"),
+            avatar_path="app/gui/icons/scene_main.png",
+            bg_color="rgba(35, 28, 15, 0.85)",
+            parent=parent
+        )
+
+class SoulStageNPCBubble(_BaseChatBubble):
+    def __init__(self, npc_name: str, archetype: str, avatar_path: str = None, parent=None):
+        if not avatar_path:
+            avatar_path = "app/gui/icons/logotype.png"
+        super().__init__(
+            name=f"{npc_name.upper()}  ·  {archetype}",
+            avatar_path=avatar_path,
+            bg_color="rgba(25, 25, 30, 0.85)", 
+            parent=parent
+        )
+
+class SoulStageEventCard(_BaseChatBubble):
+    _EVENT_THEMES = {
+        "encounter": ("ENCOUNTER", "rgba(60, 15, 10, 0.85)"),
+        "discovery": ("DISCOVERY", "rgba(45, 35, 5, 0.85)"),
+        "visitor":   ("VISITOR", "rgba(20, 15, 55, 0.85)"),
+        "twist":     ("PLOT TWIST", "rgba(5, 35, 45, 0.85)"),
+        "romance":   ("MOMENT", "rgba(50, 10, 30, 0.85)"),
+        "none":      ("NARRATOR", "rgba(35, 28, 15, 0.85)"),
+    }
+
+    def __init__(self, event_type: str = "none", parent=None):
+        event_type = event_type if event_type in self._EVENT_THEMES else "none"
+        label, bg_color = self._EVENT_THEMES[event_type]
+        super().__init__(
+            name=label,
+            avatar_path="app/gui/icons/scene_main.png",
+            bg_color=bg_color,
+            parent=parent
+        )
+
+class InventoryHUD(QWidget):
+    open_full_requested = pyqtSignal()
+
+    _ITEM_ICONS = {
+        "sword": "sword.svg", "knife": "sword.svg", "blade": "sword.svg",
+        "gun": "pistol.svg", "pistol": "pistol.svg", "rifle": "rifle.svg",
+        "bow": "bow.svg", "axe": "axe.svg", "club": "hammer.svg", "spear": "spear.svg",
+        "apple": "food.svg", "bread": "food.svg", "meat": "food.svg", "food": "food.svg",
+        "potion": "potion.svg", "medicine": "medicine-pills.svg", "аптечка": "medicine-pills.svg",
+        "water": "water.svg", "flask": "potion.svg", "canteen": "water.svg",
+        "key": "key.svg", "map": "map.svg", "torch": "torch.svg", "flashlight": "flashlight.svg",
+        "rope": "rope.svg", "book": "book.svg", "note": "document.svg", "document": "document.svg",
+        "coin": "coins.svg", "gold": "gold-bar.svg", "money": "money.svg",
+        "lock": "padlock.svg", "bag": "bag.svg", "radio": "pocket-radio.svg", "phone": "smartphone.svg",
+    }
+    _DEFAULT_ICON = "box.svg"
+
+    def __init__(self, text_input, parent=None):
+        super().__init__(parent)
+        self._text_input = text_input
+        self._items: list[str] = []
+        self.translations = _load_translations()
+
+        self.setObjectName("inv_hud")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setStyleSheet("""
+            QWidget#inv_hud {
+                background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
+                    stop:0 rgba(16,16,18,0.95),
+                    stop:1 rgba(10,10,12,0.98));
+                border: 1px solid rgba(255,255,255,0.08);
+                border-top: 1px solid rgba(255,255,255,0.15);
+                border-radius: 12px;
+            }
+        """)
+        shadow = QtWidgets.QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(18); shadow.setOffset(0, 4)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        self.setGraphicsEffect(shadow)
+
+        self._root = QVBoxLayout(self)
+        self._root.setContentsMargins(10, 7, 10, 9)
+        self._root.setSpacing(8)
+
+        hdr = QHBoxLayout()
+        hdr.setContentsMargins(0, 0, 0, 0)
+        hdr.setSpacing(6)
+        bag = QLabel()
+        bag.setPixmap(QIcon(str(Path("app/gui/icons/soul_stage/bag.svg"))).pixmap(12, 12))
+        hdr.addWidget(bag)
+        inv_lbl = QLabel(self.translations.get("inventory", "INVENTORY"))
+        inv_lbl.setFont(_font("Inter Tight SemiBold", 7, bold=True))
+        inv_lbl.setStyleSheet("color: rgba(255,255,255,0.60); letter-spacing:2px;")
+        hdr.addWidget(inv_lbl, 1)
+        open_btn = QPushButton()
+        open_btn.setIcon(QIcon(str(Path("app/gui/icons/soul_stage/expand.svg"))))
+        open_btn.setIconSize(QtCore.QSize(10, 10))
+        open_btn.setFixedSize(18, 18)
+        open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        open_btn.setToolTip(self.translations.get("tooltip_open_inventory", "Open full inventory"))
+        open_btn.setStyleSheet("""
+            QPushButton { background: rgba(255,255,255,0.05); border: none;
+                border-radius: 4px; }
+            QPushButton:hover { background: rgba(255,255,255,0.15); }
+        """)
+        open_btn.clicked.connect(self.open_full_requested.emit)
+        hdr.addWidget(open_btn)
+        self._root.addLayout(hdr)
+
+        self._tags_w = QWidget()
+        self._tags_w.setStyleSheet("background: transparent;")
+        self._tags_l = QVBoxLayout(self._tags_w)
+        self._tags_l.setContentsMargins(0, 0, 0, 0)
+        self._tags_l.setSpacing(5)
+        self._root.addWidget(self._tags_w)
+
+        self.hide()
+
+    @classmethod
+    def _item_icon(cls, item: str) -> str:
+        il = item.lower()
+        for keyword, icon in cls._ITEM_ICONS.items():
+            if keyword in il:
+                return icon
+        return cls._DEFAULT_ICON
+
+    def update_items(self, items: list[str]):
+        self._items = items
+        while self._tags_l.count():
+            child = self._tags_l.takeAt(0)
+            if child.widget(): child.widget().deleteLater()
+        if not items:
+            self.hide()
+            return
+        for item in items[:6]:
+            icon_file = self._item_icon(item)
+            icon_path = str(Path("app/gui/icons/soul_stage") / icon_file)
+            btn = QPushButton(f" {item}")
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QtCore.QSize(14, 14))
+            btn.setFont(_font("Inter Tight Medium", 10))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn.setFixedHeight(28)
+            btn.setToolTip(self.translations.get("tooltip_use_item", "Use: {item}").replace("{item}", item))
+            btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(255,255,255,0.03);
+                    border: none;
+                    border-radius: 6px;
+                    color: rgba(255,255,255,0.85);
+                    text-align: left;
+                    padding: 0 8px;
+                }
+                QPushButton:hover {
+                    background: rgba(255,255,255,0.08);
+                    color: white;
+                }
+            """)
+            btn.clicked.connect(lambda _, it=item: self._use_item(it))
+            self._tags_l.addWidget(btn)
+        if len(items) > 6:
+            more = QLabel(self.translations.get("more_items", "+{count} more").replace("{count}", str(len(items) - 6)))
+            more.setFont(_font("Inter Tight Medium", 9))
+            more.setStyleSheet("color: rgba(255,255,255,0.40); padding: 0 4px;")
+            self._tags_l.addWidget(more)
+        self._tags_l.addStretch()
+        self.adjustSize()
+        self.show()
+        self.raise_()
+
+    def _use_item(self, item: str):
+        action = f"*uses {item}*"
+        cur = self._text_input.toPlainText().strip()
+        self._text_input.setPlainText(f"{cur} {action}".strip())
+        c = self._text_input.textCursor()
+        c.movePosition(c.MoveOperation.End)
+        self._text_input.setTextCursor(c)
+        self._text_input.setFocus()
+
+    def reposition(self, parent_size):
+        self.adjustSize()
+        self.move(20, max(0, parent_size.height() - self.height() - 18))
+        self.raise_()
+
+class InventoryPanel(QtWidgets.QDialog):
+    item_used    = pyqtSignal(str)   
+    item_dropped = pyqtSignal(str)   
+
+    _CATEGORIES = {
+        "Weapons":["sword","knife","blade","gun","rifle","bow","axe","club","spear","меч","нож","пистолет","ружьё"],
+        "Consumables":["apple","bread","meat","food","potion","medicine","water","flask","canteen","еда","яблоко","аптечка","вода"],
+        "Tools":["key","map","torch","rope","book","note","lock","radio","phone","ключ","карта","фонарь","верёвка","книга"],
+        "Valuables":["coin","gold","gem","ring","деньги","монета","золото","кольцо"],
+        "Quest Items":["letter","document","journal","relic","artifact","письмо","документ","дневник"],
+        "Other":[],
+    }
+
+    def __init__(self, world_state, parent=None):
+        super().__init__(parent)
+        self.world_state = world_state
+        self.translations = _load_translations()
+        
+        self.setWindowTitle(self.translations.get("inventory_full_title", "Inventory"))
+        self.setMinimumSize(540, 560)
+        self.setStyleSheet("""
+            QDialog { 
+                background-color: #0c0c0e; 
+                color: #e8e8e8; 
+            }
+            QLabel { background: transparent; border: none; }
+            
+            QScrollBar:vertical { background: transparent; width: 6px; margin: 0; }
+            QScrollBar::handle:vertical { background: rgba(255,255,255,0.15); border-radius: 3px; min-height: 24px; }
+            QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.3); }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            QScrollArea { background: transparent; border: none; }
+        """)
+        self._build_ui()
+
+    def _set_font(self, widget, family="Inter Tight Medium", size=12, bold=False):
+        f = QtGui.QFont(family, size)
+        if bold:
+            f.setWeight(QtGui.QFont.Weight.Bold)
+        f.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        widget.setFont(f)
+
+    def _section_label(self, text: str) -> QLabel:
+        lbl = QLabel(text.upper())
+        self._set_font(lbl, "Inter Tight SemiBold", 10, bold=True)
+        lbl.setStyleSheet("color: rgba(255, 255, 255, 0.45); letter-spacing: 2px; background: transparent; border: none;")
+        return lbl
+
+    def _categorize(self, items: list[str]) -> dict:
+        cats = {k:[] for k in self._CATEGORIES}
+        for item in items:
+            il = item.lower()
+            placed = False
+            for cat, keywords in self._CATEGORIES.items():
+                if cat == "Other":
+                    continue
+                if any(kw in il for kw in keywords):
+                    cats[cat].append(item)
+                    placed = True
+                    break
+            if not placed:
+                cats["Other"].append(item)
+        return {k: v for k, v in cats.items() if v}
+
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        hdr = QFrame()
+        hdr.setObjectName("inv_header")
+        hdr.setFixedHeight(64)
+        hdr.setStyleSheet("QFrame#inv_header { background: rgba(20, 20, 24, 0.8); border: none; }")
+        hl = QHBoxLayout(hdr)
+        hl.setContentsMargins(24, 0, 24, 0)
+        hl.setSpacing(14)
+        
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(QIcon(str(Path("app/gui/icons/soul_stage/bag.svg"))).pixmap(24, 24))
+        icon_lbl.setStyleSheet("background: transparent; border: none;")
+        hl.addWidget(icon_lbl)
+        
+        title_col = QVBoxLayout()
+        title_col.setSpacing(2)
+        title_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        
+        title_lbl = QLabel(self.translations.get("inventory", "INVENTORY").upper())
+        self._set_font(title_lbl, "Inter Tight SemiBold", 13, bold=True)
+        title_lbl.setStyleSheet("color: rgba(255,255,255,0.95); letter-spacing: 1.5px; background: transparent; border: none;")
+        title_col.addWidget(title_lbl)
+        
+        ws = self.world_state
+        count_lbl = QLabel(self.translations.get("items_count", "{count} items").replace("{count}", str(len(ws.player_inventory))))
+        self._set_font(count_lbl, "Inter Tight Medium", 10)
+        count_lbl.setStyleSheet("color: rgba(255,255,255,0.40); background: transparent; border: none;")
+        title_col.addWidget(count_lbl)
+        
+        hl.addLayout(title_col, 1)
+        root.addWidget(hdr)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        inner = QWidget()
+        inner.setStyleSheet("background: transparent;")
+        il = QVBoxLayout(inner)
+        il.setContentsMargins(28, 24, 28, 24)
+        il.setSpacing(20)
+
+        items = ws.player_inventory
+        if not items:
+            empty_lbl = QLabel(self.translations.get("inventory_empty", "Your inventory is empty."))
+            self._set_font(empty_lbl, "Inter Tight Medium", 13)
+            empty_lbl.setStyleSheet("color: rgba(255,255,255,0.25); background: transparent; border: none;")
+            empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            il.addWidget(empty_lbl)
+        else:
+            cats = self._categorize(items)
+            cat_map = {
+                "Weapons": self.translations.get("category_weapons", "Weapons"),
+                "Consumables": self.translations.get("category_consumables", "Consumables"),
+                "Tools": self.translations.get("category_tools", "Tools"),
+                "Valuables": self.translations.get("category_valuables", "Valuables"),
+                "Quest Items": self.translations.get("category_quest_items", "Quest Items"),
+                "Other": self.translations.get("category_other", "Other"),
+            }
+            for cat_name, cat_items in cats.items():
+                cat_lbl = self._section_label(cat_map.get(cat_name, cat_name))
+                il.addWidget(cat_lbl)
+                
+                grid_w = QWidget()
+                grid_w.setStyleSheet("background: transparent;")
+                grid = QGridLayout(grid_w)
+                grid.setContentsMargins(0, 0, 0, 0)
+                grid.setSpacing(10)
+                
+                for idx, item in enumerate(cat_items):
+                    card = self._make_item_card(item)
+                    grid.addWidget(card, idx // 2, idx % 2)
+                il.addWidget(grid_w)
+
+        il.addStretch()
+        scroll.setWidget(inner)
+        root.addWidget(scroll, 1)
+
+        footer = QFrame()
+        footer.setObjectName("inv_footer")
+        footer.setFixedHeight(68)
+        footer.setStyleSheet("QFrame#inv_footer { background: rgba(20, 20, 24, 0.5); border: none; border-top: 1px solid rgba(255,255,255,0.03); }")
+        fl = QHBoxLayout(footer)
+        fl.setContentsMargins(24, 0, 24, 0)
+        fl.addStretch()
+        
+        close_btn = QPushButton(self.translations.get("update_available_close", "Close"))
+        self._set_font(close_btn, "Inter Tight Medium", 12)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        close_btn.setFixedHeight(38)
+        close_btn.setFixedWidth(120)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: rgba(255, 255, 255, 0.5);
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.05);
+                border-color: rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.9);
+            }
+        """)
+        close_btn.clicked.connect(self.accept)
+        fl.addWidget(close_btn)
+        
+        root.addWidget(footer)
+
+    def _make_item_card(self, item: str) -> QFrame:
+        card = QFrame()
+        card.setObjectName("inv_item_card")
+        card.setFixedHeight(54)
+        card.setStyleSheet("""
+            QFrame#inv_item_card {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid transparent;
+                border-radius: 10px;
+            }
+            QFrame#inv_item_card:hover { 
+                background: rgba(255, 255, 255, 0.08); 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+            }
+        """)
+        cl = QHBoxLayout(card)
+        cl.setContentsMargins(12, 0, 12, 0)
+        cl.setSpacing(10)
+
+        icon_file = InventoryHUD._item_icon(item)
+        ic_lbl = QLabel()
+        ic_lbl.setPixmap(QIcon(str(Path("app/gui/icons/soul_stage") / icon_file)).pixmap(20, 20))
+        ic_lbl.setFixedWidth(22)
+        ic_lbl.setStyleSheet("background: transparent; border: none;")
+        cl.addWidget(ic_lbl)
+
+        name_lbl = QLabel(item)
+        self._set_font(name_lbl, "Inter Tight SemiBold", 12)
+        name_lbl.setStyleSheet("color: rgba(255,255,255,0.9); background: transparent; border: none;")
+        name_lbl.setWordWrap(True)
+        cl.addWidget(name_lbl, 1)
+
+        btn_use = QPushButton(self.translations.get("btn_use", "Use"))
+        btn_use.setFixedSize(48, 28)
+        btn_use.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_use.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._set_font(btn_use, "Inter Tight Medium", 10)
+        btn_use.setStyleSheet("""
+            QPushButton { 
+                background: rgba(255,255,255,0.05); 
+                border: 1px solid transparent;
+                border-radius: 6px; 
+                color: rgba(255,255,255,0.85); 
+            }
+            QPushButton:hover { 
+                background: rgba(255,255,255,0.15); 
+                color: white; 
+                border-color: rgba(255,255,255,0.3); 
+            }
+        """)
+        btn_use.clicked.connect(lambda _, it=item: (self.item_used.emit(it), self.accept()))
+        cl.addWidget(btn_use)
+
+        btn_drop = QPushButton("✕")
+        btn_drop.setFixedSize(28, 28)
+        btn_drop.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_drop.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._set_font(btn_drop, "Inter Tight Medium", 11)
+        btn_drop.setToolTip(self.translations.get("tooltip_drop", "Drop item"))
+        btn_drop.setStyleSheet("""
+            QPushButton { 
+                background: rgba(255,255,255,0.03); 
+                border: 1px solid transparent;
+                border-radius: 6px; 
+                color: rgba(255,255,255,0.40); 
+            }
+            QPushButton:hover { 
+                background: rgba(255,60,60,0.15); 
+                border-color: rgba(255,60,60,0.3); 
+                color: rgba(255,100,100,0.90); 
+            }
+        """)
+        btn_drop.clicked.connect(lambda _, it=item: self._drop_item(it))
+        cl.addWidget(btn_drop)
+        return card
+
+    def _drop_item(self, item: str):
+        self.item_dropped.emit(item)
+        if item in self.world_state.player_inventory:
+            self.world_state.player_inventory.remove(item)
+        self.accept()
+        new_panel = InventoryPanel(self.world_state, self.parent())
+        new_panel.item_used.connect(self.item_used)
+        new_panel.item_dropped.connect(self.item_dropped)
+        new_panel.exec()
+
+class ChoicesBar(QFrame):
+    choice_selected = pyqtSignal(str)
+
+    _FRAME_STYLE = """
+        QFrame#choices_bar {
+            background: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(18, 18, 22, 0.0),
+                stop:0.3 rgba(14, 14, 18, 0.85),
+                stop:1 rgba(10, 10, 12, 0.95));
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: none;
+        }
+    """
+
+    _HINT_STYLE = (
+        "color: rgba(255,255,255,0.40); font-family: 'Inter Tight Medium';"
+        " font-size: 9px; letter-spacing: 1px; background: transparent; border: none;"
+    )
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("choices_bar")
+        self.setStyleSheet(self._FRAME_STYLE)
+        self._event_type = "none"
+        self.translations = _load_translations()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 8, 20, 6)
+        root.setSpacing(6)
+
+        hint_row = QHBoxLayout()
+        hint_row.setContentsMargins(0, 0, 0, 0)
+        self._hint_lbl = QLabel(self.translations.get("choice_hint_none", "CHOOSE YOUR ACTION  —  OR TYPE YOUR OWN"))
+        self._hint_lbl.setStyleSheet(self._HINT_STYLE)
+        self._hint_lbl.setFont(_font("Inter Tight SemiBold", 8, bold=True))
+        hint_row.addWidget(self._hint_lbl)
+        hint_row.addStretch()
+
+        self._btn_dismiss = QPushButton("✕")
+        self._btn_dismiss.setFixedSize(18, 18)
+        self._btn_dismiss.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._btn_dismiss.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._btn_dismiss.setStyleSheet("""
+            QPushButton { background: transparent; border: none;
+                color: rgba(255,255,255,50); font-size: 10px; }
+            QPushButton:hover { color: rgba(255,255,255,150); }
+        """)
+        self._btn_dismiss.clicked.connect(self.clear_choices)
+        hint_row.addWidget(self._btn_dismiss)
+        root.addLayout(hint_row)
+
+        self._buttons_row = QHBoxLayout()
+        self._buttons_row.setContentsMargins(0, 0, 0, 0)
+        self._buttons_row.setSpacing(8)
+        root.addLayout(self._buttons_row)
+
+        self.hide()
+
+    def _build_btn_style(self) -> str:
+        return """
+            QPushButton {
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-top: 1px solid rgba(255, 255, 255, 0.20);
+                border-radius: 10px;
+                color: rgba(255, 255, 255, 0.85);
+                font-family: 'Inter Tight Medium';
+                font-size: 12px;
+                padding: 7px 16px;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.08);
+                border-color: rgba(255, 255, 255, 0.25);
+                color: white;
+            }
+            QPushButton:pressed {
+                background: rgba(255, 255, 255, 0.12);
+                border-color: rgba(255, 255, 255, 0.40);
+            }
+        """
+
+    def show_choices(self, choices: list[str], event_type: str = "none"):
+        if not choices:
+            self.hide()
+            return
+
+        self._event_type = event_type
+
+        while self._buttons_row.count():
+            child = self._buttons_row.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        btn_style = self._build_btn_style()
+
+        for text in choices[:4]:
+            btn = QPushButton(text)
+            btn.setFont(_font("Inter Tight Medium", 12))
+            btn.setStyleSheet(btn_style)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Preferred,
+                QtWidgets.QSizePolicy.Policy.Fixed,
+            )
+            btn.setFixedHeight(34)
+
+            btn_shadow = QtWidgets.QGraphicsDropShadowEffect()
+            btn_shadow.setBlurRadius(12)
+            btn_shadow.setOffset(0, 3)
+            btn_shadow.setColor(QColor(0, 0, 0, 80))
+            btn.setGraphicsEffect(btn_shadow)
+
+            btn.clicked.connect(
+                lambda checked, t=text: self._on_choice_clicked(t)
+            )
+            self._buttons_row.addWidget(btn)
+
+        self._buttons_row.addStretch()
+
+        hint_map = {
+            "encounter": self.translations.get("choice_hint_encounter", "REACT TO THE THREAT  —  OR TYPE YOUR OWN"),
+            "discovery": self.translations.get("choice_hint_discovery", "WHAT DO YOU DO?  —  OR TYPE YOUR OWN"),
+            "visitor":   self.translations.get("choice_hint_visitor", "HOW DO YOU RESPOND?  —  OR TYPE YOUR OWN"),
+            "twist":     self.translations.get("choice_hint_twist", "YOUR MOVE  —  OR TYPE YOUR OWN"),
+            "romance":   self.translations.get("choice_hint_romance", "CHOOSE YOUR RESPONSE  —  OR TYPE YOUR OWN"),
+            "none":      self.translations.get("choice_hint_none", "CHOOSE YOUR ACTION  —  OR TYPE YOUR OWN"),
+        }
+        self._hint_lbl.setText(hint_map.get(event_type, hint_map["none"]))
+
+        self.show()
+        self.adjustSize()
+
+    def clear_choices(self):
+        while self._buttons_row.count():
+            child = self._buttons_row.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+        self.hide()
+
+    def _on_choice_clicked(self, text: str):
+        self.clear_choices()
+        self.choice_selected.emit(text)
+
+class RPGOpenSceneDialog(QtWidgets.QDialog):
+    def __init__(self, scene_title: str, entry_count: int, parent=None):
+        super().__init__(parent)
+        self.result_action = "cancel"
+        self.translations = _load_translations()
+        self.setWindowTitle(self.translations.get("open_scene_title", "Soul Stage — Open Scene"))
+        self.setMinimumWidth(480)
+        self.setFixedHeight(280)
+        self.setStyleSheet("""
+            QDialog { background-color: #0d0d10; color: #e8e8e8; }
+            QLabel { background: transparent; border: none; }
+        """)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(28, 24, 28, 24)
+        root.setSpacing(0)
+
+        title_row = QHBoxLayout()
+        title_row.setSpacing(12)
+
+        title_col = QVBoxLayout()
+        title_col.setSpacing(2)
+        scene_name = QLabel(scene_title)
+        scene_name.setFont(_font("Inter Tight SemiBold", 15))
+        scene_name.setStyleSheet("color: #ffffff;")
+        title_col.addWidget(scene_name)
+        sub = QLabel(self.translations.get("open_scene_has_history", "This scene has saved history"))
+        sub.setFont(_font("Inter Tight Medium", 10))
+        sub.setStyleSheet("color: rgba(255,255,255,0.45);")
+        title_col.addWidget(sub)
+        title_row.addLayout(title_col, 1)
+        root.addLayout(title_row)
+        root.addSpacing(20)
+        root.addWidget(_rpg_divider())
+        root.addSpacing(16)
+
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(10)
+
+        def make_choice_card(icon_path, label, desc, color_rgb, action):
+            card = QFrame()
+            card.setCursor(Qt.CursorShape.PointingHandCursor)
+            r, g, b = color_rgb.split(",")
+            card.setStyleSheet(f"""
+                QFrame {{
+                    background: rgba({r},{g},{b},0.08);
+                    border: 1px solid rgba({r},{g},{b},0.25);
+                    border-top: 1px solid rgba({r},{g},{b},0.40);
+                    border-radius: 12px;
+                    padding: 2px;
+                }}
+                QFrame:hover {{
+                    background: rgba({r},{g},{b},0.16);
+                    border-color: rgba({r},{g},{b},0.50);
+                }}
+            """)
+            card_l = QVBoxLayout(card)
+            card_l.setContentsMargins(14, 12, 14, 12)
+            card_l.setSpacing(4)
+            ic = QLabel()
+            px = QPixmap(icon_path).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            ic.setPixmap(px)
+            ic.setStyleSheet("background:transparent; border:none;")
+            card_l.addWidget(ic)
+            lbl_w = QLabel(label)
+            lbl_w.setFont(_font("Inter Tight SemiBold", 11))
+            lbl_w.setStyleSheet(f"color: rgba({r},{g},{b},1.0); background:transparent; border:none;")
+            card_l.addWidget(lbl_w)
+            desc_w = QLabel(desc)
+            desc_w.setFont(_font("Inter Tight Medium", 9))
+            desc_w.setWordWrap(True)
+            desc_w.setStyleSheet("color: rgba(200,200,210,0.55); background:transparent; border:none;")
+            card_l.addWidget(desc_w)
+
+            def click_handler(ev, a=action):
+                if ev.button() == Qt.MouseButton.LeftButton:
+                    self.result_action = a
+                    self.accept()
+            card.mousePressEvent = click_handler
+            return card
+
+        cards_row.addWidget(make_choice_card(
+            "app/gui/icons/play.png", 
+            self.translations.get("continue_session", "Continue"), 
+            self.translations.get("open_scene_continue_desc", "Load {count} saved messages and continue").replace("{count}", str(entry_count)),
+            "80,160,255", "continue"
+        ))
+        cards_row.addWidget(make_choice_card(
+            "app/gui/icons/regen.png", 
+            self.translations.get("new_session", "New Session"), 
+            self.translations.get("open_scene_new_desc", "Start fresh — history will be cleared"),
+            "255,120,60", "new"
+        ))
+        root.addLayout(cards_row, 1)
+        root.addSpacing(16)
+
+        cancel_row = QHBoxLayout()
+        cancel_row.addStretch()
+        btn_cancel = _rpg_ghost_btn(self.translations.get("cancel", "Cancel"))
+        btn_cancel.setFixedWidth(100)
+        btn_cancel.clicked.connect(self.reject)
+        cancel_row.addWidget(btn_cancel)
+        root.addLayout(cancel_row)
+
+    @staticmethod
+    def ask(scene_title: str, entry_count: int, parent=None) -> str:
+        dlg = RPGOpenSceneDialog(scene_title, entry_count, parent)
+        dlg.exec()
+        return dlg.result_action
+
+
+class RPGConfirmDialog(QtWidgets.QDialog):
+    def __init__(self, title: str, message: str, confirm_text: str = "Delete",
+                 detail: str = "", parent=None):
+        super().__init__(parent)
+        self._confirmed = False
+        self.translations = _load_translations()
+        self.setWindowTitle(title)
+        self.setMinimumWidth(420)
+        self.setFixedHeight(220)
+        self.setStyleSheet("""
+            QDialog { background-color: #0d0d10; color: #e8e8e8; }
+            QLabel { background: transparent; border: none; }
+        """)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(28, 24, 28, 24)
+        root.setSpacing(0)
+
+        header_row = QHBoxLayout()
+        header_row.setSpacing(14)
+        warn_icon = QLabel("⚠")
+        warn_icon.setStyleSheet("font-size: 28px; color: #FF6B6B;")
+        warn_icon.setFixedWidth(34)
+        header_row.addWidget(warn_icon)
+
+        text_col = QVBoxLayout()
+        text_col.setSpacing(4)
+        msg_lbl = QLabel(message)
+        msg_lbl.setFont(_font("Inter Tight SemiBold", 13))
+        msg_lbl.setStyleSheet("color: #ffffff;")
+        msg_lbl.setWordWrap(True)
+        text_col.addWidget(msg_lbl)
+        if detail:
+            det_lbl = QLabel(detail)
+            det_lbl.setFont(_font("Inter Tight Medium", 10))
+            det_lbl.setStyleSheet("color: rgba(255,255,255,0.45);")
+            det_lbl.setWordWrap(True)
+            text_col.addWidget(det_lbl)
+        header_row.addLayout(text_col, 1)
+        root.addLayout(header_row)
+        root.addSpacing(16)
+        root.addWidget(_rpg_divider())
+        root.addSpacing(16)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_cancel = _rpg_ghost_btn(self.translations.get("cancel", "Cancel"))
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addWidget(btn_cancel)
+        btn_row.addStretch()
+        btn_confirm = _rpg_primary_btn(confirm_text, "220,60,60")
+        btn_confirm.setFixedWidth(140)
+        btn_confirm.clicked.connect(self._on_confirm)
+        btn_row.addWidget(btn_confirm)
+        root.addLayout(btn_row)
+
+    def _on_confirm(self):
+        self._confirmed = True
+        self.accept()
+
+    @staticmethod
+    def ask(title: str, message: str, confirm_text: str = "Delete",
+            detail: str = "", parent=None) -> bool:
+        dlg = RPGConfirmDialog(title, message, confirm_text, detail, parent)
+        dlg.exec()
+        return dlg._confirmed
+
+
+class RPGMemorySelectDialog(QtWidgets.QDialog):
+    def __init__(self, party_names: list, parent=None):
+        super().__init__(parent)
+        self._selected = ""
+        self.translations = _load_translations()
+        
+        self.setWindowTitle(self.translations.get("memory_select_title", "Soul Memory"))
+        self.setMinimumWidth(420)
+        
+        base_height = 180
+        self.setFixedHeight(base_height + len(party_names) * 58)
+        
+        self.setStyleSheet("""
+            QDialog { background-color: #0d0d10; color: #e8e8e8; }
+            QLabel { background: transparent; border: none; }
+        """)
+
+        def _set_font(widget, family="Inter Tight Medium", size=12, bold=False):
+            f = QtGui.QFont(family, size)
+            if bold:
+                f.setWeight(QtGui.QFont.Weight.Bold)
+            f.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+            widget.setFont(f)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(28, 24, 28, 24)
+        root.setSpacing(0)
+
+        header_row = QHBoxLayout()
+        header_row.setSpacing(14)
+        
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(QIcon("app/gui/icons/soulMemory.png").pixmap(26, 26))
+        header_row.addWidget(icon_lbl)
+        
+        title_col = QVBoxLayout()
+        title_col.setSpacing(4)
+        
+        title_lbl = QLabel("SOUL MEMORY")
+        _set_font(title_lbl, "Inter Tight SemiBold", 13, bold=True)
+        title_lbl.setStyleSheet("color: rgba(255,255,255,0.95); letter-spacing: 1.5px;")
+        title_col.addWidget(title_lbl)
+        
+        sub_lbl = QLabel(self.translations.get("memory_select_query", "Whose memories would you like to view?"))
+        _set_font(sub_lbl, "Inter Tight Medium", 10)
+        sub_lbl.setStyleSheet("color: rgba(255,255,255,0.45);")
+        title_col.addWidget(sub_lbl)
+        
+        header_row.addLayout(title_col, 1)
+        root.addLayout(header_row)
+        
+        root.addSpacing(16)
+        
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)
+        divider.setFixedHeight(1)
+        divider.setStyleSheet("background: rgba(255,255,255,0.05); border: none;")
+        root.addWidget(divider)
+        
+        root.addSpacing(16)
+
+        for name in party_names:
+            card = QFrame()
+            card.setObjectName("memory_card")
+            card.setCursor(Qt.CursorShape.PointingHandCursor)
+            card.setFixedHeight(50)
+            card.setStyleSheet("""
+                QFrame#memory_card {
+                    background: rgba(255, 255, 255, 0.03);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 10px;
+                }
+                QFrame#memory_card:hover {
+                    background: rgba(255, 255, 255, 0.08);
+                    border-color: rgba(255, 255, 255, 0.2);
+                }
+            """)
+            card_l = QHBoxLayout(card)
+            card_l.setContentsMargins(12, 0, 16, 0)
+            card_l.setSpacing(12)
+
+            av_lbl = QLabel()
+            av_px = _get_char_avatar_pixmap(name)
+            av_lbl.setPixmap(_round_pixmap(av_px, 30))
+            av_lbl.setFixedSize(30, 30)
+            card_l.addWidget(av_lbl)
+
+            name_lbl = QLabel(name)
+            _set_font(name_lbl, "Inter Tight SemiBold", 12)
+            name_lbl.setStyleSheet("color: #ffffff;")
+            card_l.addWidget(name_lbl, 1)
+
+            arrow = QLabel("→")
+            _set_font(arrow, "Inter Tight Medium", 14)
+            arrow.setStyleSheet("color: rgba(255,255,255,0.25);")
+            card_l.addWidget(arrow)
+
+            def on_card_click(ev, n=name):
+                if ev.button() == Qt.MouseButton.LeftButton:
+                    self._selected = n
+                    self.accept()
+            card.mousePressEvent = on_card_click
+            root.addWidget(card)
+            root.addSpacing(8)
+
+        root.addStretch()
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        
+        btn_cancel = QPushButton(self.translations.get("cancel", "Cancel"))
+        _set_font(btn_cancel, "Inter Tight Medium", 12)
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_cancel.setFixedSize(110, 38)
+        btn_cancel.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: rgba(255, 255, 255, 0.5);
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.05);
+                border-color: rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.9);
+            }
+        """)
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addWidget(btn_cancel)
+        
+        root.addLayout(btn_row)
+
+    @staticmethod
+    def ask(party_names: list, parent=None) -> str:
+        if len(party_names) == 1:
+            return party_names[0]
+        dlg = RPGMemorySelectDialog(party_names, parent)
+        dlg.exec()
+        return dlg._selected
+
+class WorldInfoDialog(QtWidgets.QDialog):
+    world_state_changed = pyqtSignal(dict)
+
+    _TAB_ACTIVE = """
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                                        stop:0 rgba(255, 255, 255, 0.1), 
+                                        stop:1 rgba(255, 255, 255, 0.04));
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            border-radius: 10px;
+            font-family: 'Inter Tight SemiBold'; 
+            font-size: 13px;
+            padding: 12px 16px;
+            margin: 3px 0;
+            text-align: left;
+        }
+    """
+    
+    _TAB_IDLE = """
+        QPushButton {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            color: rgba(255, 255, 255, 0.45);
+            font-family: 'Inter Tight SemiBold'; 
+            font-size: 13px;
+            padding: 12px 16px;
+            margin: 3px 0;
+            text-align: left;
+        }
+        QPushButton:hover {
+            background-color: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.8);
+        }
+    """
+
+    def __init__(self, world_state, npc_registry=None, parent=None):
+        super().__init__(parent)
+        self.world_state  = world_state
+        self.npc_registry = npc_registry
+        self.translations = _load_translations()
+        self.setWindowTitle(self.translations.get("world_state_title", "World State — Soul Stage"))
+        self.setMinimumSize(720, 580)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #0c0c0e;
+                color: #e8e8e8;
+            }
+            QLabel { background: transparent; border: none; }
+            
+            QLineEdit, QTextEdit {
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-top: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 8px;
+                color: rgba(240, 240, 240, 0.95);
+                font-family: 'Inter Tight Medium'; font-size: 13px;
+                padding: 10px 14px;
+                selection-background-color: rgba(255, 255, 255, 0.20);
+            }
+            QLineEdit:focus, QTextEdit:focus {
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+            }
+            
+            QScrollBar:vertical { background: transparent; width: 6px; margin: 0; }
+            QScrollBar::handle:vertical { background: rgba(255,255,255,0.15); border-radius: 3px; min-height: 24px; }
+            QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.3); }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            QScrollArea { background: transparent; border: none; }
+        """)
+        self._build_ui()
+        self._populate()
+
+    def _create_font(self, family="Inter Tight Medium", size=12, bold=False):
+        f = QtGui.QFont(family, size)
+        if bold:
+            f.setWeight(QtGui.QFont.Weight.Bold)
+        f.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        return f
+
+    def _set_font(self, widget, family="Inter Tight Medium", size=12, bold=False):
+        widget.setFont(self._create_font(family, size, bold))
+
+    def _section_label(self, text: str) -> QLabel:
+        lbl = QLabel(text.upper())
+        self._set_font(lbl, "Inter Tight SemiBold", 10, bold=True)
+        lbl.setStyleSheet("color: rgba(255, 255, 255, 0.45); letter-spacing: 2px;")
+        return lbl
+
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        header = QFrame()
+        header.setObjectName("world_header")
+        header.setFixedHeight(64)
+        header.setStyleSheet("QFrame#world_header { background: rgba(20, 20, 24, 0.8); border: none; }")
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(24, 0, 24, 0)
+        hl.setSpacing(14)
+
+        world_icon = QLabel()
+        world_icon.setPixmap(QIcon(str(Path("app/gui/icons/soul_stage/world.svg"))).pixmap(26, 26))
+        world_icon.setStyleSheet("background: transparent; border: none;")
+        hl.addWidget(world_icon)
+
+        title_col = QVBoxLayout()
+        title_col.setSpacing(2)
+        title_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        title_lbl = QLabel(self.translations.get("world_state_title", "WORLD STATE"))
+        self._set_font(title_lbl, "Inter Tight SemiBold", 13, bold=True)
+        title_lbl.setStyleSheet("color: rgba(255,255,255,0.95); letter-spacing: 1.5px; background: transparent; border: none;")
+        title_col.addWidget(title_lbl)
+
+        self._header_sub = QLabel("")
+        self._set_font(self._header_sub, "Inter Tight Medium", 10)
+        self._header_sub.setStyleSheet("color: rgba(255,255,255,0.4); background: transparent; border: none;")
+        title_col.addWidget(self._header_sub)
+        hl.addLayout(title_col, 1)
+
+        root.addWidget(header)
+
+        body_layout = QHBoxLayout()
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+
+        sidebar = QFrame()
+        sidebar.setObjectName("world_sidebar")
+        sidebar.setFixedWidth(180)
+        sidebar.setStyleSheet("""
+            QFrame#world_sidebar {
+                background-color: rgba(15, 15, 18, 0.5);
+                border: none;
+                border-right: 1px solid rgba(255, 255, 255, 0.03);
+            }
+        """)
+        sl = QVBoxLayout(sidebar)
+        sl.setContentsMargins(12, 20, 12, 20)
+        sl.setSpacing(0)
+
+        self._tabs = QStackedWidget()
+        self._tabs.setStyleSheet("background: transparent;")
+        self._tab_buttons: list[QPushButton] = []
+
+        tab_defs =[
+            (self.translations.get("tab_scene", "Scene"), self._build_scene_tab),
+            (self.translations.get("tab_facts", "Key Facts"), self._build_facts_tab),
+            (self.translations.get("tab_inventory", "Inventory"), self._build_inventory_tab),
+            (self.translations.get("tab_status", "Status"), self._build_status_tab),
+            (self.translations.get("tab_npcs", "Active NPCs"), self._build_npcs_tab),
+        ]
+        
+        for i, (label, builder) in enumerate(tab_defs):
+            btn = QPushButton(label)
+            self._set_font(btn, "Inter Tight SemiBold", 13)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn.setStyleSheet(self._TAB_ACTIVE if i == 0 else self._TAB_IDLE)
+            btn.clicked.connect(lambda _, idx=i: self._switch_tab(idx))
+            sl.addWidget(btn)
+            self._tab_buttons.append(btn)
+            self._tabs.addWidget(builder())
+
+        sl.addStretch()
+        body_layout.addWidget(sidebar)
+
+        content_wrap = QWidget()
+        content_wrap.setStyleSheet("background: transparent;")
+        cw_l = QVBoxLayout(content_wrap)
+        cw_l.setContentsMargins(0, 0, 0, 0)
+        cw_l.addWidget(self._tabs)
+        body_layout.addWidget(content_wrap, 1)
+
+        root.addLayout(body_layout, 1)
+
+        footer = QFrame()
+        footer.setObjectName("world_footer")
+        footer.setFixedHeight(68)
+        footer.setStyleSheet("QFrame#world_footer { background: rgba(20, 20, 24, 0.5); border: none; border-top: 1px solid rgba(255,255,255,0.03); }")
+        fl = QHBoxLayout(footer)
+        fl.setContentsMargins(24, 0, 24, 0)
+        fl.setSpacing(12)
+        
+        btn_cancel = QPushButton(self.translations.get("cancel", "Cancel"))
+        self._set_font(btn_cancel, "Inter Tight Medium", 12)
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_cancel.setFixedHeight(38)
+        btn_cancel.setFixedWidth(120)
+        btn_cancel.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: rgba(255, 255, 255, 0.5);
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.05);
+                border-color: rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.9);
+            }
+        """)
+        btn_cancel.clicked.connect(self.reject)
+        fl.addWidget(btn_cancel)
+        
+        fl.addStretch()
+        
+        btn_save = QPushButton(self.translations.get("btn_apply_changes", "Apply Changes"))
+        self._set_font(btn_save, "Inter Tight SemiBold", 12)
+        btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_save.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_save.setFixedHeight(38)
+        btn_save.setFixedWidth(180)
+        btn_save.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 10px;
+                color: rgba(255, 255, 255, 0.95);
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.15);
+                border-color: rgba(255, 255, 255, 0.3);
+                color: #ffffff;
+            }
+            QPushButton:pressed {
+                background: rgba(255, 255, 255, 0.05);
+            }
+        """)
+        btn_save.clicked.connect(self._on_save)
+        fl.addWidget(btn_save)
+        
+        root.addWidget(footer)
+
+    def _switch_tab(self, idx: int):
+        self._tabs.setCurrentIndex(idx)
+        for i, btn in enumerate(self._tab_buttons):
+            btn.setStyleSheet(self._TAB_ACTIVE if i == idx else self._TAB_IDLE)
+
+    def _scroll_wrap(self, widget) -> QScrollArea:
+        sa = QScrollArea()
+        sa.setWidgetResizable(True)
+        sa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        sa.setWidget(widget)
+        return sa
+
+    def _inner_widget(self) -> tuple:
+        w = QWidget()
+        w.setStyleSheet("background: transparent; background-color: transparent;")
+        l = QVBoxLayout(w)
+        l.setContentsMargins(32, 28, 32, 28)
+        l.setSpacing(20)
+        return w, l
+
+    def _field_col(self, layout, label_text: str, widget, hint_text: str = ""):
+        col = QVBoxLayout()
+        col.setSpacing(6)
+        
+        lbl = QLabel(label_text)
+        self._set_font(lbl, "Inter Tight Medium", 11)
+        lbl.setStyleSheet("color: rgba(255,255,255,0.55);")
+        col.addWidget(lbl)
+        
+        if hint_text:
+            hint = QLabel(hint_text)
+            self._set_font(hint, "Inter Tight Medium", 9)
+            hint.setStyleSheet("color: rgba(255,255,255,0.3); margin-top: -4px;")
+            col.addWidget(hint)
+            
+        col.addWidget(widget)
+        layout.addLayout(col)
+
+    def _build_scene_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_environment", "Environment Setup")))
+        
+        self.edit_location = QLineEdit()
+        self.edit_location.setFixedHeight(42)
+        self._set_font(self.edit_location, "Inter Tight Medium", 13)
+        self._field_col(l, self.translations.get("field_location", "Location"), self.edit_location)
+        
+        self.edit_time = QLineEdit()
+        self.edit_time.setFixedHeight(42)
+        self._set_font(self.edit_time, "Inter Tight Medium", 13)
+        self._field_col(l, self.translations.get("field_time", "Time of day"), self.edit_time)
+        
+        self.edit_atmosphere = QLineEdit()
+        self.edit_atmosphere.setFixedHeight(42)
+        self._set_font(self.edit_atmosphere, "Inter Tight Medium", 13)
+        self._field_col(l, self.translations.get("field_atmosphere", "Atmosphere"), self.edit_atmosphere)
+        
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_facts_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_memory", "World Memory")))
+        
+        self.edit_facts = QTextEdit()
+        self.edit_facts.setPlaceholderText("danger level: high\nbridge: destroyed\nbonfire: burning")
+        self.edit_facts.setMinimumHeight(240)
+        self._set_font(self.edit_facts, "Inter Tight Medium", 13)
+        
+        self._field_col(l, self.translations.get("tab_facts", "Key Facts"), self.edit_facts, self.translations.get("field_facts_hint", 'Format: "key: value" (one per line)'))
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_inventory_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_player_items", "Player Items")))
+        
+        self.edit_inventory = QTextEdit()
+        self.edit_inventory.setPlaceholderText("rusty sword\n3 apples\nmap of the area")
+        self.edit_inventory.setMinimumHeight(240)
+        self._set_font(self.edit_inventory, "Inter Tight Medium", 13)
+        
+        self._field_col(l, self.translations.get("tab_inventory", "Inventory"), self.edit_inventory, self.translations.get("field_inventory_hint", "One item per line"))
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_status_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_player_conditions", "Player Conditions")))
+        
+        self.edit_status = QTextEdit()
+        self.edit_status.setPlaceholderText("wounded in shoulder\nexhausted\npoisoned")
+        self.edit_status.setMinimumHeight(240)
+        self._set_font(self.edit_status, "Inter Tight Medium", 13)
+        
+        self._field_col(l, self.translations.get("field_status_effects", "Status Effects"), self.edit_status, self.translations.get("field_status_hint", "One condition per line"))
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_npcs_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_npcs", "Characters in Scene")))
+        
+        hint = QLabel(self.translations.get("hint_npc_readonly", "NPCs currently spawned by the engine (read-only)"))
+        hint.setObjectName("hint")
+        self._set_font(hint, "Inter Tight Medium", 10)
+        l.addWidget(hint)
+        
+        npcs_container_widget = QWidget()
+        npcs_container_widget.setObjectName("npcs_container")
+        
+        self.npcs_container = QVBoxLayout(npcs_container_widget)
+        self.npcs_container.setSpacing(8)
+        self.npcs_container.setContentsMargins(0, 0, 0, 0)
+        
+        l.addWidget(npcs_container_widget)
+        l.addStretch()
+
+        hint.setStyleSheet("color: rgba(255,255,255,0.40); background: transparent; background-color: transparent; margin-bottom: 4px;")
+        npcs_container_widget.setStyleSheet("QWidget#npcs_container { background: transparent; background-color: transparent; }")
+        
+        return self._scroll_wrap(w)
+
+    def _populate(self):
+        ws = self.world_state
+        
+        location_text = ws.location if ws.location else "Unknown"
+        time_text = ws.time_of_day if ws.time_of_day else "Unknown"
+        self._header_sub.setText(f"{location_text}  ·  {time_text}")
+
+        self.edit_location.setText(ws.location)
+        self.edit_time.setText(ws.time_of_day)
+        self.edit_atmosphere.setText(ws.atmosphere)
+        self.edit_facts.setPlainText("\n".join(f"{k}: {v}" for k, v in ws.key_facts.items()))
+        self.edit_inventory.setPlainText("\n".join(ws.player_inventory))
+        self.edit_status.setPlainText("\n".join(ws.player_status))
+
+        if self.npc_registry:
+            npcs = self.npc_registry.list_active()
+            if npcs:
+                for i, npc in enumerate(npcs):
+                    card = QFrame()
+                    card.setObjectName(f"npc_card_{i}")
+                    card.setFixedHeight(54)
+                    card.setStyleSheet(f"""
+                        QFrame#npc_card_{i} {{
+                            background: rgba(255,255,255,0.03);
+                            border: 1px solid rgba(255,255,255,0.06);
+                            border-radius: 10px;
+                        }}
+                    """)
+                    card_l = QHBoxLayout(card)
+                    card_l.setContentsMargins(16, 0, 16, 0)
+                    card_l.setSpacing(12)
+
+                    name_lbl = QLabel(npc.name)
+                    name_lbl.setObjectName("npc_name_lbl")
+                    self._set_font(name_lbl, "Inter Tight SemiBold", 13)
+                    name_lbl.setStyleSheet("QLabel#npc_name_lbl { color: #ffffff; background: transparent; }")
+                    card_l.addWidget(name_lbl, 1)
+
+                    arch_lbl = QLabel(npc.archetype.upper())
+                    arch_lbl.setObjectName("npc_arch_lbl")
+                    self._set_font(arch_lbl, "Inter Tight Medium", 10)
+                    arch_lbl.setStyleSheet("QLabel#npc_arch_lbl { color: rgba(255,255,255,0.4); letter-spacing: 1px; background: transparent; }")
+                    card_l.addWidget(arch_lbl)
+
+                    self.npcs_container.addWidget(card)
+            else:
+                no_npc = QLabel(self.translations.get("no_active_npcs", "No active NPCs in this scene"))
+                no_npc.setObjectName("npc_empty_lbl")
+                self._set_font(no_npc, "Inter Tight Medium", 12)
+                no_npc.setStyleSheet("QLabel#npc_empty_lbl { color: rgba(255,255,255,0.25); margin-top: 10px; background: transparent; }")
+                self.npcs_container.addWidget(no_npc)
+
+    def _on_save(self):
+        ws = self.world_state
+        ws.location    = self.edit_location.text().strip() or ws.location
+        ws.time_of_day = self.edit_time.text().strip() or ws.time_of_day
+        ws.atmosphere  = self.edit_atmosphere.text().strip()
+        new_facts = {}
+        for line in self.edit_facts.toPlainText().splitlines():
+            if ":" in line:
+                k, _, v = line.partition(":")
+                k, v = k.strip(), v.strip()
+                if k:
+                    new_facts[k] = v
+        ws.key_facts = new_facts
+        ws.player_inventory =[
+            it.strip() for it in self.edit_inventory.toPlainText().splitlines() if it.strip()
+        ]
+        ws.player_status =[
+            st.strip() for st in self.edit_status.toPlainText().splitlines() if st.strip()
+        ]
+        self.world_state_changed.emit({
+            "location": ws.location, "time_of_day": ws.time_of_day,
+            "atmosphere": ws.atmosphere, "key_facts": ws.key_facts,
+            "player_inventory": ws.player_inventory, "player_status": ws.player_status,
+        })
+        self.accept()
+
+class TextEditUserMessage(QTextEdit):
+    handle_enter_key = pyqtSignal()
+    
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                super().keyPressEvent(event)
+            else:
+                self.handle_enter_key.emit()
+                event.accept()
+        else:
+            super().keyPressEvent(event)
+
+
+class SoulStageChatView(QFrame):
+    interrupted       = pyqtSignal()
+    exit_clicked      = pyqtSignal()
+    open_memory       = pyqtSignal()
+    world_info_clicked = pyqtSignal()
+    continue_plot     = pyqtSignal()
+    choice_made         = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("soul_stage_chat_view")
+        self.setStyleSheet("")
+        self.scene_data: dict = {}
+        self._scene_id: str = ""
+
+        self.translations = _load_translations()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        self.top_bar = QFrame(self)
+        self.top_bar.setObjectName("ss_top_bar")
+        self.top_bar.setMinimumSize(QtCore.QSize(0, 60))
+        self.top_bar.setMaximumSize(QtCore.QSize(16777215, 60))
+        self.top_bar.setStyleSheet("""
+            QFrame#ss_top_bar {
+                background-color: rgba(20, 20, 20, 180);
+                border-bottom: 1px solid rgba(255, 255, 255, 15);
+            }
+            QLabel#scene_title {
+                color: rgb(227, 227, 227);
+                background: transparent;
+            }
+        """)
+        self.top_bar.setFrameShape(QFrame.Shape.NoFrame)
+        self.top_bar.setFrameShadow(QFrame.Shadow.Raised)
+
+        tl = QHBoxLayout(self.top_bar)
+        tl.setContentsMargins(20, 9, 20, 9)
+        tl.setSpacing(8)
+
+        self.btn_back = QPushButton("←")
+        self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_back.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_back.setFixedHeight(30)
+        self.btn_back.setFont(_font("Inter Tight Medium", 11, bold=True))
+        self.btn_back.setStyleSheet("""
+            QPushButton {
+                background: transparent; color: rgba(255,255,255,0.7);
+                border: 1px solid rgba(255,255,255,0.15); border-radius: 15px; padding: 0 14px;
+            }
+            QPushButton:hover { background: rgba(255,255,255,0.1); color: white; }
+        """)
+        self.btn_back.clicked.connect(self.exit_clicked.emit)
+        tl.addWidget(self.btn_back)
+
+        dv0 = QFrame(); dv0.setFrameShape(QFrame.Shape.VLine); dv0.setFixedWidth(1)
+        dv0.setStyleSheet("background: rgba(255,255,255,0.08); margin: 10px 4px;")
+        tl.addWidget(dv0)
+
+        self.scene_title_lbl = QLabel(self.translations.get("soul_stage_title", "Soul Stage"))
+        self.scene_title_lbl.setFont(_font("Inter Tight SemiBold", 12))
+        self.scene_title_lbl.setStyleSheet("color: rgba(255,255,255,0.90);")
+        tl.addWidget(self.scene_title_lbl)
+
+        dv1 = QFrame(); dv1.setFrameShape(QFrame.Shape.VLine); dv1.setFixedWidth(1)
+        dv1.setStyleSheet("background: rgba(255,255,255,0.08); margin: 10px 4px;")
+        tl.addWidget(dv1)
+
+        self.party_container = QWidget()
+        self.party_container.setStyleSheet("background: transparent;")
+        self._party_row = QHBoxLayout(self.party_container)
+        self._party_row.setContentsMargins(0, 0, 0, 0)
+        self._party_row.setSpacing(4)
+        tl.addWidget(self.party_container)
+
+        tl.addStretch()
+
+        def _icon_btn(icon_path: str, tooltip: str, color_rgb: str = "255,255,255", alpha_normal: float = 0.08) -> QPushButton:
+            btn = QPushButton()
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QtCore.QSize(18, 18))
+            btn.setFixedSize(36, 36)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn.setToolTip(tooltip)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 rgba(255, 255, 255, 0.10),
+                        stop:1 rgba(255, 255, 255, 0.04));
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-top: 1px solid rgba(255, 255, 255, 0.22);
+                    border-radius: 18px;
+                }}
+                QPushButton:hover {{
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 rgba({color_rgb}, 0.18),
+                        stop:1 rgba({color_rgb}, 0.08));
+                    border: 1px solid rgba({color_rgb}, 0.25);
+                    border-top: 1px solid rgba({color_rgb}, 0.40);
+                }}
+                QPushButton:pressed {{
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 rgba(255, 255, 255, 0.04),
+                        stop:1 rgba(255, 255, 255, 0.10));
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                }}
+            """)
+            return btn
+
+        self.btn_memory = _icon_btn("app/gui/icons/soulMemory.png", "Soul Memory", "120,160,255")
+        self.btn_memory.clicked.connect(self.open_memory.emit)
+        tl.addWidget(self.btn_memory)
+
+        self.btn_world_info = _icon_btn("app/gui/icons/map.png", "World State", "60,200,140")
+        self.btn_world_info.clicked.connect(self.world_info_clicked.emit)
+        tl.addWidget(self.btn_world_info)
+
+        self.btn_continue_plot = _icon_btn("app/gui/icons/play.png", "Continue Plot", "180,80,220")
+        self.btn_continue_plot.clicked.connect(self.continue_plot.emit)
+        tl.addWidget(self.btn_continue_plot)
+
+        self.btn_interrupt = _icon_btn("app/gui/icons/stop.png", "Intervene (stop AI turn)", "255,180,50")
+        self.btn_interrupt.clicked.connect(self.interrupted)
+        tl.addWidget(self.btn_interrupt)
+
+        root.addWidget(self.top_bar)
+
+        self.chat_page = QWidget()
+        self.chat_page.setObjectName("chat_content_area")
+        cl = QVBoxLayout(self.chat_page)
+        cl.setContentsMargins(0, 0, 0, 0)
+
+        self.scroll_area = QScrollArea(parent=self.chat_page)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setSizeAdjustPolicy(
+            QtWidgets.QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored
+        )
+        self.scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollArea > QWidget, 
+            QScrollArea #qt_scrollarea_viewport, 
+            QScrollArea QWidget {
+                background: transparent;
+                background-color: transparent;
+            }
+            QScrollArea QScrollBar {
+                background: transparent;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                background: transparent;
+                width: 8px;
+                margin: 4px 2px 4px 2px;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 rgba(255, 255, 255, 0.15), 
+                    stop:1 rgba(255, 255, 255, 0.08)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.20);
+                border-radius: 4px;
+                min-height: 40px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 rgba(255, 255, 255, 0.25), 
+                    stop:1 rgba(255, 255, 255, 0.16)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.32);
+            }
+            QScrollBar::handle:vertical:pressed {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 rgba(255, 255, 255, 0.35), 
+                    stop:1 rgba(255, 255, 255, 0.24)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.45);
+            }
+            QScrollBar:horizontal {
+                background: transparent;
+                height: 8px;
+                margin: 2px 4px 2px 4px;
+                border: none;
+            }
+            QScrollBar::handle:horizontal {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 rgba(255, 255, 255, 0.15), 
+                    stop:1 rgba(255, 255, 255, 0.08)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                border-radius: 4px;
+                min-width: 40px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 rgba(255, 255, 255, 0.25), 
+                    stop:1 rgba(255, 255, 255, 0.16)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.32);
+            }
+            QScrollBar::handle:horizontal:pressed {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 rgba(255, 255, 255, 0.35), 
+                    stop:1 rgba(255, 255, 255, 0.24)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.45);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                background: transparent;
+                border: none;
+                width: 0px;
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+                background: transparent;
+                border: none;
+            }
+        """)
+
+        self._chat_w = QWidget()
+        self._chat_w.setStyleSheet("background: transparent;")
+        self.chat_container = QVBoxLayout(self._chat_w)
+        self.chat_container.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.chat_container.setContentsMargins(0, 20, 0, 30)
+        self.chat_container.setSpacing(0)
+
+        self.scroll_area.setWidget(self._chat_w)
+        cl.addWidget(self.scroll_area)
+        root.addWidget(self.chat_page, 1)
+
+        self.frame_send_message_full = QFrame()
+        self.frame_send_message_full.setObjectName("ss_input_full")
+        self.frame_send_message_full.setMinimumSize(QtCore.QSize(0, 45))
+        self.frame_send_message_full.setMaximumSize(QtCore.QSize(16777215, 45))
+
+        self.frame_send_message_full.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.frame_send_message_full.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.frame_send_message_full.setStyleSheet("background-color: transparent; border: none;")
+
+        input_full_layout = QHBoxLayout(self.frame_send_message_full)
+        input_full_layout.setContentsMargins(0, 0, 0, 5)
+        input_full_layout.setSpacing(0)
+
+        self.frame_send_message = QFrame()
+        self.frame_send_message.setEnabled(True)
+        ssp = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Preferred,
+            QtWidgets.QSizePolicy.Policy.Preferred
+        )
+        self.frame_send_message.setSizePolicy(ssp)
+        self.frame_send_message.setMinimumSize(QtCore.QSize(0, 40))
+        self.frame_send_message.setMaximumSize(QtCore.QSize(681, 40))
+        self.frame_send_message.setObjectName("ss_frame_send_message")
+        self.frame_send_message.setStyleSheet("""
+            QFrame#ss_frame_send_message {
+                background-color: rgba(20, 20, 22, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 19px;
+            }
+            QTextEdit {
+                background-color: transparent;
+                border: none;
+                color: rgba(255, 255, 255, 0.9);
+                padding-top: 6px;
+                padding-left: 10px;
+                padding-right: 10px;
+                selection-background-color: rgba(255, 255, 255, 0.2);
+            }
+        """)
+        self.frame_send_message.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_send_message.setFrameShadow(QFrame.Shadow.Raised)
+
+        il = QHBoxLayout(self.frame_send_message)
+        il.setContentsMargins(5, 0, 5, 0)
+        il.setSpacing(0)
+
+        self.text_input = TextEditUserMessage()
+        font = QtGui.QFont()
+        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        self.text_input.setFont(font)
+        self.text_input.textChanged.connect(self._on_user_typing)
+        self.text_input.textChanged.connect(self._adjust_input_height)
+        self.text_input.setMinimumHeight(40)
+        self.text_input.setMaximumHeight(610)
+        self.text_input.setPlaceholderText(self.translations.get("input_placeholder", "Direct the story or speak to someone..."))
+        self.text_input.setStyleSheet("""
+            QTextEdit {
+                background-color: transparent;
+                border: none;
+                color: rgba(255, 255, 255, 0.9);
+                font-family: 'Inter Tight Medium';
+                font-size: 13px;
+                padding-top: 6px;
+                padding-left: 10px;
+                padding-right: 10px;
+                selection-background-color: rgba(255, 255, 255, 0.2);
+            }
+        """)
+        self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.text_input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.text_input.setAcceptRichText(False)
+
+        self.btn_send = QPushButton()
+        self.btn_send.setFixedSize(32, 32)
+        self.btn_send.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_send.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_send.setIcon(QIcon("app/gui/icons/send.png"))
+        self.btn_send.setIconSize(QtCore.QSize(16, 16))
+        self.btn_send.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 15px;
+            }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.08); }
+            QPushButton:pressed { background-color: rgba(255, 255, 255, 0.14); }
+        """)
+
+        self.btn_stop = QPushButton()
+        self.btn_stop.setFixedSize(32, 32)
+        self.btn_stop.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_stop.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_stop.setIcon(QIcon("app/gui/icons/stop.png"))
+        self.btn_stop.setIconSize(QtCore.QSize(14, 14))
+        self.btn_stop.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 15px;
+            }
+            QPushButton:hover { background-color: rgba(255, 80, 80, 0.15); }
+            QPushButton:pressed { background-color: rgba(255, 80, 80, 0.25); }
+        """)
+        self.btn_stop.hide()
+
+        il.addWidget(self.text_input)
+        il.addWidget(self.btn_send)
+        il.addWidget(self.btn_stop)
+
+        spacer_left = QtWidgets.QSpacerItem(
+            200, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum
+        )
+        input_full_layout.addItem(spacer_left)
+        input_full_layout.addWidget(self.frame_send_message)
+        spacer_right = QtWidgets.QSpacerItem(
+            200, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum
+        )
+        input_full_layout.addItem(spacer_right)
+
+        self.choices_bar = ChoicesBar()
+        self.choices_bar.choice_selected.connect(self._on_choice_selected)
+        root.addWidget(self.choices_bar)
+
+        self.setStyleSheet("""
+            QMenu {
+                background-color: #1E1E1E;
+                color: #D4D4D4;
+                border: 1px solid #383838;
+                border-radius: 8px;
+            }
+            QMenu::item { padding: 6px 20px; background-color: transparent; }
+            QMenu::item:selected {
+                background-color: #2D2D2D;
+                color: #FFFFFF;
+                border-radius: 4px;
+            }
+        """)
+
+        root.addWidget(self.frame_send_message_full)
+
+        self.inventory_hud = InventoryHUD(
+            text_input=self.text_input,
+            parent=self.chat_page,
+        )
+        self.inventory_hud.hide()
+
+    def load_scene(self, scene_data: dict, scene_id: str):
+        self.scene_data = scene_data
+        self._scene_id  = scene_id
+        title = scene_data.get("title", self.translations.get("soul_stage_title", "Soul Stage"))
+        self.scene_title_lbl.setText(title)
+
+        while self._party_row.count():
+            item = self._party_row.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+
+        for name in scene_data.get("party", [])[:5]:
+            av_lbl = QLabel()
+            av_px  = _get_char_avatar_pixmap(name)
+            av_lbl.setPixmap(_round_pixmap(av_px, 32))
+            av_lbl.setFixedSize(32, 32)
+            av_lbl.setStyleSheet("background: transparent; border: none;")
+            av_lbl.setToolTip(name)
+            self._party_row.addWidget(av_lbl)
+
+        bg_val = scene_data.get("starting_bg", "None")
+        if bg_val and bg_val != "None":
+            bg_path = f"assets/backgrounds/{bg_val}".replace("\\", "/")
+            if os.path.exists(bg_path):
+                self.chat_page.setStyleSheet(f"QWidget#chat_content_area {{ border-image: url({bg_path}) 0 0 0 0 stretch stretch; }}")
+            else:
+                self.chat_page.setStyleSheet("QWidget#chat_content_area { background: transparent; }")
+        else:
+            self.chat_page.setStyleSheet("QWidget#chat_content_area { background: transparent; }")
+
+    def scroll_to_bottom(self):
+        QtCore.QTimer.singleShot(50, lambda: self.scroll_area.verticalScrollBar().setValue(
+            self.scroll_area.verticalScrollBar().maximum()))
+
+    def clear_chat(self):
+        while self.chat_container.count():
+            item = self.chat_container.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget(): child.widget().deleteLater()
+    
+    def show_choices(self, choices: list, event_type: str = "none"):
+        self.choices_bar.show_choices(choices, event_type)
+
+    def clear_choices(self):
+        self.choices_bar.clear_choices()
+    
+    def _on_user_typing(self):
+        if self.choices_bar.isVisible():
+            if self.text_input.toPlainText().strip():
+                self.choices_bar.clear_choices()
+
+    def _on_choice_selected(self, text: str):
+        self.text_input.setPlainText(text)
+        cursor = self.text_input.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        self.text_input.setTextCursor(cursor)
+        self.choice_made.emit(text)
+    
+    def _adjust_input_height(self):
+        doc_height = self.text_input.document().size().height()
+        padding_vertical = 16
+        target_height = int(doc_height + padding_vertical)
+
+        target_height = max(40, min(target_height, 400))
+
+        current_height = self.frame_send_message.height()
+
+        if current_height == target_height:
+            return
+
+        if hasattr(self, '_input_anim_group') and self._input_anim_group.state() == QtCore.QAbstractAnimation.State.Running:
+            self._input_anim_group.stop()
+
+        self._input_anim_group = QtCore.QParallelAnimationGroup(self)
+        duration = 100
+
+        anim1 = QPropertyAnimation(self.frame_send_message, b"minimumHeight")
+        anim1.setDuration(duration)
+        anim1.setStartValue(current_height)
+        anim1.setEndValue(target_height)
+        anim1.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        anim2 = QPropertyAnimation(self.frame_send_message, b"maximumHeight")
+        anim2.setDuration(duration)
+        anim2.setStartValue(current_height)
+        anim2.setEndValue(target_height)
+        anim2.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        anim3 = QPropertyAnimation(self.frame_send_message_full, b"minimumHeight")
+        anim3.setDuration(duration)
+        anim3.setStartValue(current_height)
+        anim3.setEndValue(target_height)
+        anim3.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        anim4 = QPropertyAnimation(self.frame_send_message_full, b"maximumHeight")
+        anim4.setDuration(duration)
+        anim4.setStartValue(current_height)
+        anim4.setEndValue(target_height)
+        anim4.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        self._input_anim_group.addAnimation(anim1)
+        self._input_anim_group.addAnimation(anim2)
+        self._input_anim_group.addAnimation(anim3)
+        self._input_anim_group.addAnimation(anim4)
+
+        anim1.valueChanged.connect(lambda val: self.scroll_to_bottom())
+
+        self._input_anim_group.start()
+
+    def update_inventory_hud(self, items: list):
+        self.inventory_hud.update_items(items)
+        if items:
+            self.inventory_hud.reposition(self.chat_page.size())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "inventory_hud") and self.inventory_hud.isVisible():
+            self.inventory_hud.reposition(self.chat_page.size())
+
+class SoulStagePage(QWidget):
+    launch_scene = pyqtSignal(str, dict, bool)
+    open_memory_requested = pyqtSignal(list)
+
+    IDX_LOBBY  = 0
+    IDX_EDITOR = 1
+    IDX_CHAT   = 2
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("soul_stage_page")
+        self.setStyleSheet("background: transparent;")
+
+        self.translations = _load_translations()
+
+        layout = QVBoxLayout(self); layout.setContentsMargins(0, 0, 0, 0); layout.setSpacing(0)
+        self.inner_stack = QStackedWidget(); self.inner_stack.setStyleSheet("background: transparent;")
+
+        all_chars = self._get_character_names()
+        self.lobby_view  = SoulStageLobbyView()
+        self.editor_view = SceneEditorView(all_characters=all_chars)
+        self.chat_view   = SoulStageChatView()
+        self.inner_stack.addWidget(self.lobby_view)
+        self.inner_stack.addWidget(self.editor_view)
+        self.inner_stack.addWidget(self.chat_view)
+        layout.addWidget(self.inner_stack)
+
+        self.lobby_view.create_new.connect(self._on_create_new)
+        self.lobby_view.open_scene.connect(self._on_open_scene)
+        self.lobby_view.edit_scene.connect(self._on_edit_scene)
+        self.lobby_view.delete_scene.connect(self._on_delete_scene)
+        self.lobby_view.import_scene.connect(self._on_import_scene)
+        self.editor_view.saved.connect(self._on_scene_saved)
+        self.editor_view.canceled.connect(self._go_lobby)
+        self.chat_view.exit_clicked.connect(self._go_lobby)
+        self.chat_view.open_memory.connect(self._on_memory_clicked)
+
+    def _go_lobby(self):
+        self.lobby_view.refresh()
+        self.inner_stack.setCurrentIndex(self.IDX_LOBBY)
+
+    def _go_editor(self): self.inner_stack.setCurrentIndex(self.IDX_EDITOR)
+    def _go_chat(self):   self.inner_stack.setCurrentIndex(self.IDX_CHAT)
+
+    def _on_create_new(self):
+        self.editor_view.clear_form()
+        self.editor_view.rebuild_char_list(self._get_character_names())
+        self._go_editor()
+
+    def _on_edit_scene(self, scene_id: str):
+        data = _load_scenes(); sdata = data["scenes"].get(scene_id)
+        if sdata:
+            self.editor_view.rebuild_char_list(self._get_character_names())
+            self.editor_view.load_scene(scene_id, sdata)
+            self._go_editor()
+
+    def _on_scene_saved(self, scene_id: str):
+        data = _load_scenes(); sdata = data["scenes"].get(scene_id, {})
+        self._launch_scene(scene_id, sdata, restore=False)
+
+    def _on_open_scene(self, scene_id: str):
+        data  = _load_scenes()
+        sdata = data["scenes"].get(scene_id, {})
+        if not sdata:
+            return
+        chat_log = sdata.get("chat_log", [])
+        if chat_log:
+            action = RPGOpenSceneDialog.ask(
+                scene_title=sdata.get("title", "Scene"),
+                entry_count=len(chat_log),
+                parent=self,
+            )
+            if action == "continue":
+                self._launch_scene(scene_id, sdata, restore=True, is_new_session=False)
+            elif action == "new":
+                d = _load_scenes()
+                d["scenes"][scene_id]["chat_log"] = []
+                d["scenes"][scene_id].pop("world_state", None)
+                d["scenes"][scene_id].pop("active_npcs", None)
+                _save_scenes(d)
+                
+                sdata["chat_log"] = []
+                sdata.pop("world_state", None)
+                sdata.pop("active_npcs", None)
+                
+                self._launch_scene(scene_id, sdata, restore=False, is_new_session=True)
+        else:
+            self._launch_scene(scene_id, sdata, restore=False, is_new_session=True)
+
+    def _launch_scene(self, scene_id: str, scene_data: dict, restore: bool = False, is_new_session: bool = False):
+        d = _load_scenes()
+        if scene_id in d["scenes"]:
+            d["scenes"][scene_id]["last_played"] = datetime.datetime.now().isoformat()
+            _save_scenes(d)
+        self.chat_view.load_scene(scene_data, scene_id)
+        self._go_chat()
+        self.launch_scene.emit(scene_id, scene_data, is_new_session)
+
+    def _on_delete_scene(self, scene_id: str):
+        data   = _load_scenes()
+        sdata  = data["scenes"].get(scene_id, {})
+        title  = sdata.get("title", "this scene")
+        log_n  = len(sdata.get("chat_log",[]))
+        
+        if log_n:
+            detail_template = self.translations.get("delete_scene_detail", '"{title}" · {count} saved messages will be lost')
+            detail = detail_template.replace("{title}", title).replace("{count}", str(log_n))
+        else:
+            detail = f'"{title}"'
+        confirmed = RPGConfirmDialog.ask(
+            title=self.translations.get("delete_scene_title", "Delete Scene"),
+            message=self.translations.get("delete_scene_confirm", "Permanently delete this scene?"),
+            confirm_text=self.translations.get("delete", "Delete"),
+            detail=detail,
+            parent=self,
+        )
+        if confirmed:
+            data["scenes"].pop(scene_id, None)
+            _save_scenes(data)
+            self.lobby_view.refresh()
+
+    def _on_import_scene(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            self.translations.get("import_title", "Import Scene"),
+            "",
+            "JSON Files (*.json)"
+        )
+        if file_path:
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    import_data = json.load(f)
+
+                if not import_data.get("title"):
+                    QMessageBox.warning(self, self.translations.get("import_error", "Import Error"), self.translations.get("import_error", "Failed to import scene. Invalid file format."))
+                    return
+
+                self.editor_view.clear_form()
+                self.editor_view.rebuild_char_list(self._get_character_names())
+                self.editor_view.load_from_import(import_data)
+                self._go_editor()
+
+            except Exception as e:
+                QMessageBox.warning(self, self.translations.get("import_error", "Import Error"), f"{self.translations.get('import_error', 'Failed to import scene. Invalid file format.')}\n{str(e)}")
+
+    def _on_memory_clicked(self):
+        party = self.chat_view.scene_data.get("party", [])
+        if party:
+            self.open_memory_requested.emit(party)
+
+    def on_page_shown(self):
+        self.lobby_view.refresh()
+        self.editor_view.rebuild_char_list(self._get_character_names())
+
+        try:
+            from app.configuration import configuration
+            personas = configuration.ConfigurationSettings().get_user_data("personas") or {}
+            self.editor_view.load_personas(personas)
+        except Exception as e:
+            print(f"Error loading personas in Soul Stage: {e}")
+
+        self._go_lobby()
+
+    def update_character_list(self):
+        self.editor_view.rebuild_char_list(self._get_character_names())
+
+    @staticmethod
+    def _get_character_names() -> list:
+        try:
+            from app.configuration import configuration
+            return list(configuration.ConfigurationCharacters().load_configuration().get("character_list", {}).keys())
+        except Exception:
+            return []
+
+class AutoResizingTextEdit(QtWidgets.QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._min_h = 80
+        self._max_h = 320
+        self.setMinimumHeight(self._min_h)
+        self.setMaximumHeight(self._max_h)
+
+        self.setFont(_font("Inter Tight Medium", 13)) 
+        
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.textChanged.connect(self.adjust_height)
+        QtCore.QTimer.singleShot(0, self.adjust_height)
+
+    def adjust_height(self):
+        self.blockSignals(True)
+        try:
+            doc_height = self.document().size().height()
+            margins = self.contentsMargins()
+            frame = self.frameWidth() * 2
+            new_height = int(doc_height + margins.top() + margins.bottom() + frame + 12)
+            
+            new_height = max(self._min_h, min(new_height, self._max_h))
+
+            if new_height != self.height():
+                self.setFixedHeight(new_height)
+                self.updateGeometry()
+        finally:
+            self.blockSignals(False)
