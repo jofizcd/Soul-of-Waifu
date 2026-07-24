@@ -7,19 +7,16 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QBrush, QLinearGradient, QPen
 
 class C:
-    # backgrounds
     ROOT        = "#08080e"
     PANEL       = "#0c0c0c"
     CARD        = "rgba(16,16,16,220)"
     CARD_BORDER = "rgba(255,255,255,10)"
     TITLEBAR    = "rgba(13,13,24,0)"
 
-    # text
     T_PRIMARY   = "#e8e8f0"
     T_SECONDARY = "rgba(160,160,188,200)"
     T_MUTED     = "rgba(100,100,128,190)"
 
-    # accent
     STOPPED     = QColor(75,  75,  90)
     LISTENING   = QColor(52,  211, 153)
     PROCESSING  = QColor(251, 191, 36)
@@ -283,8 +280,6 @@ class SOW_System(QMainWindow):
         self.close_app_btn.clicked.connect(self.close)
         self._build_grips()
 
-    #  LEFT PANEL
-    # =========================================================================
     def _build_left_panel(self):
         self.left_panel = QtWidgets.QWidget()
         self.left_panel.setObjectName("left_panel")
