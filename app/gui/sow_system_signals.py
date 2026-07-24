@@ -31,13 +31,14 @@ from PyQt6.QtWebEngineCore import QWebEnginePage
 
 from app.gui.sowSystem import SOW_System
 from app.configuration import configuration
-from app.utils.ai_clients.local_ai_client import LocalAI
-from app.utils.ai_clients.mistral_ai_client import MistralAI
-from app.utils.ai_clients.openai_client import OpenAI
-from app.utils.ai_clients.character_ai_client import CharacterAI
+from app.utils.ai_clients.local_server_manager import LocalServerManager
+from app.utils.ai_clients.prompt_engine import PromptEngine
+from app.utils.ai_clients.ai_factory import AIFactory
+from app.utils.soul_companion.soul_companion import SoulCompanion
 from app.utils.translator import Translator
-from app.utils.text_to_speech import ElevenLabs, XTTSv2_SOW_System, EdgeTTS, KokoroTTS_SOW_System, SileroTTS_SOW_System, TTSWorker
+from app.utils.text_to_speech import TTSWorker
 from app.utils.speech_to_text import AudioInputWorker, STTWorker
+from app.gui.custom_widgets import sow_toast
 
 import sys
 import ctypes
@@ -93,26 +94,15 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             case 1:
                 self.load_translation("ru")
 
-        # Initialize AI clients and other utilities
-        self.character_ai_client = CharacterAI()
-        self.mistral_ai_client = MistralAI()
-        self.open_ai_client = OpenAI()
-        self.local_ai_client = LocalAI()
-        
-        self.eleven_labs_client = ElevenLabs()
-        self.xttsv2_client = XTTSv2_SOW_System()
-        self.edge_tts_client = EdgeTTS()
-        self.kokoro_client = KokoroTTS_SOW_System()
-        self.silero_client = SileroTTS_SOW_System()
+        self.prompt_engine = PromptEngine()
+        self.local_server_manager = LocalServerManager(self.ui)
 
         self.translator = Translator()
         self.tokenizer = None
         self.session = None
 
         self.live2d_no_gui = None
-        self.live2d_expression_widget = None
         self.vrm_no_gui = None
-        self.vrm_expression_widget = None
 
         self.messages = {}
         self.message_order = []
@@ -132,13 +122,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self.model_background_color = self.configuration_settings.get_main_setting("model_background_color")
         self.model_background_image = self.configuration_settings.get_main_setting("model_background_image")
 
-        self.speech_to_text_method = self.configuration_settings.get_main_setting("stt_method")
         self.live2d_mode = self.configuration_settings.get_main_setting("live2d_mode")
-        self.input_device = self.configuration_settings.get_main_setting("input_device")
-        self.output_device = self.configuration_settings.get_main_setting("output_device")
-        self.current_translator = self.configuration_settings.get_main_setting("translator")
-        self.target_language = self.configuration_settings.get_main_setting("target_language")
-        self.translator_mode = self.configuration_settings.get_main_setting("translator_mode")
 
         character_data = self.configuration_characters.load_configuration()
         character_info = character_data["character_list"][character_name]
@@ -147,42 +131,8 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self.live2d_model_folder = character_info.get("live2d_model_folder", None)
         self.vrm_model_file = character_info.get("vrm_model_file", None)
         self.current_text_to_speech = character_info.get("current_text_to_speech", "Nothing")
-        self.character_avatar = character_info.get("character_avatar")
         configuration_data = self.configuration_characters.load_configuration()
         character_info = configuration_data["character_list"][character_name]
-
-        if self.conversation_method != "Character AI":
-            current_chat = character_info["current_chat"]
-            chats = character_info.get("chats", {})
-
-        self.character_title = character_info.get("character_title")
-        self.character_description = character_info.get("character_description")
-        self.character_personality = character_info.get("character_personality")
-        self.first_message = character_info.get("first_message")
-
-        match self.conversation_method:
-            case "Character AI":
-                self.character_id = character_info.get("character_id")
-                self.chat_id = character_info.get("chat_id")
-                self.character_avatar_url = character_info.get("character_avatar")
-                self.voice_name = character_info.get("voice_name")
-                self.character_ai_voice_id = character_info.get("character_ai_voice_id")
-
-                character_data = self.configuration_characters.load_configuration()
-                character_list = character_data.get("character_list")
-                character_information = character_list.get(character_name)
-
-                self.chat_content = character_information.get("chat_content", {})
-            case "Mistral AI" | "Open AI" | "OpenRouter" | "Local LLM":
-                character_data = self.configuration_characters.load_configuration()
-                character_list = character_data.get("character_list")
-                character_information = character_list.get(character_name)
-                current_chat = character_information["current_chat"]
-                chats = character_information.get("chats", {})
-
-                self.chat_content = chats[current_chat].get("chat_content", {})
-
-                self.character_avatar = character_info.get("character_avatar")
 
         self.elevenlabs_voice_id = character_info.get("elevenlabs_voice_id")
         self.voice_type = character_info.get("voice_type")
@@ -216,9 +166,8 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         self.ui.close_app_btn.clicked.connect(self.safe_close)
 
-        # ======================================
         self.audio_worker = None 
-        self.input_device_index = self.configuration_settings.get_main_setting("input_device")
+        self.input_device_index = self.configuration_settings.get_main_setting("input_device_real_index")
 
         self.interaction_state = "STOPPED" # STOPPED, LISTENING, PROCESSING, SPEAKING
         self.is_interrupted = False
@@ -286,7 +235,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
     
     def toggle_voice_interaction(self, character_name):
         if self.interaction_state == "STOPPED":
-            logger.info("▶️ Starting Voice Interaction Pipeline...")
+            logger.info("Starting Voice Interaction Pipeline...")
             
             if self.audio_worker is None or not self.audio_worker.isRunning():
                 self.audio_worker = AudioInputWorker(input_device_index=self.input_device_index)
@@ -334,6 +283,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
     def safe_close(self):
         self.stop_all_workers()
+        self._stop_companion_systems()
         self.ui.stop_call_timer()
 
         if hasattr(self, 'server_thread') and self.server_thread is not None:
@@ -351,7 +301,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         if self.interaction_state == "STOPPED":
             return
 
-        logger.info("🛑 INTERRUPT DETECTED! Stop the processes...")
+        logger.info("INTERRUPT DETECTED! Stop the processes...")
 
         self.is_interrupted = True
         if self.llm_task and not self.llm_task.done():
@@ -362,12 +312,47 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             self.tts_worker.clear_queue()
             logger.info("The TTS and player queues are cleared")
 
+        self._subtitle_clear()
         self.set_state("LISTENING")
     
     def on_audio_finished(self):
         if self.interaction_state == "SPEAKING" and not self.is_interrupted:
-            logger.info("✅ Player has finished playback. Return to listening mode...")
-            self.set_state("LISTENING")
+
+            self._subtitle_on_speech_ended()
+
+            if getattr(self, '_companion_speaking', False):
+                self._companion_speaking = False
+                self.set_state("STOPPED")
+            else:
+                self.set_state("LISTENING")
+    
+    def _subtitle_on_speech_ended(self):
+        try:
+            current_mode = self._get_current_mode()
+            if current_mode == "Live2D Model":
+                widget = self._get_model_widget_instance()
+                if widget and hasattr(widget, "subtitle_overlay"):
+                    widget.subtitle_overlay.on_speech_ended()
+            elif current_mode == "VRM":
+                if hasattr(self, "vrm_no_gui") and self.vrm_no_gui:
+                    if hasattr(self.vrm_no_gui, "subtitle_overlay"):
+                        self.vrm_no_gui.subtitle_overlay.on_speech_ended()
+        except Exception:
+            pass
+ 
+    def _subtitle_clear(self):
+        try:
+            current_mode = self._get_current_mode()
+            if current_mode == "Live2D Model":
+                widget = self._get_model_widget_instance()
+                if widget and hasattr(widget, "subtitle_overlay"):
+                    widget.subtitle_overlay.clear_subtitles()
+            elif current_mode == "VRM":
+                if hasattr(self, "vrm_no_gui") and self.vrm_no_gui:
+                    if hasattr(self.vrm_no_gui, "subtitle_overlay"):
+                        self.vrm_no_gui.subtitle_overlay.clear_subtitles()
+        except Exception:
+            pass
     
     def update_avatar_lips(self, mouth_value):
         """Update avatar lip sync and voice indicator animation."""
@@ -405,19 +390,13 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         character_info = configuration_data["character_list"][character_name]
         conversation_method = character_info["conversation_method"]
         
-        if conversation_method != "Character AI":
-            current_chat = character_info["current_chat"]
-            chats = character_info.get("chats", {})
+        current_chat = character_info["current_chat"]
+        chats = character_info.get("chats", {})
 
-            current_emotion = chats[current_chat]["current_emotion"]
-            if not current_emotion:
-                configuration_data["character_list"][character_name]["chats"][current_chat]["current_emotion"] = "neutral"
-                self.configuration_characters.save_configuration_edit(configuration_data)
-        else:
-            current_emotion = character_info["current_emotion"]
-            if not current_emotion:
-                configuration_data["character_list"][character_name]["current_emotion"] = "neutral"
-                self.configuration_characters.save_configuration_edit(configuration_data)
+        current_emotion = chats[current_chat]["current_emotion"]
+        if not current_emotion:
+            configuration_data["character_list"][character_name]["chats"][current_chat]["current_emotion"] = "neutral"
+            self.configuration_characters.save_configuration_edit(configuration_data)
 
         configuration_data = self.configuration_characters.load_configuration()
         character_info = configuration_data["character_list"][character_name]
@@ -430,25 +409,14 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         current_text_to_speech = character_info.get("current_text_to_speech", "Nothing")
         character_avatar = character_info.get("character_avatar")
 
-        if conversation_method != "Character AI":
-            current_emotion = chats[current_chat]["current_emotion"]
-        else:
-            current_emotion = character_info["current_emotion"]
+        current_emotion = chats[current_chat]["current_emotion"]
 
         character_title = character_info.get("character_title")
         character_description = character_info.get("character_description")
         character_personality = character_info.get("character_personality")
         first_message = character_info.get("first_message")
 
-        match conversation_method:
-            case "Character AI":
-                character_id = character_info.get("character_id")
-                chat_id = character_info.get("chat_id")
-                character_avatar_url = character_info.get("character_avatar")
-                voice_name = character_info.get("voice_name")
-                character_ai_voice_id = character_info.get("character_ai_voice_id")
-            case "Mistral AI" | "Open AI" | "OpenRouter" | "Local LLM":
-                character_avatar = character_info.get("character_avatar")
+        character_avatar = character_info.get("character_avatar")
 
         elevenlabs_voice_id = character_info.get("elevenlabs_voice_id")
         voice_type = character_info.get("voice_type")
@@ -458,11 +426,12 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         if conversation_method == "Local LLM":
             local_llm = self.configuration_settings.get_main_setting("local_llm")
             if local_llm is None:
-                message_box_information = QMessageBox()
-                message_box_information.setWindowIcon(QtGui.QIcon("app/gui/icons/logotype.ico"))
-                message_box_information.setWindowTitle(self.translations.get("llm_error_title", "No Local LLM"))
-                message_box_information.setText(self.translations.get("llm_error_body", "Choose Local LLM in the options."))
-                message_box_information.exec()
+                sow_toast(
+                    parent=self.parent_window,
+                    title=self.translations.get("llm_error_title", "No Local LLM"),
+                    text=self.translations.get("llm_error_body", "Choose Local LLM in the options."),
+                    msg_type="error"
+                )
                 return
 
         if live2d_mode == 0:
@@ -476,28 +445,27 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 else:
                     self.user_avatar = personas_data[current_persona].get("user_avatar", "app/gui/icons/person.png")
             except Exception as e:
-                message_box_information = QMessageBox()
-                message_box_information.setWindowIcon(QtGui.QIcon("app/gui/icons/logotype.ico"))
-                message_box_information.setWindowTitle(self.translations.get("persona_error_title", "Change persona"))
-                message_box_information.setText(self.translations.get("persona_error_body", "A non-existent persona has been selected, please change it."))
-                message_box_information.exec()
+                sow_toast(
+                    parent=self.parent_window,
+                    title=self.translations.get("persona_error_title", "Change persona"),
+                    text=self.translations.get("persona_error_body", "A non-existent persona has been selected, please change it."),
+                    msg_type="error"
+                )
                 return
 
             self.ui.character_name_label.setText(character_name)
-            if conversation_method == "Character AI":
-                self.ui.character_description_label.setText(character_title)
-            else:
-                max_words = 7
-                if character_title:
-                    words = character_title.split()
-                    if len(words) > max_words:
-                        cropped_description = " ".join(words[:max_words]) + "..."
-                        self.ui.character_description_label.setText(cropped_description)
-                        self.ui.character_description_label.setWordWrap(True)
-                    else:
-                        cropped_description = character_title
-                        self.ui.character_description_label.setText(cropped_description)
-                        self.ui.character_description_label.setWordWrap(True)
+
+            max_words = 7
+            if character_title:
+                words = character_title.split()
+                if len(words) > max_words:
+                    cropped_description = " ".join(words[:max_words]) + "..."
+                    self.ui.character_description_label.setText(cropped_description)
+                    self.ui.character_description_label.setWordWrap(True)
+                else:
+                    cropped_description = character_title
+                    self.ui.character_description_label.setText(cropped_description)
+                    self.ui.character_description_label.setWordWrap(True)
             
             if hasattr(self.ui, 'character_avatar_label'):
                 if character_avatar and os.path.exists(character_avatar):
@@ -833,26 +801,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             elif current_sow_system_mode == "VRM":
                 self.ui.stackedWidget_main.setCurrentWidget(self.ui.page_vrm_model)
             
-            match conversation_method:
-                case "Character AI":
-                    await self.character_ai_client.fetch_chat(
-                        chat_id, character_name, character_id, character_avatar_url, character_title,
-                        character_description, character_personality, first_message, current_text_to_speech,
-                        voice_name, character_ai_voice_id, elevenlabs_voice_id, voice_type, rvc_enabled,
-                        rvc_file, current_sow_system_mode, expression_images_folder, live2d_model_folder,
-                        vrm_model_file, conversation_method, current_emotion
-                    )
-                    character_avatar = self.character_ai_client.get_from_cache(character_avatar_url)
-                    
-                case "Mistral AI" | "Open AI" | "OpenRouter" | "Local LLM":
-                    pass
-
             self.draw_circle_avatar(character_avatar, current_sow_system_mode)
 
-            if conversation_method == "Character AI":
-                await self.first_render_cai_messages(character_name)
-            else:
-                await self.first_render_messages(character_name)
+            await self.first_render_messages(character_name)
             
             self.ui.start_call_timer()
             
@@ -869,11 +820,12 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 else:
                     self.user_avatar = personas_data[current_persona].get("user_avatar", "app/gui/icons/person.png")
             except Exception as e:
-                message_box_information = QMessageBox()
-                message_box_information.setWindowIcon(QtGui.QIcon("app/gui/icons/logotype.ico"))
-                message_box_information.setWindowTitle(self.translations.get("persona_error_title", "Change persona"))
-                message_box_information.setText(self.translations.get("persona_error_body", "A non-existent persona has been selected, please change it."))
-                message_box_information.exec()
+                sow_toast(
+                    parent=self.parent_window,
+                    title=self.translations.get("persona_error_title", "Change persona"),
+                    text=self.translations.get("persona_error_body", "A non-existent persona has been selected, please change it."),
+                    msg_type="error"
+                )
                 return
             
             try:
@@ -887,8 +839,17 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         if self.interaction_state != "LISTENING":
             return
 
+        if hasattr(self, "soul_companion"):
+            self.soul_companion.on_user_spoke(text)
+
+        live2d_mode = self.configuration_settings.get_main_setting("live2d_mode")
+        is_no_gui = (live2d_mode != 0)
+
+        if is_no_gui:
+            return
+
         add_msg_task = asyncio.create_task(
-            self.add_message(self.character_name, text, is_user=True, message_id=None)
+            self.add_message(self.character_name, text, is_user=True, message_id=None, no_gui=False)
         )
         
         self.llm_task = asyncio.create_task(self.process_llm_response(text, add_msg_task))
@@ -916,61 +877,38 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         full_text = ""
         sentence_buffer = ""
-        current_cai_text_length = 0
 
-        translator_engine = self.configuration_settings.get_main_setting("translator") # 0-Off, 1-Google, 2-Yandex
+        translator_engine = self.configuration_settings.get_main_setting("translator") # 0-Off, 1-Google, 2-Yandex, 3-LLM
         target_lang = self.configuration_settings.get_main_setting("target_language") # 0-RU
-        translator_mode = self.configuration_settings.get_main_setting("translator_mode")
 
         try:
             self.llm_task = asyncio.current_task()
             
             context_messages = []
-            if conversation_method != "Character AI":
-                current_chat = char_info["current_chat"]
-                chat_history = char_info.get("chats", {}).get(current_chat, {}).get("chat_history", [])
-                for msg in chat_history:
-                    if msg.get("user"): context_messages.append({"role": "user", "content": msg["user"].strip()})
-                    if msg.get("character"): context_messages.append({"role": "assistant", "content": msg["character"].strip()})
+            current_chat = char_info["current_chat"]
+            chat_history = char_info.get("chats", {}).get(current_chat, {}).get("chat_history", [])
+            for msg in chat_history:
+                if msg.get("user"): context_messages.append({"role": "user", "content": msg["user"].strip()})
+                if msg.get("character"): context_messages.append({"role": "assistant", "content": msg["character"].strip()})
             
-            match conversation_method:
-                case "Local LLM":
-                    stream_generator = self.local_ai_client.send_message(
-                        context_messages, user_text, self.character_name, user_name, user_description
-                    )
-                case "Mistral AI":
-                    stream_generator = self.mistral_ai_client.send_message(
-                        context_messages, user_text, self.character_name, user_name, user_description
-                    )
-                case "Open AI" | "OpenRouter":
-                    stream_generator = self.open_ai_client.send_message(
-                        conversation_method, context_messages, user_text, 
-                        self.character_name, user_name, user_description
-                    )
-                case "Character AI":
-                    char_id = char_info.get("character_id")
-                    chat_id = char_info.get("chat_id")
-                    stream_generator = self.character_ai_client.send_message(
-                        char_id, chat_id, user_text
-                    )
-                case _:
-                    raise ValueError(f"Unknown method: {conversation_method}")
+            messages, activated_lorebook_entries = self.prompt_engine.build_system_prompt_blocks(
+                self.character_name, user_name, user_description, context_messages, user_text
+            )
+
+            provider = AIFactory.get_provider(conversation_method)
+            if not provider:
+                raise ValueError(f"Unknown method: {conversation_method}")
+
+            stream_generator = provider.generate_stream(messages)
             
             async for data_chunk in stream_generator:
                 if self.is_interrupted:
-                    logger.info("🛑 LLM generation is interrupted by the user")
+                    logger.info("LLM generation is interrupted by the user")
                     break
 
-                chunk = ""
-
-                if conversation_method == "Character AI":
-                    new_full_text = data_chunk.get_primary_candidate().text
-                    chunk = new_full_text[current_cai_text_length:]
-                    current_cai_text_length = len(new_full_text)
-                else:
-                    chunk = data_chunk
-                    if conversation_method == "OpenRouter":
-                        chunk = chunk.encode('latin1').decode('utf-8') if isinstance(chunk, str) else chunk
+                chunk = data_chunk
+                if conversation_method == "OpenRouter":
+                    chunk = chunk.encode('latin1').decode('utf-8') if isinstance(chunk, str) else chunk
 
                 if not chunk:
                     continue
@@ -999,7 +937,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                     clean_sentence = sentence.replace("*", "").replace("_", "").replace("~", "")
                     
                     if len(clean_sentence) > 2:
-                        logger.info(f"🗣️ Sending to TTS: {clean_sentence}")
+                        logger.info(f"Sending to TTS: {clean_sentence}")
                         if self.interaction_state != "SPEAKING":
                             self.set_state("SPEAKING")
                         
@@ -1008,11 +946,11 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                     sentence_buffer = sentence_buffer[split_idx:]
         
         except asyncio.CancelledError:
-            logger.info("⚠️ The LLM task has been cancelled externally (Interrupt).")
+            logger.info("The LLM task has been cancelled externally (Interrupt).")
             self.is_interrupted = True
         
         except Exception as e:
-            logger.error(f"❌ Error when generating LLM: {e}")
+            logger.error(f"Error when generating LLM: {e}")
 
         if self.is_interrupted:
             full_text += " ... [Interrupted]"
@@ -1022,12 +960,12 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         if not self.is_interrupted and len(sentence_buffer.strip()) > 1:
             clean_tail = sentence_buffer.strip().replace("*", "").replace("_", "")
-            logger.info(f"🗣️ Sending the remaining text to TTS: {clean_tail}")
+            logger.info(f"Sending the remaining text to TTS: {clean_tail}")
             if self.interaction_state != "SPEAKING":
                 self.set_state("SPEAKING")
             self.tts_worker.add_text(clean_tail)
 
-        if translator_engine in [1, 2] and translator_mode in [0, 2] and target_lang == 0:
+        if translator_engine in [1, 2, 3] and target_lang == 0:
             engine_name = "google" if translator_engine == 1 else "yandex"
             try:
                 translated_html = self.translator.translate(display_html, engine_name, 'ru')
@@ -1083,27 +1021,11 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         chat_content = chats[current_chat].get("chat_content", {})
 
-        translator = self.configuration_settings.get_main_setting("translator")
-        target_language = self.configuration_settings.get_main_setting("target_language")
-        translator_mode = self.configuration_settings.get_main_setting("translator_mode")
-
         for message_id, msg_data in sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf'))):
             is_user = msg_data.get("is_user", False)
             current_variant_id = msg_data.get("current_variant_id", "default")
             variants = msg_data.get("variants", [])
             text = next((v["text"] for v in variants if v["variant_id"] == current_variant_id), "")
-                
-            if translator != 0:
-                if translator == 1: # Google Translator
-                    if translator_mode in (0, 2):
-                        if target_language == 0:
-                            if not is_user or translator_mode == 0:  # Translate user messages or all messages
-                                text = self.translator.translate(text, "google", "ru")
-                elif translator == 2:  # Yandex Translator
-                    if translator_mode in (0, 2):  # Translate all messages or only model messages
-                        if target_language == 0:  # Target language is Russian
-                            if not is_user or translator_mode == 0:  # Translate user messages or all messages
-                                text = self.translator.translate(text, "yandex", "ru")
 
             await self.add_message(
                 character_name=character_name,
@@ -1151,10 +1073,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         chat_content = chats[current_chat].get("chat_content", {})
 
-        translator = self.configuration_settings.get_main_setting("translator")
-        target_language = self.configuration_settings.get_main_setting("target_language")
-        translator_mode = self.configuration_settings.get_main_setting("translator_mode")
-
         new_message_ids = list(chat_content.keys())
         existing_ids = set(self.messages.keys())
 
@@ -1175,13 +1093,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             variants = msg_data.get("variants", [])
             text = next((v["text"] for v in variants if v["variant_id"] == current_variant_id), "")
             author_name = msg_data.get("author_name", character_name if not is_user else "User")
-
-            if translator != 0:
-                if translator == 1 or translator == 2:
-                    if translator_mode in (0, 2) and target_language == 0:
-                        if not is_user or translator_mode == 0:
-                            service = "google" if translator == 1 else "yandex"
-                            text = self.translator.translate(text, service, "ru")
             
             if message_id in self.messages:
                 message_entry = self.messages[message_id]
@@ -1239,184 +1150,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self.chat_container.update()
         self.ui.scrollArea_chat.setVisible(True)
         QApplication.processEvents()
-
-    async def first_render_cai_messages(self, character_name):
-        self.chat_widget.setUpdatesEnabled(False)
-        self.ui.scrollArea_chat.setVisible(False)
-
-        while self.chat_container.count():
-            item = self.chat_container.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        self.messages.clear()
-        self.message_order.clear()
-
-        character_data = self.configuration_characters.load_configuration()
-        character_list = character_data.get("character_list")
-        character_information = character_list.get(character_name)
-
-        chat_content = character_information.get("chat_content", {})
-
-        translator = self.configuration_settings.get_main_setting("translator")
-        target_language = self.configuration_settings.get_main_setting("target_language")
-        translator_mode = self.configuration_settings.get_main_setting("translator_mode")
-
-        sorted_messages = sorted(
-            chat_content.items(),
-            key=lambda item: item[1].get("sequence_number", float('inf'))
-        )
-
-        for original_message_id, msg_data in sorted_messages:
-            try:
-                message_id = original_message_id
-                sequence = msg_data.get("sequence_number") or len(self.messages) + 1
-                is_user = msg_data.get("is_user", False)
-                text = msg_data.get("text", "")
-
-                if translator != 0:
-                    if translator == 1:  # Google Translator
-                        if translator_mode in (0, 2):  # Translate all messages or only model messages
-                            if target_language == 0:  # Target language is Russian
-                                if not is_user or translator_mode == 0:  # Translate user messages or all messages
-                                    text = self.translator.translate(text, "google", "ru")
-                    elif translator == 2:  # Yandex Translator
-                        if translator_mode in (0, 2):  # Translate all messages or only model messages
-                            if target_language == 0:  # Target language is Russian
-                                if not is_user or translator_mode == 0:  # Translate user messages or all messages
-                                    text = self.translator.translate(text, "yandex", "ru")
-
-                message_entry = await self.add_message(
-                    character_name=character_name,
-                    text=text,
-                    is_user=is_user,
-                    message_id=message_id
-                )
-
-                if message_entry:
-                    self.messages[message_id] = {
-                        "message_id": message_id,
-                        "sequence_number": sequence,
-                        "author_name": msg_data.get("author_name", "User" if is_user else character_name),
-                        "is_user": is_user,
-                        "text": text,
-                        "label": message_entry["label"],
-                        "frame": message_entry["frame"]
-                    }
-                    self.message_order.append(message_id)
-
-            except Exception as e:
-                logger.error(f"Error processing {message_id}: {str(e)}")
-                traceback.print_exc()
-
-        self.chat_widget.setUpdatesEnabled(True)
-        self.ui.scrollArea_chat.setVisible(True)
-        self.ui.scrollArea_chat.update()
-        self.chat_container.update()
-        QApplication.processEvents()
-
-    async def render_cai_messages(self, character_name):
-        self.chat_widget.setUpdatesEnabled(False)
-        self.ui.scrollArea_chat.setVisible(False)
-        
-        try:
-            translator = self.configuration_settings.get_main_setting("translator")
-            target_language = self.configuration_settings.get_main_setting("target_language")
-            translator_mode = self.configuration_settings.get_main_setting("translator_mode")
-
-            character_data = self.configuration_characters.load_configuration()
-            character_list = character_data.get("character_list")
-            character_information = character_list.get(character_name)
-
-            new_chat_content = character_information.get("chat_content", {})
-
-            new_messages = {
-                msg_id: {
-                    "sequence_number": data.get("sequence_number", float('inf')),
-                    "is_user": data.get("is_user", False),
-                    "text": data.get("text", ""),
-                    "author_name": data.get("author_name", "User" if data.get("is_user") else character_name)
-                }
-                for msg_id, data in new_chat_content.items()
-            }
-
-            current_ids = set(self.messages.keys())
-            new_ids = set(new_messages.keys())
-
-            for msg_id in current_ids - new_ids:
-                if msg_id in self.messages:
-                    widget = self.messages[msg_id].get("frame")
-                    if widget and widget.parent():
-                        widget.deleteLater()
-                    del self.messages[msg_id]
-                    if msg_id in self.message_order:
-                        self.message_order.remove(msg_id)
-
-            for msg_id in current_ids & new_ids:
-                current = self.messages[msg_id]
-                new_data = new_messages[msg_id]
-
-                if (current["text"] != new_data["text"] or current["is_user"] != new_data["is_user"]):
-                    current.update({
-                        "text": new_data["text"],
-                        "is_user": new_data["is_user"],
-                        "author_name": new_data["author_name"]
-                    })
-
-            for msg_id in new_ids - current_ids:
-                try:
-                    msg_data = new_chat_content[msg_id]
-                    is_user = msg_data.get("is_user", False)
-                    text = msg_data.get("text", "")
-
-                    if translator != 0:
-                        if translator == 1:  # Google Translator
-                            if translator_mode in (0, 2):  # Translate all messages or only model messages
-                                if target_language == 0:  # Target language is Russian
-                                    if not is_user or translator_mode == 0:  # Translate user messages or all messages
-                                        text = self.translator.translate(text, "google", "ru")
-                        elif translator == 2:  # Yandex Translator
-                            if translator_mode in (0, 2):  # Translate all messages or only model messages
-                                if target_language == 0:  # Target language is Russian
-                                    if not is_user or translator_mode == 0:  # Translate user messages or all messages
-                                        text = self.translator.translate(text, "yandex", "ru")
-
-                    message_entry = await self.add_message(
-                        character_name=character_name,
-                        text=text,
-                        is_user=is_user,
-                        message_id=msg_id
-                    )
-
-                    if message_entry:
-                        self.messages[msg_id] = {
-                            "message_id": msg_id,
-                            "sequence_number": msg_data.get("sequence_number", len(self.messages) + 1),
-                            "author_name": msg_data.get("author_name", "User" if msg_data["is_user"] else character_name),
-                            "is_user": msg_data["is_user"],
-                            "text": text,
-                            "label": message_entry["label"],
-                            "frame": message_entry["frame"],
-                        }
-
-                except Exception as e:
-                    logger.error(f"Error processing message {msg_id}: {str(e)}")
-                    traceback.print_exc()
-
-            self.message_order = sorted(
-                new_ids, 
-                key=lambda x: new_messages[x]["sequence_number"]
-            )
-
-            for idx, msg_id in enumerate(self.message_order):
-                if msg_id in self.messages:
-                    widget = self.messages[msg_id]["frame"]
-                    self.chat_container.insertWidget(idx, widget)
-
-        finally:
-            self.chat_widget.setUpdatesEnabled(True)
-            self.ui.scrollArea_chat.setVisible(True)
-            QApplication.processEvents()
 
     def draw_circle_avatar(self, avatar_path, current_sow_system_mode):
         target_size = 54
@@ -1532,12 +1265,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         return text
     
-    def clean_text_for_tts(self, full_text):
-        cleaned_text = re.sub(r"[^a-zA-Zа-яА-Я0-9\s.,!?]", "", full_text)
-        cleaned_text = re.sub(r"\s+", " ", cleaned_text).strip()
-
-        return cleaned_text
-    
     async def add_message(self, character_name, text, is_user, message_id, no_gui=False):
         """
         Adds a message to the chat interface
@@ -1552,8 +1279,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         char_info = configuration_data["character_list"][character_name]
         conversation_method = char_info.get("conversation_method", {})
         character_avatar = char_info.get("character_avatar", {})
-        if conversation_method == "Character AI":
-            character_avatar = self.character_ai_client.get_from_cache(character_avatar)
 
         personas_data = self.configuration_settings.get_user_data("personas")
         current_persona = char_info.get("selected_persona")
@@ -1750,12 +1475,12 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             tokenizer_path = os.path.join("app", "utils", "emotions", "detector")
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
             model_path = os.path.join("app", "utils", "emotions", "detector")
-            model = AutoModelForSequenceClassification.from_pretrained(model_path)
+            self.session = AutoModelForSequenceClassification.from_pretrained(model_path)
 
         inputs = self.tokenizer(text, return_tensors="pt", truncation=True, padding=True)
 
         with torch.no_grad():
-            outputs = model(**inputs)
+            outputs = self.session(**inputs)
 
         logits = outputs.logits
         predicted_class_id = torch.argmax(logits, dim=1).item()
@@ -1771,13 +1496,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         configuration_data = self.configuration_characters.load_configuration()
         character_info = configuration_data["character_list"][character_name]
 
-        if conversation_method != "Character AI":
-            current_chat = character_info["current_chat"]
-            configuration_data["character_list"][character_name]["chats"][current_chat]["current_emotion"] = emotion
-            self.configuration_characters.save_configuration_edit(configuration_data)
-        else:
-            configuration_data["character_list"][character_name]["current_emotion"] = emotion
-            self.configuration_characters.save_configuration_edit(configuration_data)
+        current_chat = character_info["current_chat"]
+        configuration_data["character_list"][character_name]["chats"][current_chat]["current_emotion"] = emotion
+        self.configuration_characters.save_configuration_edit(configuration_data)
 
         if current_sow_system_mode == "Expressions Images":
             self.show_emotion_image(expression_images_folder, character_name)
@@ -1807,6 +1528,8 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         """
         Updates the .model3.json file by adding missing emotions to the Expressions section.
         """
+        self.sanitize_and_validate_model_json(model_json_path)
+
         emotions_path = "../../../../app/utils/emotions/live2d/expressions"
         
         with open(model_json_path, "r", encoding="utf-8") as file:
@@ -1840,14 +1563,10 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         configuration_data = self.configuration_characters.load_configuration()
         configuration_data = self.configuration_characters.load_configuration()
         character_info = configuration_data["character_list"][character_name]
-        conversation_method = character_info["conversation_method"]
         
-        if conversation_method != "Character AI":
-            current_chat = character_info["current_chat"]
-            chats = character_info.get("chats", {})
-            current_emotion = chats[current_chat]["current_emotion"]
-        else:
-            current_emotion = character_info["current_emotion"]
+        current_chat = character_info["current_chat"]
+        chats = character_info.get("chats", {})
+        current_emotion = chats[current_chat]["current_emotion"]
 
         image_name = self.emotion_resources[current_emotion]["image"]
 
@@ -1887,25 +1606,10 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 self.ui.avatar_label.setPixmap(scaled_pixmap)
             else:
                 logger.error(f"Files for emotion {image_name} and neutral not found.")
-    
-    def show_emotion_animation(self, character_name):
-        configuration_data = self.configuration_characters.load_configuration()
-        character_info = configuration_data["character_list"][character_name]
-        conversation_method = character_info["conversation_method"]
-        
-        if conversation_method != "Character AI":
-            current_chat = character_info["current_chat"]
-            chats = character_info.get("chats", {})
-            current_emotion = chats[current_chat]["current_emotion"]
-        else:
-            current_emotion = character_info["current_emotion"]
-
-        self.set_expression_vrm(current_emotion)
-        self.play_vrm_animation(current_emotion)
 
     async def initialize_sow_system_no_gui(self, current_sow_system_mode):
         """
-        Desktop Companion init
+        Soul Companion init
         """
         character_data = self.configuration_characters.load_configuration()
         character_info = character_data["character_list"][self.character_name]
@@ -1957,14 +1661,14 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 logger.error("VRM model path not specified for character")
     
     def _init_companion_variables(self):
-        """Initialize Desktop Companion variables."""
+        """Initialize Soul Companion variables."""
+
         # Eye Tracker
         self._eye_tracker_timer = QtCore.QTimer(self)
         self._eye_tracker_timer.timeout.connect(self._update_eye_tracking)
         self._eye_update_interval = 100
         self._current_eye_x = 0.0
         self._current_eye_y = 0.0
-        self._eye_smoothing = 0.15
         self._eye_max_rotation = 0.7
         
         # Idle Scheduler
@@ -1999,19 +1703,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._time_context_timer.timeout.connect(self._check_time_context)
         self._time_context_interval = 60000
         self._current_time_context = None
-        self._has_greeted = False
-
-        # Proactive Speaker
-        self._proactive_timer = QtCore.QTimer(self)
-        self._proactive_timer.setSingleShot(True)
-        self._proactive_timer.timeout.connect(self._trigger_proactive)
-        self._proactive_min_interval = 15 * 60 * 1000
-        self._proactive_max_interval = 40 * 60 * 1000
-        self._last_proactive_time = None
 
         # Drag physics
         self._drag_velocity_x = 0.0
-        self._drag_velocity_y = 0.0
         self._drag_last_pos = None
         self._drag_last_time = 0
 
@@ -2070,47 +1764,69 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._breath_amp_z  = 0.4
         self._breath_timer.start(33)
 
-        # Active window reaction system
-        self._active_window_timer = QtCore.QTimer(self)
-        self._active_window_timer.timeout.connect(self._check_active_window)
-        self._active_window_check_interval = 45000
-        self._last_active_window = ""
-        self._last_window_reaction_time = None
-        self._window_reaction_cooldown_ms = 20 * 60 * 1000
-        self._active_window_reactions_enabled = True
-        self._app_reaction_times: dict = {}
-        self._app_category_cooldown_h = 2.0
-        self._startup_grace_period = True
-        QtCore.QTimer.singleShot(30000, self._clear_startup_grace)
-
         self._check_time_context()
-        logger.info("Desktop Companion variables initialized")
+        self.soul_companion = SoulCompanion(system_ref=self)
+        logger.info("Desktop Companion variables initialized (Soul Companion ready)")
     
     def _start_companion_systems(self):
-        """Start all companion systems."""
         self._eye_tracker_timer.start(self._eye_update_interval)
         self._idle_timer.start(self._idle_timer_interval)
         self._sleep_check_timer.start(self._sleep_check_interval)
         self._time_context_timer.start(self._time_context_interval)
-        self._active_window_timer.start(self._active_window_check_interval)
         self._check_time_context()
-        self._schedule_next_proactive()
-        QtCore.QTimer.singleShot(3500, self._say_startup_greeting)
-        logger.info("Companion systems started")
+        self.soul_companion.start()
+        logger.info("Companion systems started (Soul Companion)")
+
+    @QtCore.pyqtSlot(str)
+    def _sc_speak_slot(self, text: str):
+        if not (hasattr(self, "tts_worker") and self.tts_worker):
+            return
+ 
+        self._companion_speaking = True
+        self.tts_worker.add_text(text)
+        self.set_state("SPEAKING")
+
+        tts_duration_ms = max(3500, int(len(text) * 130 + 2000))
+
+        current_mode = self._get_current_mode()
+
+        if current_mode == "Live2D Model":
+            widget = self._get_model_widget_instance()
+            if widget and hasattr(widget, "subtitle_overlay"):
+                if getattr(widget, "_subtitles_enabled", True):
+                    widget.subtitle_overlay.show_text(text, tts_duration_ms)
+
+        elif current_mode == "VRM":
+            if hasattr(self, "vrm_no_gui") and self.vrm_no_gui:
+                if hasattr(self.vrm_no_gui, "subtitle_overlay"):
+                    if getattr(self.vrm_no_gui, "_subtitles_enabled", True):
+                        self.vrm_no_gui.subtitle_overlay.show_text(text, tts_duration_ms)
+
+        if current_mode == "Live2D Model":
+            widget = self._get_model_widget_instance()
+            if widget and hasattr(widget, "play_motion_safely"):
+                widget.play_motion_safely("Talk")
+
+    @QtCore.pyqtSlot(str)
+    def _sc_emotion_slot(self, emotion: str):
+        try:
+            self._companion_set_expression(emotion)
+        except Exception:
+            pass
 
     def _stop_companion_systems(self):
-        """Stop all companion systems."""
         self._eye_tracker_timer.stop()
         self._idle_timer.stop()
         self._sleep_check_timer.stop()
         self._time_context_timer.stop()
-        self._proactive_timer.stop()
         self._sleep_animation_timer.stop()
-        self._active_window_timer.stop()
         self._spring_return_timer.stop()
         self._idle_anim_timer.stop()
         self._breath_timer.stop()
-        logger.info("Companion systems stopped")
+
+        if hasattr(self, "soul_companion"):
+            self.soul_companion.stop()
+        logger.info("Companion systems stopped (Soul Companion)")
 
     def _get_model(self):
         """Return the active Live2D LAppModel, or None."""
@@ -2134,9 +1850,16 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         except Exception:
             return "Nothing"
 
+    def _get_model_widget_instance(self):
+        """Return the active Live2D Widget."""
+        if hasattr(self, 'live2d_no_gui') and self.live2d_no_gui:
+            return self.live2d_no_gui
+        if hasattr(self, 'live2d_openGL_widget') and self.live2d_openGL_widget:
+            return self.live2d_openGL_widget
+        return None
+    
     # === EYE TRACKER ===
     def _set_tracking_speed(self, preset: str):
-        """Adjust per-frame lerp alphas for eye/head/body tracking."""
         presets = {
             #          eye   head   body
             "Slow":   (0.08, 0.05, 0.02),
@@ -2150,12 +1873,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._tracking_speed_preset = preset
 
     def _update_eye_tracking(self):
-        """
-        Called by timer every ~50ms.
-        PURPOSE: only read cursor position and update TARGET values.
-        Actual smooth interpolation happens per render-frame in
-        Live2DWidget_NoGUI.timerEvent via _step_tracking_frame().
-        """
         if self._is_sleeping:
             return
         try:
@@ -2203,7 +1920,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         if self._is_sleeping:
             return
 
-        # --- 1. Drag body tilt ---
         if self._drag_is_active:
             vx = self._drag_smoothed_vx
             tilt_target = max(-15.0, min(15.0, vx * 0.035))
@@ -2214,7 +1930,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._body_tilt_current += (self._body_tilt_target - self._body_tilt_current) * self._body_tilt_alpha
         tilt_z = self._body_tilt_current * 0.6
 
-        # --- 2. Eye / head / body cursor tracking ---
         if not self._spring_return_timer.isActive() and not self._drag_is_active:
             ea = self._eye_alpha
             ha = self._head_alpha
@@ -2245,18 +1960,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                     model.SetParameterValue("ParamBodyAngleX", self._current_body_x)
         except Exception as e:
             logger.debug(f"Tracking frame step error: {e}")
-
-    def _apply_layered_tracking(self, eye_x, eye_y, head_x, head_y, body_x):
-        try:
-            mode = self._get_current_mode()
-            if mode == "VRM":
-                wv = self._get_webview()
-                if wv:
-                    wv.page().runJavaScript(f"updateLookAtTarget({eye_x:.3f}, {eye_y:.3f});")
-                    wv.page().runJavaScript(f"setHeadAngle({head_x:.2f}, {head_y:.2f}, 0);")
-                    wv.page().runJavaScript(f"setBodyAngle({body_x:.2f}, 0);")
-        except Exception as e:
-            logger.debug(f"Layered tracking apply error: {e}")
 
     def _apply_eye_direction(self, x, y):
         try:
@@ -2452,7 +2155,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         QtCore.QTimer.singleShot(random.randint(1000, 2000), lambda: self._apply_eye_direction(self._current_eye_x, self._current_eye_y))
     
     def _set_head_angle(self, x, y):
-        """Set idle target head angle"""
         self._idle_target_head_x = x
         self._idle_target_head_y = y
         try:
@@ -2491,17 +2193,35 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         "nervousness":   "surprised", "embarrassment": "surprised",
     }
 
+    _EMOTION_ANIMATION_MAP = {
+        "neutral": "neutral",
+        "curious": "curiosity",
+        "warm": "love",
+        "amused": "amusement",
+        "concerned": "confusion",
+        "playful": "joy",
+        "relaxed": "relief",
+        "sleepy": "neutral",
+        "melancholy": "sadness",
+        "excited": "excitement"
+    }
+
     def _companion_set_expression(self, expression):
         try:
+            mapped_expression = self._EMOTION_ANIMATION_MAP.get(expression, expression)
+            
             mode = self._get_current_mode()
             if mode == "Live2D Model":
                 model = self._get_model()
                 if model:
-                    model.SetExpression(expression)
+                    model.SetExpression(mapped_expression)
+                    widget = self._get_model_widget_instance()
+                    if widget and hasattr(widget, "play_motion_safely"):
+                        widget.play_motion_safely("Idle")
             elif mode == "VRM":
                 wv = self._get_webview()
                 if wv:
-                    vrm_expr = self._VRM_EXPRESSION_MAP.get(expression, "neutral")
+                    vrm_expr = self._VRM_EXPRESSION_MAP.get(mapped_expression, "neutral")
                     wv.page().runJavaScript(f"setExpression('{vrm_expr}');")
         except Exception as e:
             logger.debug(f"Set expression error: {e}")
@@ -2510,12 +2230,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         try:
             mode = self._get_current_mode()
             if mode == "Live2D Model":
-                model = self._get_model()
-                if model:
-                    try:
-                        model.StartMotion("Idle", 0)
-                    except Exception:
-                        pass
+                widget = self._get_model_widget_instance()
+                if widget and hasattr(widget, "play_motion_safely"):
+                    widget.play_motion_safely("Idle")
             self._companion_set_expression("relief")
             QtCore.QTimer.singleShot(4000, lambda: self._companion_set_expression("neutral"))
         except Exception as e:
@@ -2544,6 +2261,10 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._set_eye_open(0.0)
         self._set_head_angle(0, 15)
         self._set_body_angle(0)
+        
+        if hasattr(self, "soul_companion"):
+            self.soul_companion.hormones.energy = 0.0
+            
         wv = self._get_webview()
         if wv:
             wv.page().runJavaScript("setSleeping(true);")
@@ -2575,6 +2296,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         QtCore.QTimer.singleShot(900,  lambda: self._set_eye_open(1.0))
         QtCore.QTimer.singleShot(1000, lambda: self._companion_set_expression("joy"))
         QtCore.QTimer.singleShot(1200, self._say_wake_reaction)
+        
+        if hasattr(self, "soul_companion"):
+            self.soul_companion.on_user_return_from_afk()
 
     def _say_wake_reaction(self):
         selected_language = self.configuration_settings.get_main_setting("program_language")
@@ -2668,588 +2392,8 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             self._current_time_context = context
             logger.info(f"Time context: {context}")
 
-    def _say_startup_greeting(self):
-        if self._has_greeted:
-            return
-        self._has_greeted = True
-        context = self._current_time_context or "morning"
-
-        selected_language = self.configuration_settings.get_main_setting("program_language")
-        match selected_language:
-            case 0:
-                _FALLBACK_GREETINGS = {
-                    "early_morning": [
-                        "Good morning! You're up early!",
-                        "It's so early... How are you?",
-                        "Wow, the sun's barely up! Morning!",
-                        "Early bird catches the worm~ Good morning!",
-                        "Mmm... it's barely dawn! Hey there...",
-                        "You're awake before the birds? Impressive!",
-                        "Good morning! The world is still sleeping~",
-                    ],
-                    "morning": [
-                        "Good morning! How did you sleep?",
-                        "Morning! Glad to see you.",
-                        "Rise and shine! Ready for the day?",
-                        "Good morning! Coffee first or chat first?",
-                        "Hey! Hope your morning is off to a great start!",
-                        "Morning! What's on the agenda today?",
-                        "Good morning! You look refreshed!",
-                    ],
-                    "afternoon": [
-                        "Hi! How's your day going?",
-                        "Oh, you're here! How are things?",
-                        "Afternoon! Taking a break?",
-                        "Hey there! Midday check-in~",
-                        "Hi! Hope your day is treating you well!",
-                        "Afternoon! Anything exciting happening?",
-                        "Hey! You caught me in a good mood~",
-                    ],
-                    "evening": [
-                        "Good evening! How was your day?",
-                        "Evening! Tired?",
-                        "Hey! Time to unwind?",
-                        "Good evening! Ready to relax?",
-                        "Evening! Did you eat yet?",
-                        "Hey there! Long day?",
-                        "Good evening! I was waiting for you~",
-                    ],
-                    "night": [
-                        "It's late today.",
-                        "It's already night, and you're still working?",
-                        "Night owl, huh? Hey!",
-                        "It's dark outside... but I'm glad you're here!",
-                        "Late night vibes... What's up?",
-                        "You're burning the midnight oil? Careful!",
-                        "Night time... Perfect for quiet chats~",
-                    ],
-                    "late_night": [
-                        "Wow, you're still awake? It's really late!",
-                        "You should get some sleep...",
-                        "It's past your bedtime! Just kidding... sort of~",
-                        "The moon's out and so are you! Hey!",
-                        "Late night again? Take care of yourself!",
-                        "You're going to be tired tomorrow... but hi!",
-                        "It's the witching hour! What are you up to?",
-                        "Sleep is important... but I'm happy you're here!",
-                    ],
-                }
-            case 1:
-                _FALLBACK_GREETINGS = {
-                    "early_morning": [
-                        "Доброе утро! Ты сегодня рано!",
-                        "Ещё так рано... Как ты?",
-                        "Ух, солнце едва встало! Доброе утро!",
-                        "Ранняя пташка ловит червячка~ Доброе утро!",
-                        "Ммм... едва рассвет... Привет...",
-                        "Ты проснулся раньше птиц? Впечатляет!",
-                        "Доброе утро! Мир ещё спит~",
-                    ],
-                    "morning": [
-                        "Доброе утро! Как спалось?",
-                        "Утро доброе! Рада тебя видеть.",
-                        "Просыпайся и сияй! Готов к дню?",
-                        "Доброе утро! Сначала кофе или поболтаем?",
-                        "Эй! Надеюсь, утро начинается отлично!",
-                        "Доброе утро! Что в планах на сегодня?",
-                        "Доброе утро! Выглядишь отдохнувшим!",
-                    ],
-                    "afternoon": [
-                        "Привет! Как проходит день?",
-                        "О, ты здесь! Как дела?",
-                        "Добрый день! Не забывай делать перерывы.",
-                        "Эй! Проверка в середине дня~",
-                        "Привет! Надеюсь, день тебя радует!",
-                        "Добрый день! Что-нибудь интересное случилось?",
-                        "Эй! Ты застал меня в хорошем настроении~",
-                    ],
-                    "evening": [
-                        "Добрый вечер! Как прошёл день?",
-                        "Вечер добрый. Устал?",
-                        "Эй! Время расслабиться?",
-                        "Добрый вечер! Готов отдохнуть?",
-                        "Добрый вечер! Ты уже поел?",
-                        "Привет! Долгий день был?",
-                        "Добрый вечер! Я ждала тебя~",
-                    ],
-                    "night": [
-                        "Поздновато ты сегодня.",
-                        "Уже ночь, а ты всё работаешь?",
-                        "Сова ночная, да? Привет!",
-                        "На улице темно... но я рада, что ты здесь!",
-                        "Ночная атмосфера... Что случилось?",
-                        "Ты жжёшь ночное масло? Осторожнее!",
-                        "Ночное время... Идеально для тихих разговоров~",
-                    ],
-                    "late_night": [
-                        "Ого, ты ещё не спишь? Уже очень поздно!",
-                        "Поспать бы тебе...",
-                        "Уже пора спать! Шучу... ну почти~",
-                        "Луна на небе, и ты тоже! Привет!",
-                        "Снова поздно? Береги себя!",
-                        "Завтра будешь уставшим... но привет!",
-                        "Час ведьм! Чем занимаешься?",
-                        "Сон важен... но я рада, что ты здесь!",
-                    ],
-                }
-            case _:
-                _FALLBACK_GREETINGS = {
-                    "early_morning": ["Good morning! You're up early!"],
-                    "morning": ["Good morning! How did you sleep?"],
-                    "afternoon": ["Hi! How's your day going?"],
-                    "evening": ["Good evening! How was your day?"],
-                    "night": ["It's getting late!"],
-                    "late_night": ["Wow, you're still awake?"],
-                }
-
-        phrase = random.choice(_FALLBACK_GREETINGS.get(context, ["Hello!"]))
-        self.tts_worker.add_text(phrase)
-        self.set_state("SPEAKING")
-        logger.info(f"Startup greeting (fallback): {phrase}")
-    
-    # === PROACTIVE SPEAKER ===
-    def _schedule_next_proactive(self):
-        interval = random.randint(self._proactive_min_interval, self._proactive_max_interval)
-        self._proactive_timer.start(interval)
-
-    def _trigger_proactive(self):
-        if self.interaction_state != "STOPPED" or self._is_sleeping:
-            self._schedule_next_proactive()
-            return
-        self._last_proactive_time = datetime.now()
-        self._schedule_next_proactive()
-
-        selected_language = self.configuration_settings.get_main_setting("program_language")
-        match selected_language:
-            case 0:
-                _PROACTIVE_FALLBACK = {
-                    "early_morning": [
-                        "Early morning... You're already awake?",
-                        "So early? Wow, you're energetic!",
-                        "Mmm... it's still dark, but you're here~",
-                        "Did you wake up with the sun? I'm impressed!",
-                        "It's so early... But I'm glad you're here.",
-                        "Dawn just started... How are you feeling?",
-                    ],
-                    "morning": [
-                        "How's your morning going?",
-                        "Is everything okay?",
-                        "Good morning! Had breakfast yet?",
-                        "Hope your day starts wonderfully!",
-                        "What's the first thing on your agenda today?",
-                        "Morning! Got any plans?",
-                        "Good morning! Coffee or tea?",
-                    ],
-                    "afternoon": [
-                        "How's your day going?",
-                        "Don't forget to take breaks.",
-                        "Hey! How are things?",
-                        "Day's in full swing! Everything on track?",
-                        "You're not overworking, are you? Maybe rest a bit?",
-                        "Hi! Anything interesting happen today?",
-                        "How's your mood? Still going strong?",
-                    ],
-                    "evening": [
-                        "Evening! How was your day?",
-                        "Tired?",
-                        "Good evening! Time to unwind~",
-                        "Hope you had a good day?",
-                        "Was dinner tasty? Tell me!",
-                        "Evening... Perfect time for conversations.",
-                        "Hey! Will you be busy much longer?",
-                    ],
-                    "night": [
-                        "It's already night... Maybe time to rest?",
-                        "You're still here?",
-                        "Night has fallen... But I don't mind chatting~",
-                        "Working late? Take care of yourself!",
-                        "It's late... But if you want to talk, I'm here.",
-                        "Nighttime quiet... Cozy, isn't it?",
-                        "Are you a night owl? Or is today just special?",
-                    ],
-                    "late_night": [
-                        "Are you sure you don't want to sleep?",
-                        "It's really late...",
-                        "Sleep is important, you know... But I'll wait if you need.",
-                        "It's deep night now... Is everything okay?",
-                        "You're a hero for still being up! But rest matters too~",
-                        "Mmm... eyes getting heavy? Maybe continue tomorrow?",
-                        "Night... The perfect time for quiet, personal talks.",
-                        "I'm worried... Are you sure you're not tired?",
-                    ],
-                }
-            case 1:
-                _PROACTIVE_FALLBACK = {
-                    "early_morning": [
-                        "Раннее утро... Ты уже проснулся?",
-                        "Так рано? Ух, какой ты бодрый!",
-                        "Ммм... ещё темно, а ты уже тут~",
-                        "Ты встал вместе с солнцем? Восхищаюсь!",
-                        "Ещё так рано... Но я рада, что ты здесь.",
-                        "Рассвет только начался... Как настроение?",
-                    ],
-                    "morning": [
-                        "Как твоё утро?",
-                        "Всё хорошо?",
-                        "Утро доброе! Уже завтракал?",
-                        "Надеюсь, день начнётся отлично!",
-                        "Что первым делом будешь делать сегодня?",
-                        "Утра! Есть планы на день?",
-                        "Доброе утро! Кофе или чай?",
-                    ],
-                    "afternoon": [
-                        "Как день проходит?",
-                        "Не забывай делать перерывы.",
-                        "Эй! Как успехи?",
-                        "День в разгаре! Всё идёт по плану?",
-                        "Ты не переутомился? Может, отдохнёшь?",
-                        "Привет! Что интересного случилось?",
-                        "Как настроение? Всё ещё в строю?",
-                    ],
-                    "evening": [
-                        "Вечер! Как прошёл день?",
-                        "Устал?",
-                        "Вечер добрый! Время расслабиться~",
-                        "Надеюсь, день был хорошим?",
-                        "Ужин был вкусным? Рассказывай!",
-                        "Вечер... Идеальное время для разговоров.",
-                        "Привет! Долго ещё будешь занят?",
-                    ],
-                    "night": [
-                        "Уже ночь... Может, пора отдыхать?",
-                        "Ты ещё здесь?",
-                        "Ночь на дворе... Но я не против поболтать~",
-                        "Ты работаешь допоздна? Береги силы!",
-                        "Поздно уже... Но если хочешь поговорить — я тут.",
-                        "Ночная тишина... Уютно, правда?",
-                        "Ты сова? Или просто сегодня особый день?",
-                    ],
-                    "late_night": [
-                        "Ты точно не хочешь поспать?",
-                        "Поздно уже...",
-                        "Сон важен, знаешь ли... Но я подожду, если нужно.",
-                        "Уже глубокая ночь... Всё в порядке?",
-                        "Ты герой, что ещё не спишь! Но отдых тоже важен~",
-                        "Ммм... глаза слипаются? Может, завтра продолжим?",
-                        "Ночь... Самое время для тихих, личных разговоров.",
-                        "Я волнуюсь... Ты точно не устал?",
-                    ],
-                }
-
-        context = self._current_time_context or "afternoon"
-        message = random.choice(_PROACTIVE_FALLBACK.get(context, ["Эй, ты тут?"]))
-        logger.info(f"Proactive (fallback): {message}")
-        self.tts_worker.add_text(message)
-        self.set_state("SPEAKING")
-
-    def _clear_startup_grace(self):
-        self._startup_grace_period = False
-
-    def _get_active_window_title(self) -> str:
-        """Read the foreground window title via WinAPI."""
-        try:
-            if sys.platform != "win32":
-                return ""
-            hwnd = ctypes.windll.user32.GetForegroundWindow()
-            length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
-            if length == 0:
-                return ""
-            buf = ctypes.create_unicode_buffer(length + 1)
-            ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
-            return buf.value
-        except Exception:
-            return ""
-
-    def _check_active_window(self):
-        """
-        Poll active window title and fire a contextual reaction.
-        Called every 45 seconds by _active_window_timer.
-        """
-        if not self._active_window_reactions_enabled:
-            return
-        if self._startup_grace_period:
-            return
-        if self.interaction_state != "STOPPED" or self._is_sleeping:
-            return
-        
-        _PRIVACY_KEYWORDS = [
-            "password", "passwort", "contraseña", "пароль",
-            "bank", "банков", "wallet", "кошелёк",
-            "private", "incognito", "secret", "приват",
-            "login", "signin", "auth", "вход",
-        ]
-
-        
-        selected_language = self.configuration_settings.get_main_setting("program_language")
-        match selected_language:
-            case 0:
-                _WINDOW_PATTERNS = {
-                    "coding": ["pycharm", "vscode", "code", "sublime", "vim", "neovim", 
-                            "intellij", "webstorm", "cursor", "android studio", "xcode",
-                            ".py", ".js", ".ts", ".cpp", ".java", ".rs", ".go"],
-                    "gaming": ["steam", "epic", "genshin", "minecraft", "valorant", 
-                            "cs2", "counter-strike", "league", "dota", "overwatch",
-                            "game", "play", "roblox", "fortnite"],
-                    "music": ["spotify", "music", "soundcloud", "tidal", "deezer",
-                            "foobar", "winamp", "aimp", "musicbee"],
-                    "video": ["youtube", "twitch", "netflix", "vlc", "mpv", "potplayer",
-                            "prime", "disney", "hulu", "crunchyroll", "кино", "видео"],
-                    "creative": ["photoshop", "illustrator", "figma", "blender", "krita",
-                                "clip studio", "procreate", "gimp", "after effects",
-                                "premiere", "davinci", "canva", "draw", "design"],
-                    "office": ["word", "excel", "powerpoint", "libreoffice", "google docs",
-                            "notion", "onenote", "pdf", "document", "spreadsheet"],
-                    "communication": ["zoom", "teams", "discord", "skype", "meet", "webex",
-                                    "telegram", "whatsapp", "slack", "call", "chat"],
-                    "browser": ["chrome", "firefox", "edge", "safari", "opera", "brave",
-                            "http", "www", "browser"],
-                    "system": ["explorer", "finder", "settings", "control panel", "task manager",
-                            "folder", "disk", "file", "directory"],
-                }
-                
-                _APP_REACTION_RULES = {
-                    "coding": [
-                        "Coding? I'll be quiet nearby.",
-                        "Writing code? I won't disturb.",
-                        "Oh, development. Good luck!",
-                        "Working hard? I'll wait patiently.",
-                        "Look at you go! Programmer mode activated~",
-                        "Code flow detected. I'm impressed!",
-                        "Bug hunting? I believe in you!",
-                        "Compiling... I'll hold my breath~",
-                    ],
-                    "gaming": [
-                        "Gaming? Don't forget to eat!",
-                        "Oh, games! Good luck out there.",
-                        "Having fun? That's great!",
-                        "Gaming is important. Enjoy yourself!",
-                        "Try not to rage too much~",
-                        "I'll cheer for you from here!",
-                        "Victory is yours! ...I hope!",
-                        "Level up! Both in game and in life~",
-                    ],
-                    "music": [
-                        "Oh, music! I like that too.",
-                        "Nice music choice.",
-                        "Listening to something? Enjoy.",
-                        "Music makes everything better~",
-                        "What are you listening to? Tell me later!",
-                        "This song hits different, doesn't it?",
-                        "Music is the soundtrack of life~",
-                    ],
-                    "video": [
-                        "Watching something interesting?",
-                        "A movie? I'd watch with you...",
-                        "Enjoy the show!",
-                        "Hope it's a good one~",
-                        "Don't forget to blink occasionally!",
-                        "Ooh, what are we watching?",
-                        "Popcorn would be nice right now~",
-                    ],
-                    "creative": [
-                        "Creating something? How interesting!",
-                        "You're so creative! Show me later?",
-                        "Drawing or modeling? That's cool.",
-                        "Art in progress~ I won't disturb!",
-                        "Your creations always amaze me!",
-                        "Making magic happen, I see~",
-                        "Artist at work! I'm inspired!",
-                    ],
-                    "office": [
-                        "Office work... Hang in there!",
-                        "Documents? I'll be quiet.",
-                        "Work is work. I'm right here.",
-                        "Boring stuff, but you've got this!",
-                        "Take breaks, okay?",
-                        "Paperwork warrior! You got this~",
-                        "Almost done? I believe in you!",
-                    ],
-                    "communication": [
-                        "On a call? I'll be super quiet.",
-                        "Chatting? I won't interrupt.",
-                        "Social time! Have fun~",
-                        "I'll wait until you're free!",
-                        "Talking to friends? Nice!",
-                        "Don't forget about me though~",
-                    ],
-                    "browser": [
-                        "Browsing the web? Find anything interesting?",
-                        "Surfing the internet~ Don't fall in!",
-                        "Research mode? I'm here if you need me!",
-                        "Tab hoarder? I see you~",
-                        "Lost in the internet? I'll guide you back!",
-                    ],
-                    "system": [
-                        "System stuff? Being productive!",
-                        "Organizing files? I approve!",
-                        "Settings? Making things better~",
-                        "Digital housekeeping! Neat!",
-                    ],
-                    "unknown": [
-                        "What's that? Looks interesting!",
-                        "New window? Tell me about it!",
-                        "You're doing... something. I support it!",
-                        "I see you're busy. I'm here!",
-                        "Whatever it is, you've got this!",
-                        "Curious... What are you up to?",
-                        "New territory! I'm excited for you~",
-                    ],
-                }
-                
-            case 1:
-                _WINDOW_PATTERNS = {
-                    "coding": ["pycharm", "vscode", "code", "sublime", "vim", "neovim", 
-                            "intellij", "webstorm", "cursor", "android studio", "xcode",
-                            ".py", ".js", ".ts", ".cpp", ".java", ".rs", ".go"],
-                    "gaming": ["steam", "epic", "genshin", "minecraft", "valorant", 
-                            "cs2", "counter-strike", "league", "dota", "overwatch",
-                            "game", "play", "roblox", "fortnite", "игра"],
-                    "music": ["spotify", "music", "soundcloud", "tidal", "deezer",
-                            "foobar", "winamp", "aimp", "musicbee", "музыка"],
-                    "video": ["youtube", "twitch", "netflix", "vlc", "mpv", "potplayer",
-                            "prime", "disney", "hulu", "crunchyroll", "кино", "видео"],
-                    "creative": ["photoshop", "illustrator", "figma", "blender", "krita",
-                                "clip studio", "procreate", "gimp", "after effects",
-                                "premiere", "davinci", "canva", "draw", "design"],
-                    "office": ["word", "excel", "powerpoint", "libreoffice", "google docs",
-                            "notion", "onenote", "pdf", "document", "spreadsheet", "документ"],
-                    "communication": ["zoom", "teams", "discord", "skype", "meet", "webex",
-                                    "telegram", "whatsapp", "slack", "call", "chat", "звонок"],
-                    "browser": ["chrome", "firefox", "edge", "safari", "opera", "brave",
-                            "http", "www", "browser", "браузер"],
-                    "system": ["explorer", "finder", "settings", "control panel", "task manager",
-                            "folder", "disk", "file", "directory", "папка"],
-                }
-                
-                _APP_REACTION_RULES = {
-                    "coding": [
-                        "Программируешь? Тогда не буду мешать.",
-                        "Пишешь код? Я не буду мешать.",
-                        "О, разрабатываешь что-то? Удачки тебе!",
-                        "Работаешь? Хорошо, я подожду.",
-                        "Вот это да! Режим программиста активирован~",
-                        "Поток кода обнаружен. Впечатляюще!",
-                        "Охоту на баги ведёшь? Верю в тебя!",
-                        "Компиляция... Я затаю дыхание~",
-                    ],
-                    "gaming": [
-                        "Играешь? Не забудь поесть!",
-                        "О, игры! Удачи там.",
-                        "Развлекаешься? Хорошо!",
-                        "Игры — это важно. Наслаждайся!",
-                        "Старайся не злиться слишком сильно~",
-                        "Я буду болеть за тебя отсюда!",
-                        "Победа будет твоей! ...Надеюсь!",
-                        "Уровень вверх! И в игре, и в жизни~",
-                    ],
-                    "music": [
-                        "О, музыка! Мне тоже нравится.",
-                        "Хороший выбор музыки.",
-                        "Слушаешь что-то? Приятно.",
-                        "Музыка делает всё лучше~",
-                        "Что слушаешь? Расскажешь потом?",
-                        "Этот трек особенный, да?",
-                        "Музыка — саундтрек жизни~",
-                    ],
-                    "video": [
-                        "Смотришь что-то интересное?",
-                        "Кино? Я бы тоже посмотрела...",
-                        "Приятного просмотра!",
-                        "Надеюсь, это что-то хорошее~",
-                        "Не забывай моргать иногда!",
-                        "Оо, что мы смотрим?",
-                        "Попкорн бы сейчас не помешал~",
-                    ],
-                    "creative": [
-                        "Что-то создаёшь? Интересно!",
-                        "Творческий человек! Покажешь потом?",
-                        "Рисуешь или моделируешь? Круто.",
-                        "Искусство в процессе~ Не буду мешать!",
-                        "Твои работы всегда меня удивляют!",
-                        "Магию создаёшь, я вижу~",
-                        "Художник за работой! Я вдохновлена!",
-                    ],
-                    "office": [
-                        "Офисная работа... Держись!",
-                        "Документы? Буду тихо.",
-                        "Работа есть работа. Я рядом.",
-                        "Скучновато, но ты справишься!",
-                        "Делай перерывы, хорошо?",
-                        "Воин бумаг! Ты справишься~",
-                        "Почти готово? Я верю в тебя!",
-                    ],
-                    "communication": [
-                        "Звонок? Буду супер тихо.",
-                        "Общаешься? Не буду мешать.",
-                        "Время общения! Веселись~",
-                        "Я подожду, пока освободишься!",
-                        "С друзьями говоришь? Здорово!",
-                        "Только не забывай обо мне~",
-                    ],
-                    "browser": [
-                        "Бродишь по интернету? Нашёл что-то интересное?",
-                        "Серфишь в сети~ Только не упади!",
-                        "Режим исследования? Я тут, если что!",
-                        "Коллекционер вкладок? Я вижу~",
-                        "Потерялся в интернете? Я выведу!",
-                    ],
-                    "system": [
-                        "Системные дела? Продуктивно!",
-                        "Файлы организуешь? Я одобряю!",
-                        "Настройки? Делаешь лучше~",
-                        "Цифровая уборка! Аккуратно!",
-                    ],
-                    "unknown": [
-                        "Что это? Выглядит интересно!",
-                        "Новое окно? Расскажешь?",
-                        "Ты делаешь... что-то. Я поддерживаю!",
-                        "Вижу, ты занят. Я тут!",
-                        "Что бы это ни было — ты справишься!",
-                        "Любопытно... Чем занимаешься?",
-                        "Новая территория! Я за тебя рада~",
-                    ],
-                }
-
-        title = self._get_active_window_title().lower()
-        if not title or title == self._last_active_window:
-            return
-
-        if any(keyword in title for keyword in _PRIVACY_KEYWORDS):
-            self._last_active_window = title
-            return
-        
-        self._last_active_window = title
-
-        now = datetime.now()
-        if self._last_window_reaction_time:
-            elapsed_ms = (now - self._last_window_reaction_time).total_seconds() * 1000
-            if elapsed_ms < self._window_reaction_cooldown_ms:
-                return
-
-        matched_category = "unknown"
-        for category, keywords in _WINDOW_PATTERNS.items():
-            if any(kw in title for kw in keywords):
-                matched_category = category
-                break
-
-        reactions = _APP_REACTION_RULES.get(matched_category, _APP_REACTION_RULES["unknown"])
-        
-        last_cat_time = self._app_reaction_times.get(matched_category)
-        if last_cat_time:
-            hours_passed = (now - last_cat_time).total_seconds() / 3600
-            if hours_passed < self._app_category_cooldown_h:
-                return
-
-        phrase = random.choice(reactions)
-        self.tts_worker.add_text(phrase)
-        self.set_state("SPEAKING")
-        self._last_window_reaction_time = now
-        self._app_reaction_times[matched_category] = now
-        logger.info(f"Active window reaction [{matched_category}]: {phrase}")
-
     # === INTERACTION HANDLER ===
     def companion_on_click(self):
-        """Called when user clicks on the companion widget."""
         self._idle_time_ms = 0
         self._last_interaction_timestamp = datetime.now()
 
@@ -3260,54 +2404,129 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._companion_set_expression(random.choice(["surprise", "joy", "amusement"]))
         self._companion_blink()
 
-        selected_language = self.configuration_settings.get_main_setting("program_language")
-        match selected_language:
-            case 0:
-                _PET_REACTIONS = [
-                    # Surprised
-                    "Hey, what was that?",
-                    "Oh! Didn't expect that!",
-                    "Hm?",
-                    "You surprised me!",
-                    "Ah...",
-                    
-                    # Playful
-                    "Hey, that's ticklish!",
-                    "Careful now~",
-                    "What are you doing?",
-                    "Heeey! No poking!",
-                    "I felt that!",
-                    
-                    # Warm
-                    "Mmm, hello there~",
-                    "You got my attention!",
-                    "Hi! What's up?",
-                ]
+        if self.interaction_state == "STOPPED" and hasattr(self, "soul_companion"):
+            self.soul_companion.on_user_click()
+    
+    def sanitize_and_validate_model_json(self, model_json_path):
+        """
+        Validates and repairs .model3.json and its associated motion files.
+        """
+        try:
+            if not model_json_path or not os.path.exists(model_json_path):
+                return
                 
-            case 1:
-                _PET_REACTIONS = [
-                    # Surprised
-                    "Эй, что это было?",
-                    "О! Не ожидала!",
-                    "Хм?",
-                    "Ты меня удивил!",
-                    "Аа...",
+            with open(model_json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            modified = False
+            base_dir = os.path.dirname(model_json_path)
+            
+            expressions = data.get("FileReferences", {}).get("Expressions", [])
+            valid_expressions = []
+            for expr in expressions:
+                rel_path = expr.get("File", "")
+                full_path = os.path.join(base_dir, rel_path).replace("\\", "/")
+                if os.path.exists(full_path) and os.path.getsize(full_path) > 0:
+                    try:
+                        with open(full_path, "r", encoding="utf-8") as ef:
+                            json.load(ef)
+                        valid_expressions.append(expr)
+                    except Exception:
+                        logger.warning(f"[Live2D Sanitizer] Removing corrupted expression: {rel_path}")
+                        modified = True
+                else:
+                    logger.warning(f"[Live2D Sanitizer] Removing missing/empty expression: {rel_path}")
+                    modified = True
+            if modified:
+                data["FileReferences"]["Expressions"] = valid_expressions
+                
+            motions = data.get("FileReferences", {}).get("Motions", {})
+            valid_motions = {}
+            
+            for group_name, motion_list in list(motions.items()):
+                if isinstance(motion_list, list):
+                    valid_group_list = []
+                    for motion_entry in motion_list:
+                        rel_path = motion_entry.get("File", "")
+                        full_path = os.path.join(base_dir, rel_path).replace("\\", "/")
+                        
+                        if os.path.exists(full_path) and os.path.getsize(full_path) > 0:
+                            try:
+                                with open(full_path, "r", encoding="utf-8") as mf:
+                                    motion_data = json.load(mf)
+                                
+                                curves = motion_data.get("Curves", [])
+                                computed_segments = 0
+                                computed_points = 0
+                                
+                                for curve in curves:
+                                    segments = curve.get("Segments", [])
+                                    if not segments or len(segments) < 2:
+                                        continue
+                                        
+                                    curve_points = 1
+                                    curve_segments = 0
+                                    
+                                    i = 2
+                                    while i < len(segments):
+                                        seg_type = int(segments[i])
+                                        curve_segments += 1
+                                        
+                                        if seg_type == 0:    # Linear
+                                            curve_points += 1
+                                            i += 3
+                                        elif seg_type == 1:  # Bezier
+                                            curve_points += 3
+                                            i += 7
+                                        elif seg_type == 2:  # Stepped
+                                            curve_points += 1
+                                            i += 3
+                                        elif seg_type == 3:  # Inverse Stepped
+                                            curve_points += 1
+                                            i += 3
+                                        else:
+                                            i += 1
+                                            
+                                    computed_segments += curve_segments
+                                    computed_points += curve_points
+                                    
+                                meta = motion_data.get("Meta", {})
+                                declared_segments = meta.get("TotalSegmentCount", 0)
+                                declared_points = meta.get("TotalPointCount", 0)
+                                
+                                if computed_segments != declared_segments or computed_points != declared_points:
+                                    logger.info(
+                                        f"[Live2D Sanitizer] Fixing broken header in {os.path.basename(rel_path)}: "
+                                        f"Segments: {declared_segments}➔{computed_segments}, Points: {declared_points}➔{computed_points}"
+                                    )
+                                    meta["TotalSegmentCount"] = computed_segments
+                                    meta["TotalPointCount"] = computed_points
+                                    motion_data["Meta"] = meta
+                                    
+                                    with open(full_path, "w", encoding="utf-8") as mf_write:
+                                        json.dump(motion_data, mf_write, indent=4, ensure_ascii=False)
+                                
+                                valid_group_list.append(motion_entry)
+                            except Exception as e:
+                                logger.error(f"[Live2D Sanitizer] Discarding corrupted motion file {rel_path}: {e}")
+                                modified = True
+                        else:
+                            logger.warning(f"[Live2D Sanitizer] Discarding missing motion: {rel_path}")
+                            modified = True
+                            
+                    if valid_group_list:
+                        valid_motions[group_name] = valid_group_list
+                else:
+                    valid_motions[group_name] = motion_list
                     
-                    # Playful
-                    "Эй, щекотно!",
-                    "Осторожнее~",
-                    "Что ты делаешь?",
-                    "Ээей! Не тыкай!",
-                    
-                    # Warm
-                    "Ммм, привет~",
-                    "Ты привлёк моё внимание!",
-                    "Привет! Что случилось?",
-                ]
-        if self.interaction_state == "STOPPED" and hasattr(self, 'tts_worker') and self.tts_worker:
-            phrase = random.choice(_PET_REACTIONS)
-            self.tts_worker.add_text(phrase)
-            self.set_state("SPEAKING")
+            if modified:
+                data["FileReferences"]["Motions"] = valid_motions
+                with open(model_json_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+                logger.info(f"[Live2D Sanitizer] Model metadata is synchronized successfully.")
+                
+        except Exception as e:
+            logger.error(f"[Live2D Sanitizer] Error during self-healing: {e}")
 
 
 class Live2DWidget(QOpenGLWidget):
@@ -3326,8 +2545,6 @@ class Live2DWidget(QOpenGLWidget):
         self.model_path = model_path
         self.character_name = character_name
         self.parent = parent
-
-        self.output_device = self.configuration_settings.get_main_setting("output_device_real_index")
 
         logger.info("Initializing Live2D...")
         live2d.init()
@@ -3463,13 +2680,9 @@ class Live2DWidget(QOpenGLWidget):
         try:
             configuration_data = self.configuration_characters.load_configuration()
             character_info = configuration_data["character_list"][self.character_name]
-            conversation_method = character_info["conversation_method"]
             
-            if conversation_method != "Character AI":
-                current_chat = character_info["current_chat"]
-                current_emotion = character_info.get("chats", {}).get(current_chat, {}).get("current_emotion", "neutral")
-            else:
-                current_emotion = character_info.get("current_emotion", "neutral")
+            current_chat = character_info["current_chat"]
+            current_emotion = character_info.get("chats", {}).get(current_chat, {}).get("current_emotion", "neutral")
 
             if current_emotion != getattr(self, '_last_emotion_applied', None):
                 self._last_emotion_applied = current_emotion
@@ -3477,11 +2690,76 @@ class Live2DWidget(QOpenGLWidget):
                 
         except Exception as e:
             logger.debug(f"update_live2d_emotion error: {e}")
+    
+    def get_available_motions(self) -> dict[str, int]:
+        try:
+            if not self.model_path or not os.path.exists(self.model_path):
+                return {}
+            with open(self.model_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            motions_dict = data.get("FileReferences", {}).get("Motions", {})
+            
+            result = {}
+            for group_name, motion_list in motions_dict.items():
+                if isinstance(motion_list, list):
+                    result[group_name] = len(motion_list)
+                else:
+                    result[group_name] = 1
+            return result
+        except Exception as e:
+            logger.debug(f"Failed to parse motion groups from JSON: {e}")
+            return {}
+
+    def start_motion(self, group_name: str, no: int = 0, priority: int = 3):
+        if not self.live2d_model:
+            return False
+        try:
+            p = getattr(live2d, "MotionPriority", None)
+            priority_val = getattr(p, "FORCE", 3) if priority == 3 else priority
+            self.live2d_model.StartMotion(group_name, no, priority_val)
+            logger.info(f"[Live2D] Playing motion: {group_name}_{no} (priority={priority_val})")
+            return True
+        except Exception as e:
+            logger.debug(f"[Live2D] Failed to play motion {group_name}_{no}: {e}")
+            return False
+
+    def play_motion_safely(self, target_group: str):
+        if not self.live2d_model:
+            return
+        available = self.get_available_motions()
+        if not available:
+            try:
+                self.live2d_model.StartRandomMotion(priority=3)
+            except Exception:
+                pass
+            return
+        
+        matched_group = None
+        for g in available.keys():
+            if g.lower() == target_group.lower():
+                matched_group = g
+                break
+        
+        if matched_group:
+            max_index = available[matched_group]
+            random_index = random.randint(0, max_index - 1) if max_index > 1 else 0
+            self.start_motion(matched_group, random_index, 3)
+        else:
+            fallback_groups = ["Idle", "idle", "TapBody", "motion", "Motion"]
+            for f_g in fallback_groups:
+                for avail_g in available.keys():
+                    if avail_g.lower() == f_g.lower():
+                        max_index = available[avail_g]
+                        random_index = random.randint(0, max_index - 1) if max_index > 1 else 0
+                        self.start_motion(avail_g, random_index, 3)
+                        return
+            
+            random_g = random.choice(list(available.keys()))
+            max_index = available[random_g]
+            random_index = random.randint(0, max_index - 1) if max_index > 1 else 0
+            self.start_motion(random_g, random_index, 3)
 
     def cleanup(self):
-        """
-        Cleans up resources used by the Live2D model and OpenGL context.
-        """
         logger.info("Releasing model resources...")
         if self.timerId is not None:
             logger.info("Stopping timer...")
@@ -3508,9 +2786,6 @@ class Live2DWidget(QOpenGLWidget):
         logger.info("All resources released.")
 
     def hideEvent(self, event):
-        """
-        Handles the hide event by stopping the timer and cleaning up resources.
-        """
         logger.info("Widget hidden, stopping timer and releasing resources.")
         if self.timerId is not None:
             self.killTimer(self.timerId)
@@ -3520,9 +2795,6 @@ class Live2DWidget(QOpenGLWidget):
         super().hideEvent(event)
 
     def closeEvent(self, event):
-        """
-        Handles the close event by cleaning up resources.
-        """
         logger.info("Closing widget...")
         self.cleanup()
         super().closeEvent(event)
@@ -3626,11 +2898,17 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         self.configuration_characters = configuration.ConfigurationCharacters()
         self.configuration_settings = configuration.ConfigurationSettings()
 
+        self.subtitle_overlay = CompanionSubtitleOverlay(self)
+
         live2d.init()
         self.live2d_model = None
         self.live2d_model_loaded = False
         self.opengl_initialized = False
         self.timerId = None
+
+        self._click_through = False
+        self._always_on_top = True
+        self._subtitles_enabled = True
 
         self.dragging_window = False
         self.drag_offset = QtCore.QPoint()
@@ -3672,22 +2950,15 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         self.update()
 
     def update_live2d_emotion(self):
-        """
-        Updates the emotion of the Live2D model based on the current character's emotion.
-        """
         if not self.live2d_model:
             return
 
         try:
             configuration_data = self.configuration_characters.load_configuration()
             character_info = configuration_data["character_list"][self.character_name]
-            conversation_method = character_info["conversation_method"]
             
-            if conversation_method != "Character AI":
-                current_chat = character_info["current_chat"]
-                current_emotion = character_info.get("chats", {}).get(current_chat, {}).get("current_emotion", "neutral")
-            else:
-                current_emotion = character_info.get("current_emotion", "neutral")
+            current_chat = character_info["current_chat"]
+            current_emotion = character_info.get("chats", {}).get(current_chat, {}).get("current_emotion", "neutral")
 
             if current_emotion != getattr(self, '_last_emotion_applied', None):
                 self._last_emotion_applied = current_emotion
@@ -3695,6 +2966,93 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
                 
         except Exception as e:
             logger.debug(f"update_live2d_emotion error: {e}")
+    
+    def get_available_motions(self) -> dict[str, int]:
+        try:
+            if not self.model_path or not os.path.exists(self.model_path):
+                return {}
+            with open(self.model_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            motions_dict = data.get("FileReferences", {}).get("Motions", {})
+            
+            result = {}
+            for group_name, motion_list in motions_dict.items():
+                if isinstance(motion_list, list):
+                    result[group_name] = len(motion_list)
+                else:
+                    result[group_name] = 1
+            return result
+        except Exception as e:
+            logger.debug(f"Failed to parse motion groups from JSON: {e}")
+            return {}
+
+    def start_motion(self, group_name: str, no: int = 0, priority: int = 3):
+        if not self.live2d_model:
+            return False
+        try:
+            p = getattr(live2d, "MotionPriority", None)
+            priority_val = getattr(p, "FORCE", 3) if priority == 3 else priority
+            self.live2d_model.StartMotion(group_name, no, priority_val)
+            logger.info(f"[Live2D] Playing motion: {group_name}_{no} (priority={priority_val})")
+            return True
+        except Exception as e:
+            logger.debug(f"[Live2D] Failed to play motion {group_name}_{no}: {e}")
+            return False
+
+    def play_motion_safely(self, target_group: str):
+        if not self.live2d_model:
+            return
+        available = self.get_available_motions()
+        if not available:
+            try:
+                self.live2d_model.StartRandomMotion(priority=3)
+            except Exception:
+                pass
+            return
+        
+        matched_group = None
+        for g in available.keys():
+            if g.lower() == target_group.lower():
+                matched_group = g
+                break
+        
+        if matched_group:
+            max_index = available[matched_group]
+            random_index = random.randint(0, max_index - 1) if max_index > 1 else 0
+            self.start_motion(matched_group, random_index, 3)
+        else:
+            fallback_groups = ["Idle", "idle", "TapBody", "motion", "Motion"]
+            for f_g in fallback_groups:
+                for avail_g in available.keys():
+                    if avail_g.lower() == f_g.lower():
+                        max_index = available[avail_g]
+                        random_index = random.randint(0, max_index - 1) if max_index > 1 else 0
+                        self.start_motion(avail_g, random_index, 3)
+                        return
+            
+            random_g = random.choice(list(available.keys()))
+            max_index = available[random_g]
+            random_index = random.randint(0, max_index - 1) if max_index > 1 else 0
+            self.start_motion(random_g, random_index, 3)
+
+    def update_window_properties(self):
+        flags = QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Tool
+        if self._always_on_top:
+            flags |= QtCore.Qt.WindowType.WindowStaysOnTopHint
+        if self._click_through:
+            flags |= QtCore.Qt.WindowType.WindowTransparentForInput
+            
+        self.setWindowFlags(flags)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.show()
+
+    def show_hormones_hud(self):
+        if not self.sow_system_ref or not hasattr(self.sow_system_ref, "soul_companion"):
+            return
+        h_dict = self.sow_system_ref.soul_companion.hormones.to_dict()
+        hud = HormonesHUDOverlay(self, h_dict)
+        hud.move(10, 20)
+        hud.show()
 
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -3768,131 +3126,197 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         
         menu.setStyleSheet("""
             QMenu {
-                background-color: rgba(28, 28, 30, 240);
+                background-color: rgba(28, 28, 30, 245);
                 border: 1px solid rgba(255, 255, 255, 30);
                 border-radius: 12px;
-                padding: 5px;
+                padding: 6px;
                 color: #E0E0E0;
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 14px;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                font-size: 13px;
             }
             QMenu::item {
-                padding: 8px 24px;
-                border-radius: 8px;
+                padding: 6px 20px;
+                border-radius: 6px;
                 margin: 2px 4px;
                 background-color: transparent;
             }
             QMenu::item:selected {
-                background-color: rgba(255, 255, 255, 25);
+                background-color: rgba(255, 255, 255, 20);
                 color: #FFFFFF;
             }
             QMenu::separator {
                 height: 1px;
-                background: rgba(255, 255, 255, 30);
-                margin: 4px 8px;
+                background: rgba(255, 255, 255, 25);
+                margin: 4px 6px;
             }
         """)
         
         shadow = QGraphicsDropShadowEffect(menu)
         shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setColor(QColor(0, 0, 0, 160))
         shadow.setOffset(0, 4)
         menu.setGraphicsEffect(shadow)
         menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        mic_status = "Turn on the microphone"
+        ref = self.sow_system_ref
+
+        def t(key, default):
+            return ref.translations.get(key, default) if ref else default
+
+        # --- 1. QUICK ACTIONS ---
+        qa_menu = menu.addMenu(t("sc_menu_quick_actions", "⚡  Quick Actions"))
+        qa_menu.setStyleSheet(menu.styleSheet())
+        action_vision = qa_menu.addAction(t("sc_menu_vision", "📸  Look at my Screen (Vision)"))
+        action_clip   = qa_menu.addAction(t("sc_menu_clipboard", "📋  Read Clipboard (Analyze)"))
+        action_mind   = qa_menu.addAction(t("sc_menu_mind", "🧠  What is on your Mind?"))
+        menu.addSeparator()
+
+        # --- 2. CORE CONTROLS & DYNAMIC ANIMATIONS ---
+        mic_status = t("sc_menu_mic_on", "Turn on the microphone")
         mic_icon = "🎙️"
-        if self.sow_system_ref and self.sow_system_ref.interaction_state != "STOPPED":
-            mic_status = "Turn off the microphone"
+        if ref and ref.interaction_state != "STOPPED":
+            mic_status = t("sc_menu_mic_off", "Turn off the microphone")
             mic_icon = "🔇"
 
-        ref = self.sow_system_ref
-        eye_on   = ref._eye_tracker_timer.isActive() if ref else True
-        react_on = ref._active_window_reactions_enabled if ref else True
-        eye_lbl   = "👁  Eye Tracking: ON"   if eye_on   else "👁  Eye Tracking: OFF"
-        react_lbl = "💬  Window Reactions: ON" if react_on else "💬  Window Reactions: OFF"
-
         action_voice  = menu.addAction(f"{mic_icon}  {mic_status}")
-        action_pet    = menu.addAction("🤚  Pet")
+        action_pet    = menu.addAction(t("sc_menu_pet", "🤚  Pet"))
+
+        available_motions = self.get_available_motions()
+        if available_motions:
+            anim_menu = menu.addMenu(t("sc_menu_play_animation", "🎭  Play Animation"))
+            anim_menu.setStyleSheet(menu.styleSheet())
+            for g_name, count in available_motions.items():
+                act = anim_menu.addAction(f"🎬 {g_name} ({count} {t('sc_menu_motions', 'motions')})")
+                act.triggered.connect(lambda checked, gn=g_name: self.play_motion_safely(gn))
+
         menu.addSeparator()
+
+        # --- 3. HARDWARE & WIN CONTROLS ---
+        click_thr_status = t("sc_menu_click_through_on", "👁‍🗨  Click-Through: ON") if getattr(self, "_click_through", False) else t("sc_menu_click_through_off", "👁‍🗨  Click-Through: OFF")
+        aot_status = t("sc_menu_aot_on", "📌  Always on Top: ON") if getattr(self, "_always_on_top", True) else t("sc_menu_aot_off", "📌  Always on Top: OFF")
+        action_click_thr = menu.addAction(click_thr_status)
+        action_aot       = menu.addAction(aot_status)
+
+        eye_on   = ref._eye_tracker_timer.isActive() if ref else True
+        react_on = ref.soul_companion._enabled if (ref and hasattr(ref, "soul_companion")) else True
+        sub_on   = getattr(self, "_subtitles_enabled", True)
+
+        eye_lbl   = t("sc_menu_eye_on", "👁  Eye Tracking: ON")   if eye_on   else t("sc_menu_eye_off", "👁  Eye Tracking: OFF")
+        react_lbl = t("sc_menu_react_on", "💬  Window Reactions: ON") if react_on else t("sc_menu_react_off", "💬  Window Reactions: OFF")
+        sub_lbl   = t("sc_menu_sub_on", "📝  Subtitles: ON") if sub_on else t("sc_menu_sub_off", "📝  Subtitles: OFF")
+
         action_eye    = menu.addAction(eye_lbl)
         action_react  = menu.addAction(react_lbl)
+        action_sub    = menu.addAction(sub_lbl)
         menu.addSeparator()
 
-        # === Companion Settings ===
-        settings_menu = menu.addMenu("⚙️  Companion Settings")
+        # --- 4. COMPANION SETTINGS ---
+        settings_menu = menu.addMenu(t("sc_menu_settings", "⚙️  Companion Settings"))
+        settings_menu.setStyleSheet(menu.styleSheet())
 
-        proactive_menu  = settings_menu.addMenu("🗓  Proactive Interval")
-        action_15min    = proactive_menu.addAction("15 minutes")
-        action_30min    = proactive_menu.addAction("30 minutes")
-        action_60min    = proactive_menu.addAction("60 minutes")
+        proactive_menu  = settings_menu.addMenu(t("sc_menu_proactive", "🗓  Proactive Interval"))
+        proactive_menu.setStyleSheet(menu.styleSheet())
+        action_3min     = proactive_menu.addAction(t("sc_menu_min_3", "3 minutes"))
+        action_5min     = proactive_menu.addAction(t("sc_menu_min_5", "5 minutes"))
+        action_10min    = proactive_menu.addAction(t("sc_menu_min_10", "10 minutes"))
+        action_15min    = proactive_menu.addAction(t("sc_menu_min_15", "15 minutes"))
+        action_30min    = proactive_menu.addAction(t("sc_menu_min_30", "30 minutes"))
+        action_60min    = proactive_menu.addAction(t("sc_menu_min_60", "60 minutes"))
 
-        sleep_menu         = settings_menu.addMenu("😴  Sleep After")
-        action_sleep_3min  = sleep_menu.addAction("3 minutes")
-        action_sleep_5min  = sleep_menu.addAction("5 minutes")
-        action_sleep_10min = sleep_menu.addAction("10 minutes")
+        sleep_menu         = settings_menu.addMenu(t("sc_menu_sleep", "😴  Sleep After"))
+        sleep_menu.setStyleSheet(menu.styleSheet())
+        action_sleep_3min  = sleep_menu.addAction(t("sc_menu_min_3", "3 minutes"))
+        action_sleep_5min  = sleep_menu.addAction(t("sc_menu_min_5", "5 minutes"))
+        action_sleep_10min = sleep_menu.addAction(t("sc_menu_min_10", "10 minutes"))
 
-        speed_menu         = settings_menu.addMenu("👁  Tracking Speed")
-        action_speed_slow  = speed_menu.addAction("Slow")
-        action_speed_norm  = speed_menu.addAction("Normal")
-        action_speed_fast  = speed_menu.addAction("Fast")
+        speed_menu         = settings_menu.addMenu(t("sc_menu_speed", "👁  Tracking Speed"))
+        speed_menu.setStyleSheet(menu.styleSheet())
+        action_speed_slow  = speed_menu.addAction(t("sc_menu_speed_slow", "Slow"))
+        action_speed_norm  = speed_menu.addAction(t("sc_menu_speed_normal", "Normal"))
+        action_speed_fast  = speed_menu.addAction(t("sc_menu_speed_fast", "Fast"))
 
-        size_menu          = settings_menu.addMenu("📐  Model Size")
-        action_size_small  = size_menu.addAction("Small  (200 × 300)")
-        action_size_medium = size_menu.addAction("Medium (400 × 600)")
-        action_size_large  = size_menu.addAction("Large  (600 × 900)")
+        size_menu          = settings_menu.addMenu(t("sc_menu_size", "📐  Model Size"))
+        size_menu.setStyleSheet(menu.styleSheet())
+        action_size_small  = size_menu.addAction(t("sc_menu_size_small", "Small  (200 × 300)"))
+        action_size_medium = size_menu.addAction(t("sc_menu_size_medium", "Medium (400 × 600)"))
+        action_size_large  = size_menu.addAction(t("sc_menu_size_large", "Large  (600 × 900)"))
+
+        action_hud = settings_menu.addAction(t("sc_menu_hud", "📊  Show Hormones HUD"))
 
         menu.addSeparator()
-        action_center = menu.addAction("📍  Center on Screen")
-        action_reset  = menu.addAction("🔄  Reset Size")
-        action_close  = menu.addAction("❌  Hide Companion")
+        action_center = menu.addAction(t("sc_menu_center", "📍  Center on Screen"))
+        action_reset  = menu.addAction(t("sc_menu_reset", "🔄  Reset Size"))
+        action_close  = menu.addAction(t("sc_menu_hide", "❌  Hide Companion"))
 
         action = menu.exec(event.globalPos())
 
-        if action == action_voice and self.toggle_voice_cb:
+        if action == action_vision and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.event_bus.emit_threadsafe("manual_screenshot", {})
+        elif action == action_clip and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.event_bus.emit_threadsafe("manual_clipboard", {})
+        elif action == action_mind and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.event_bus.emit_threadsafe("manual_scratchpad", {})
+
+        elif action == action_voice and self.toggle_voice_cb:
             self.toggle_voice_cb()
         elif action == action_pet and ref:
             ref.companion_on_click()
 
+        elif action == action_click_thr:
+            self._click_through = not getattr(self, "_click_through", False)
+            self.update_window_properties()
+        elif action == action_aot:
+            self._always_on_top = not getattr(self, "_always_on_top", True)
+            self.update_window_properties()
+
         elif action == action_eye and ref:
             if ref._eye_tracker_timer.isActive():
                 ref._eye_tracker_timer.stop()
-                logger.info("Eye tracking disabled")
             else:
                 ref._eye_tracker_timer.start(ref._eye_update_interval)
-                logger.info("Eye tracking enabled")
         elif action == action_react and ref:
-            ref._active_window_reactions_enabled = not ref._active_window_reactions_enabled
-            logger.info(f"Window reactions: {ref._active_window_reactions_enabled}")
+            if hasattr(ref, "soul_companion"):
+                ref.soul_companion.set_enabled(not ref.soul_companion._enabled)
+        
+        elif action == action_sub:
+            self._subtitles_enabled = not getattr(self, "_subtitles_enabled", True)
+            if not self._subtitles_enabled and hasattr(self, "subtitle_overlay"):
+                self.subtitle_overlay.clear_subtitles()
 
-        # Proactive interval
-        elif action == action_15min and ref:
-            ref._proactive_min_interval = 10 * 60 * 1000
-            ref._proactive_max_interval = 20 * 60 * 1000
-        elif action == action_30min and ref:
-            ref._proactive_min_interval = 20 * 60 * 1000
-            ref._proactive_max_interval = 40 * 60 * 1000
-        elif action == action_60min and ref:
-            ref._proactive_min_interval = 40 * 60 * 1000
-            ref._proactive_max_interval = 80 * 60 * 1000
+        # Proactive Interval
+        elif action == action_3min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(3 * 60)
+        elif action == action_5min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(5 * 60)
+        elif action == action_10min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(10 * 60)
+        elif action == action_15min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(15 * 60)
+        elif action == action_30min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(30 * 60)
+        elif action == action_60min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(60 * 60)
 
-        # Sleep threshold
+        # Sleep
         elif action == action_sleep_3min  and ref: ref._sleep_threshold_ms = 3  * 60 * 1000
         elif action == action_sleep_5min  and ref: ref._sleep_threshold_ms = 5  * 60 * 1000
         elif action == action_sleep_10min and ref: ref._sleep_threshold_ms = 10 * 60 * 1000
 
-        # Tracking speed
+        # Speed
         elif action == action_speed_slow and ref: ref._set_tracking_speed("Slow")
         elif action == action_speed_norm and ref: ref._set_tracking_speed("Normal")
         elif action == action_speed_fast and ref: ref._set_tracking_speed("Fast")
 
-        # Model size
+        # Sizes
         elif action == action_size_small:
             self.resize(200, 300)
         elif action == action_size_medium:
             self.resize(400, 600)
         elif action == action_size_large:
             self.resize(600, 900)
+
+        elif action == action_hud:
+            self.show_hormones_hud()
 
         # Position
         elif action == action_center:
@@ -3903,6 +3327,11 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
             self.resize(400, 600)
         elif action == action_close:
             self.close()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "subtitle_overlay"):
+            self.subtitle_overlay._reposition()
 
     def wheelEvent(self, event: QtGui.QWheelEvent):
         delta = event.angleDelta().y()
@@ -4027,13 +3456,23 @@ class VRMWidget_NoGUI(QWidget):
  
         self.dragging_window = False
         self.drag_offset = QtCore.QPoint()
- 
+
+        self._click_through = False
+        self._always_on_top = True
+        self._subtitles_enabled = True
+
+        self.subtitle_overlay = CompanionSubtitleOverlay(self)
+        self.subtitle_overlay.raise_()
+
         self.vrm_webview.page().loadFinished.connect(self.on_load_finished)
         self.load_vrm_model()
  
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.overlay.resize(self.size())
+
+        if hasattr(self, "subtitle_overlay"):
+            self.subtitle_overlay._reposition()
  
     def load_vrm_model(self):
         html_url = f"http://localhost:{self.server_thread.port}/app/utils/emotions/vrm_module_companion.html"
@@ -4093,14 +3532,33 @@ class VRMWidget_NoGUI(QWidget):
             anim_file = animation_map.get(emotion, "neutral.fbx")
             animation_url = f"/app/utils/emotions/vrm/expressions/{anim_file}"
             self.vrm_webview.page().runJavaScript(f"loadFBX('{animation_url}');")
- 
+
+    def update_window_properties(self):
+        flags = QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Tool
+        if self._always_on_top:
+            flags |= QtCore.Qt.WindowType.WindowStaysOnTopHint
+        if self._click_through:
+            flags |= QtCore.Qt.WindowType.WindowTransparentForInput
+            
+        self.setWindowFlags(flags)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.show()
+
+    def show_hormones_hud(self):
+        if not self.sow_system_ref or not hasattr(self.sow_system_ref, "soul_companion"):
+            return
+        h_dict = self.sow_system_ref.soul_companion.hormones.to_dict()
+        hud = HormonesHUDOverlay(self, h_dict)
+        hud.move(10, 20)
+        hud.show()
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging_window = True
             self.drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             if self.sow_system_ref:
                 self.sow_system_ref.companion_on_click()
- 
+
     def mouseMoveEvent(self, event):
         cur_pos = event.globalPosition().toPoint()
         if self.dragging_window:
@@ -4117,7 +3575,7 @@ class VRMWidget_NoGUI(QWidget):
                         wv.page().runJavaScript(f"setBodyAngle({tilt}, 0);")
                 ref._drag_last_pos = cur_pos
                 ref._drag_last_time = now
- 
+
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging_window = False
@@ -4132,139 +3590,203 @@ class VRMWidget_NoGUI(QWidget):
                 ref._spring_body_x  = body_x
                 ref._spring_angle_z = angle_z
                 ref._start_spring_return(body_x, angle_z)
- 
+
     def contextMenuEvent(self, event):
         menu = QtWidgets.QMenu(self)
         
         menu.setStyleSheet("""
             QMenu {
-                background-color: rgba(28, 28, 30, 240);
+                background-color: rgba(28, 28, 30, 245);
                 border: 1px solid rgba(255, 255, 255, 30);
                 border-radius: 12px;
-                padding: 5px;
+                padding: 6px;
                 color: #E0E0E0;
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 14px;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                font-size: 13px;
             }
             QMenu::item {
-                padding: 8px 24px;
-                border-radius: 8px;
+                padding: 6px 20px;
+                border-radius: 6px;
                 margin: 2px 4px;
                 background-color: transparent;
             }
             QMenu::item:selected {
-                background-color: rgba(255, 255, 255, 25);
+                background-color: rgba(255, 255, 255, 20);
                 color: #FFFFFF;
             }
             QMenu::separator {
                 height: 1px;
-                background: rgba(255, 255, 255, 30);
-                margin: 4px 8px;
+                background: rgba(255, 255, 255, 25);
+                margin: 4px 6px;
             }
         """)
         
         shadow = QGraphicsDropShadowEffect(menu)
         shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setColor(QColor(0, 0, 0, 160))
         shadow.setOffset(0, 4)
         menu.setGraphicsEffect(shadow)
         menu.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
- 
-        mic_status = "Turn on the microphone"
-        mic_icon = "🎙️"
-        if self.sow_system_ref and self.sow_system_ref.interaction_state != "STOPPED":
-            mic_status = "Turn off the microphone"
-            mic_icon = "🔇"
- 
+
         ref = self.sow_system_ref
-        eye_on   = ref._eye_tracker_timer.isActive() if ref else True
-        react_on = ref._active_window_reactions_enabled if ref else True
-        eye_lbl   = "👁  Eye Tracking: ON"   if eye_on   else "👁  Eye Tracking: OFF"
-        react_lbl = "💬  Window Reactions: ON" if react_on else "💬  Window Reactions: OFF"
- 
-        action_voice  = menu.addAction(f"{mic_icon}  {mic_status}")
-        action_pet    = menu.addAction("🤚  Pet")
+
+        def t(key, default):
+            return ref.translations.get(key, default) if ref else default
+
+        # 1. QUICK ACTIONS
+        qa_menu = menu.addMenu(t("sc_menu_quick_actions", "⚡  Quick Actions"))
+        qa_menu.setStyleSheet(menu.styleSheet())
+        action_vision = qa_menu.addAction(t("sc_menu_vision", "📸  Look at my Screen (Vision)"))
+        action_clip   = qa_menu.addAction(t("sc_menu_clipboard", "📋  Read Clipboard (Analyze)"))
+        action_mind   = qa_menu.addAction(t("sc_menu_mind", "🧠  What is on your Mind?"))
         menu.addSeparator()
+
+        # 2. CORE CONTROLS & DYNAMIC VRM ANIMATIONS
+        mic_status = t("sc_menu_mic_on", "Turn on the microphone")
+        mic_icon = "🎙️"
+        if ref and ref.interaction_state != "STOPPED":
+            mic_status = t("sc_menu_mic_off", "Turn off the microphone")
+            mic_icon = "🔇"
+
+        action_voice  = menu.addAction(f"{mic_icon}  {mic_status}")
+        action_pet    = menu.addAction(t("sc_menu_pet", "🤚  Pet"))
+
+        vrm_anims = ["neutral", "joy", "anger", "sadness", "surprise", "relief", "love", "curiosity", "excitement"]
+        anim_menu = menu.addMenu(t("sc_menu_play_animation", "🎭  Play Animation"))
+        anim_menu.setStyleSheet(menu.styleSheet())
+        for anim in vrm_anims:
+            act = anim_menu.addAction(f"🎬 {anim.capitalize()}")
+            act.triggered.connect(lambda checked, a=anim: (self.set_expression(a), self.play_animation(a)))
+
+        menu.addSeparator()
+
+        # 3. HARDWARE & WIN CONTROLS
+        click_thr_status = t("sc_menu_click_through_on", "👁‍🗨  Click-Through: ON") if getattr(self, "_click_through", False) else t("sc_menu_click_through_off", "👁‍🗨  Click-Through: OFF")
+        aot_status = t("sc_menu_aot_on", "📌  Always on Top: ON") if getattr(self, "_always_on_top", True) else t("sc_menu_aot_off", "📌  Always on Top: OFF")
+        action_click_thr = menu.addAction(click_thr_status)
+        action_aot       = menu.addAction(aot_status)
+
+        eye_on   = ref._eye_tracker_timer.isActive() if ref else True
+        react_on = ref.soul_companion._enabled if (ref and hasattr(ref, "soul_companion")) else True
+        sub_on   = getattr(self, "_subtitles_enabled", True)
+
+        eye_lbl   = t("sc_menu_eye_on", "👁  Eye Tracking: ON")   if eye_on   else t("sc_menu_eye_off", "👁  Eye Tracking: OFF")
+        react_lbl = t("sc_menu_react_on", "💬  Window Reactions: ON") if react_on else t("sc_menu_react_off", "💬  Window Reactions: OFF")
+        sub_lbl   = t("sc_menu_sub_on", "📝  Subtitles: ON") if sub_on else t("sc_menu_sub_off", "📝  Subtitles: OFF")
+
         action_eye    = menu.addAction(eye_lbl)
         action_react  = menu.addAction(react_lbl)
+        action_sub    = menu.addAction(sub_lbl)
         menu.addSeparator()
- 
-        # === Companion Settings ===
-        settings_menu = menu.addMenu("⚙️  Companion Settings")
- 
-        proactive_menu  = settings_menu.addMenu("🗓  Proactive Interval")
-        action_15min    = proactive_menu.addAction("15 minutes")
-        action_30min    = proactive_menu.addAction("30 minutes")
-        action_60min    = proactive_menu.addAction("60 minutes")
- 
-        sleep_menu         = settings_menu.addMenu("😴  Sleep After")
-        action_sleep_3min  = sleep_menu.addAction("3 minutes")
-        action_sleep_5min  = sleep_menu.addAction("5 minutes")
-        action_sleep_10min = sleep_menu.addAction("10 minutes")
- 
-        speed_menu         = settings_menu.addMenu("👁  Tracking Speed")
+
+        # 4. COMPANION SETTINGS
+        settings_menu = menu.addMenu(t("sc_menu_settings", "⚙️  Companion Settings"))
+        settings_menu.setStyleSheet(menu.styleSheet())
+
+        proactive_menu  = settings_menu.addMenu(t("sc_menu_proactive", "🗓  Proactive Interval"))
+        proactive_menu.setStyleSheet(menu.styleSheet())
+        action_3min     = proactive_menu.addAction(t("sc_menu_min_3", "3 minutes"))
+        action_5min     = proactive_menu.addAction(t("sc_menu_min_5", "5 minutes"))
+        action_10min    = proactive_menu.addAction(t("sc_menu_min_10", "10 minutes"))
+        action_15min    = proactive_menu.addAction(t("sc_menu_min_15", "15 minutes"))
+        action_30min    = proactive_menu.addAction(t("sc_menu_min_30", "30 minutes"))
+        action_60min    = proactive_menu.addAction(t("sc_menu_min_60", "60 minutes"))
+
+        sleep_menu         = settings_menu.addMenu(t("sc_menu_sleep", "😴  Sleep After"))
+        sleep_menu.setStyleSheet(menu.styleSheet())
+        action_sleep_3min  = sleep_menu.addAction(t("sc_menu_min_3", "3 minutes"))
+        action_sleep_5min  = sleep_menu.addAction(t("sc_menu_min_5", "5 minutes"))
+        action_sleep_10min = sleep_menu.addAction(t("sc_menu_min_10", "10 minutes"))
+
+        speed_menu         = settings_menu.addMenu(t("sc_menu_speed", "👁  Tracking Speed"))
+        speed_menu.setStyleSheet(menu.styleSheet())
         action_speed_slow  = speed_menu.addAction("Slow")
         action_speed_norm  = speed_menu.addAction("Normal")
         action_speed_fast  = speed_menu.addAction("Fast")
- 
+
         size_menu          = settings_menu.addMenu("📐  Model Size")
+        size_menu.setStyleSheet(menu.styleSheet())
         action_size_small  = size_menu.addAction("Small  (200 × 300)")
         action_size_medium = size_menu.addAction("Medium (400 × 600)")
         action_size_large  = size_menu.addAction("Large  (600 × 900)")
- 
+
+        action_hud = settings_menu.addAction("📊  Show Hormones HUD")
+
         menu.addSeparator()
         action_center = menu.addAction("📍  Center on Screen")
         action_reset  = menu.addAction("🔄  Reset Size")
         action_close  = menu.addAction("❌  Hide Companion")
- 
+
         action = menu.exec(event.globalPos())
- 
-        if action == action_voice and self.toggle_voice_cb:
+
+        if action == action_vision and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.event_bus.emit_threadsafe("manual_screenshot", {})
+        elif action == action_clip and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.event_bus.emit_threadsafe("manual_clipboard", {})
+        elif action == action_mind and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.event_bus.emit_threadsafe("manual_scratchpad", {})
+
+        elif action == action_voice and self.toggle_voice_cb:
             self.toggle_voice_cb()
         elif action == action_pet and ref:
             ref.companion_on_click()
- 
-        # Toggles
+
+        elif action == action_click_thr:
+            self._click_through = not getattr(self, "_click_through", False)
+            self.update_window_properties()
+        elif action == action_aot:
+            self._always_on_top = not getattr(self, "_always_on_top", True)
+            self.update_window_properties()
+
         elif action == action_eye and ref:
             if ref._eye_tracker_timer.isActive():
                 ref._eye_tracker_timer.stop()
-                logger.info("Eye tracking disabled")
             else:
                 ref._eye_tracker_timer.start(ref._eye_update_interval)
-                logger.info("Eye tracking enabled")
         elif action == action_react and ref:
-            ref._active_window_reactions_enabled = not ref._active_window_reactions_enabled
-            logger.info(f"Window reactions: {ref._active_window_reactions_enabled}")
- 
-        # Proactive interval
-        elif action == action_15min and ref:
-            ref._proactive_min_interval = 10 * 60 * 1000
-            ref._proactive_max_interval = 20 * 60 * 1000
-        elif action == action_30min and ref:
-            ref._proactive_min_interval = 20 * 60 * 1000
-            ref._proactive_max_interval = 40 * 60 * 1000
-        elif action == action_60min and ref:
-            ref._proactive_min_interval = 40 * 60 * 1000
-            ref._proactive_max_interval = 80 * 60 * 1000
- 
-        # Sleep threshold
+            if hasattr(ref, "soul_companion"):
+                ref.soul_companion.set_enabled(not ref.soul_companion._enabled)
+
+        elif action == action_sub:
+            self._subtitles_enabled = not getattr(self, "_subtitles_enabled", True)
+            if not self._subtitles_enabled and hasattr(self, "subtitle_overlay"):
+                self.subtitle_overlay.clear_subtitles()
+
+        # Proactive Interval
+        elif action == action_3min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(3 * 60)
+        elif action == action_5min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(5 * 60)
+        elif action == action_10min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(10 * 60)
+        elif action == action_15min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(15 * 60)
+        elif action == action_30min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(30 * 60)
+        elif action == action_60min and ref and hasattr(ref, "soul_companion"):
+            ref.soul_companion.set_heartbeat_interval(60 * 60)
+
+        # Sleep
         elif action == action_sleep_3min  and ref: ref._sleep_threshold_ms = 3  * 60 * 1000
         elif action == action_sleep_5min  and ref: ref._sleep_threshold_ms = 5  * 60 * 1000
         elif action == action_sleep_10min and ref: ref._sleep_threshold_ms = 10 * 60 * 1000
- 
-        # Tracking speed
+
+        # Speed
         elif action == action_speed_slow and ref: ref._set_tracking_speed("Slow")
         elif action == action_speed_norm and ref: ref._set_tracking_speed("Normal")
         elif action == action_speed_fast and ref: ref._set_tracking_speed("Fast")
- 
-        # Model size
+
+        # Sizes
         elif action == action_size_small:
             self.resize(200, 300)
         elif action == action_size_medium:
             self.resize(400, 600)
         elif action == action_size_large:
             self.resize(600, 900)
- 
+
+        elif action == action_hud:
+            self.show_hormones_hud()
+
         # Position
         elif action == action_center:
             screen = QGuiApplication.primaryScreen().geometry()
@@ -4316,3 +3838,372 @@ class VRMWidget_NoGUI(QWidget):
                 self.server_thread.stop()
         except Exception as e:
             logger.error(f"Error stopping server in bg: {e}")
+
+class CompanionSubtitleOverlay(QWidget):
+    FONT_MAX_PX    = 40
+    FONT_MIN_PX    = 18
+    PADDING_X      = 22
+    PADDING_Y      = 10
+    BOTTOM_MARGIN  = 70
+    MAX_LINES      = 3
+    FADE_IN_MS     = 85
+    FADE_OUT_MS    = 380
+    MIN_INTERVAL   = 80
+    MAX_INTERVAL   = 700
+ 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setStyleSheet("background: transparent; border: none;")
+
+        self._full_text    : str   = ""
+        self._words        : list  = []
+        self._revealed_idx : int   = 0
+        self._opacity      : float = 0.0
+
+        self._reveal_timer = QtCore.QTimer(self)
+        self._reveal_timer.timeout.connect(self._reveal_next)
+ 
+        self._hide_timer = QtCore.QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.timeout.connect(self._start_fade_out)
+ 
+        self._fade_anim = None
+
+        self._font = QFont()
+        self._font.setFamily("Comfortaa")
+        self._font.setStyleHint(QFont.StyleHint.SansSerif)
+        self._font.setWeight(QFont.Weight.Bold)
+        self._font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        self._font_px = self.FONT_MAX_PX
+        self._font.setPixelSize(self._font_px)
+ 
+        self.hide()
+
+    @QtCore.pyqtProperty(float)
+    def opacity(self) -> float:
+        return self._opacity
+ 
+    @opacity.setter
+    def opacity(self, val: float):
+        self._opacity = max(0.0, min(1.0, float(val)))
+        self.update()
+
+    def _calculate_word_delay(self, word: str) -> int:
+        clean_word = re.sub(r"[^\wа-яА-Яa-zA-Z]", "", word)
+        
+        char_time = len(clean_word) * 45
+        
+        base_gap = 100
+        
+        total_delay = char_time + base_gap
+        
+        if "," in word or ";" in word or ":" in word or "—" in word:
+            total_delay += 200
+        if "." in word or "!" in word or "?" in word:
+            total_delay += 450
+
+        return max(self.MIN_INTERVAL, min(self.MAX_INTERVAL, total_delay))
+ 
+    def show_text(self, text: str, tts_duration_ms: int = 5000):
+        text = text.strip()
+        if not text:
+            self.clear_subtitles()
+            return
+ 
+        self._stop_all()
+ 
+        self._full_text    = text
+        self._words        = text.split()
+        self._revealed_idx = 0
+        self._opacity      = 0.0
+ 
+        if not self._words:
+            return
+
+        self._font_px = self._calc_font_px(text)
+        self._font.setPixelSize(self._font_px)
+
+        self._reposition()
+ 
+        self.show()
+        self.raise_()
+
+        self._reveal_next()
+        
+        first_interval = self._calculate_word_delay(self._words[0])
+        self._reveal_timer.start(first_interval)
+
+        self._hide_timer.start(tts_duration_ms + 1500)
+ 
+    def on_speech_ended(self):
+        if not self._full_text:
+            return
+
+        if self._revealed_idx < len(self._words):
+            self._reveal_timer.stop()
+            self._revealed_idx = len(self._words)
+            self.update()
+
+        self._hide_timer.stop()
+        self._hide_timer.start(1200)
+ 
+    def clear_subtitles(self):
+        self._stop_all()
+        self._full_text    = ""
+        self._words        = []
+        self._revealed_idx = 0
+        self._opacity      = 0.0
+        self.hide()
+        self.update()
+ 
+    def _revealed_text(self) -> str:
+        return " ".join(self._words[:self._revealed_idx])
+ 
+    def _reveal_next(self):
+        if self._revealed_idx >= len(self._words):
+            self._reveal_timer.stop()
+            return
+        
+        self._revealed_idx += 1
+        if self._opacity < 1.0:
+            self._animate_opacity(self._opacity, 1.0, self.FADE_IN_MS)
+        self.update()
+
+        if self._revealed_idx < len(self._words):
+            next_word = self._words[self._revealed_idx]
+            next_interval = self._calculate_word_delay(next_word)
+            self._reveal_timer.setInterval(next_interval)
+ 
+    def _start_fade_out(self):
+        self._reveal_timer.stop()
+        self._animate_opacity(
+            self._opacity, 0.0, self.FADE_OUT_MS,
+            on_finish=self._on_fade_done
+        )
+ 
+    def _on_fade_done(self):
+        if self._opacity <= 0.02:
+            self.clear_subtitles()
+ 
+    def _animate_opacity(self, start: float, end: float, dur_ms: int,
+                         on_finish=None):
+        if self._fade_anim is not None:
+            try:
+                self._fade_anim.stop()
+            except Exception:
+                pass
+            self._fade_anim = None
+ 
+        anim = QtCore.QPropertyAnimation(self, b"opacity", self)
+        anim.setDuration(dur_ms)
+        anim.setStartValue(float(start))
+        anim.setEndValue(float(end))
+        anim.setEasingCurve(QtCore.QEasingCurve.Type.OutCubic)
+        if on_finish:
+            anim.finished.connect(on_finish)
+        anim.start()
+        self._fade_anim = anim
+ 
+    def _stop_all(self):
+        if self._fade_anim is not None:
+            try:
+                self._fade_anim.stop()
+            except Exception:
+                pass
+            self._fade_anim = None
+        self._reveal_timer.stop()
+        self._hide_timer.stop()
+ 
+    def _get_available_width(self) -> int:
+        w = self.width()
+        if w <= 0:
+            p = self.parent()
+            if p:
+                w = p.width() - 30
+            else:
+                w = 370
+        return max(w - self.PADDING_X * 2, 80)
+ 
+    def _calc_font_px(self, text: str) -> int:
+        avail_w = self._get_available_width()
+        for px in range(self.FONT_MAX_PX, self.FONT_MIN_PX - 1, -1):
+            f = QFont(self._font)
+            f.setPixelSize(px)
+            fm = QtGui.QFontMetrics(f)
+            br = fm.boundingRect(
+                0, 0, avail_w, 100000,
+                int(Qt.AlignmentFlag.AlignHCenter) | int(Qt.TextFlag.TextWordWrap),
+                text
+            )
+            if br.height() <= fm.height() * self.MAX_LINES + 4:
+                return px
+        return self.FONT_MIN_PX
+ 
+    def _calc_needed_height(self, text: str) -> int:
+        avail_w = self._get_available_width()
+        f = QFont(self._font)
+        f.setPixelSize(self._font_px)
+        fm = QtGui.QFontMetrics(f)
+        br = fm.boundingRect(
+            0, 0, avail_w, 100000,
+            int(Qt.AlignmentFlag.AlignHCenter) | int(Qt.TextFlag.TextWordWrap),
+            text
+        )
+        return br.height() + self.PADDING_Y * 2
+ 
+    def _reposition(self):
+        parent = self.parent()
+        if not parent:
+            return
+ 
+        pw = parent.width()
+        ph = parent.height()
+ 
+        slot_w = max(pw - 30, 60)
+        slot_x = 15
+
+        self.resize(slot_w, self.height() if self.height() > 0 else 80)
+ 
+        if self._full_text:
+            self._font_px = self._calc_font_px(self._full_text)
+            self._font.setPixelSize(self._font_px)
+            needed_h = max(self._calc_needed_height(self._full_text), 36)
+        else:
+            needed_h = 80
+ 
+        new_y = ph - needed_h - self.BOTTOM_MARGIN
+        self.setGeometry(slot_x, new_y, slot_w, needed_h)
+ 
+    def paintEvent(self, event):
+        text = self._revealed_text()
+        if not text or self._opacity <= 0.01:
+            return
+ 
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+ 
+        alpha = int(self._opacity * 255)
+        rect  = self.rect().adjusted(
+            self.PADDING_X, self.PADDING_Y,
+            -self.PADDING_X, -self.PADDING_Y
+        )
+        flags = (
+            int(Qt.AlignmentFlag.AlignHCenter) |
+            int(Qt.AlignmentFlag.AlignVCenter) |
+            int(Qt.TextFlag.TextWordWrap)
+        )
+ 
+        painter.setFont(self._font)
+ 
+        os_ = max(2, self._font_px // 10)
+        oc  = QColor(0, 0, 0, int(alpha * 0.93))
+        painter.setPen(oc)
+        for dx, dy in [
+            (-os_, -os_), (0, -os_), (os_, -os_),
+            (-os_,    0),            (os_,    0),
+            (-os_,  os_), (0,  os_), (os_,  os_),
+            (-os_,  0  ), (os_,  0  ),
+            (0,    -os_), (0,    os_),
+        ]:
+            painter.drawText(rect.translated(dx, dy), flags, text)
+ 
+        painter.setPen(QColor(255, 255, 255, alpha))
+        painter.drawText(rect, flags, text)
+
+class HormonesHUDOverlay(QtWidgets.QFrame):
+    """
+    Transient HUD overlay to display current hormones.
+    """
+    def __init__(self, parent, hormones_dict):
+        super().__init__(parent)
+        self.setWindowFlags(QtCore.Qt.WindowType.SubWindow | QtCore.Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        
+        self.setStyleSheet("""
+            QFrame {
+                background-color: rgba(20, 20, 25, 0.45);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+            }
+            QLabel {
+                color: #E5E5EA;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                font-weight: bold;
+                font-size: 11px;
+                border: none;
+                background: transparent;
+            }
+            QProgressBar {
+                border: 1px solid rgba(255, 255, 255, 15);
+                border-radius: 5px;
+                background-color: rgba(255, 255, 255, 10);
+                text-align: right;
+                color: transparent;
+                height: 10px;
+            }
+            QProgressBar::chunk {
+                border-radius: 4px;
+            }
+        """)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(6)
+        
+        title_lbl = QtWidgets.QLabel("🧪 Endocrine Balance")
+        title_lbl.setStyleSheet("font-size: 13px; color: #FFFFFF; font-weight: bold; margin-bottom: 4px;")
+        layout.addWidget(title_lbl)
+        
+        bars_info = [
+            ("🧪 Oxytocin (Love)", "oxytocin", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #ff758c, stop:1 #ff7eb3)"),
+            ("⚡ Dopamine (Interest)", "dopamine", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #4facfe, stop:1 #00f2fe)"),
+            ("🔥 Cortisol (Stress)", "cortisol", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #ff0844, stop:1 #ffb199)"),
+            ("🔋 Energy (Vigor)", "energy", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #43e97b, stop:1 #38f9d7)"),
+        ]
+        
+        for label_text, key, chunk_style in bars_info:
+            val = hormones_dict.get(key, 0.5)
+            pct = int(max(0, min(1, val)) * 100)
+            
+            lbl = QtWidgets.QLabel(f"{label_text}: {pct}%")
+            bar = QtWidgets.QProgressBar()
+            bar.setRange(0, 100)
+            bar.setValue(pct)
+            bar.setStyleSheet(f"QProgressBar::chunk {{ background: {chunk_style}; }}")
+            
+            layout.addWidget(lbl)
+            layout.addWidget(bar)
+            
+        self.adjustSize()
+        
+        self._opacity = 0.0
+        self._opacity_anim = QtCore.QPropertyAnimation(self, b"windowOpacity", self)
+        self._opacity_anim.setDuration(300)
+        self._opacity_anim.setStartValue(0.0)
+        self._opacity_anim.setEndValue(0.96)
+        self._opacity_anim.start()
+        
+        self._timer = QtCore.QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._start_fade_out)
+        self._timer.start(5000)
+
+    def _start_fade_out(self):
+        self._opacity_anim.stop()
+        self._opacity_anim.setDuration(400)
+        self._opacity_anim.setStartValue(self._opacity)
+        self._opacity_anim.setEndValue(0.0)
+        self._opacity_anim.finished.connect(self.deleteLater)
+        self._opacity_anim.start()
+        
+    @QtCore.pyqtProperty(float)
+    def windowOpacity(self) -> float:
+        return self._opacity
+        
+    @windowOpacity.setter
+    def windowOpacity(self, value):
+        self._opacity = value
+        self.setWindowOpacity(value)
