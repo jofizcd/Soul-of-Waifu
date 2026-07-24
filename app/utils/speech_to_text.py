@@ -1,24 +1,15 @@
 import os
-import io
 import sys
-import json
 import torch
 import time
 import pyaudio
-import audioop
-import asyncio
 import logging
-import wave
 import numpy as np
-import soundfile as sf
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from faster_whisper import WhisperModel
-from io import BytesIO
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from app.configuration.configuration import ConfigurationAPI, ConfigurationCharacters, ConfigurationSettings
 
 logger = logging.getLogger("Speech-To-Text Module")
 
@@ -36,7 +27,7 @@ class AudioInputWorker(QThread):
         self.SAMPLE_RATE = 16000
         self.CHUNK_SIZE = 512
         
-        logger.info("⏳ Loading Silero VAD model...")
+        logger.info("Loading Silero VAD model...")
         try:
             silero_local_path = os.path.join(os.getcwd(), "app", "utils", "speech-to-text", "silero-vad")
 
@@ -51,9 +42,9 @@ class AudioInputWorker(QThread):
                                                    force_reload=False,
                                                    trust_repo=True)
             self.get_speech_timestamps, _, _, _, _ = utils
-            logger.info("✅ Silero VAD Loaded successfully!")
+            logger.info("Silero VAD Loaded successfully!")
         except Exception as e:
-            logger.error(f"❌ Error loading Silero VAD: {e}")
+            logger.error(f"Error loading Silero VAD: {e}")
             self.model = None
 
         self.frames = []
@@ -61,23 +52,26 @@ class AudioInputWorker(QThread):
         self.voice_threshold = 0.5
 
     def run(self):
-        logger.info("🚀 Audio Worker Thread Started")
+        logger.info("Audio Worker Thread Started")
         p = pyaudio.PyAudio()
 
-        info = p.get_host_api_info_by_index(0)
-        numdevices = info.get('deviceCount')
-        logger.info(f"🎧 Found {numdevices} audio devices:")
+        numdevices = p.get_device_count()
+        logger.info(f"Found {numdevices} audio devices total:")
         found_device = False
         
         for i in range(0, numdevices):
-            if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
-                name = p.get_device_info_by_host_api_device_index(0, i).get('name')
-                logger.info(f"   Device ID {i}: {name}")
-                if self.input_device_index == i:
-                    found_device = True
+            try:
+                device_info = p.get_device_info_by_index(i)
+                if device_info.get('maxInputChannels') > 0:
+                    name = device_info.get('name')
+                    logger.info(f"   Device ID {i}: {name}")
+                    if self.input_device_index == i:
+                        found_device = True
+            except Exception:
+                continue
 
         if self.input_device_index is not None and not found_device:
-            logger.warning(f"⚠️ Device ID {self.input_device_index} not found. Using Default.")
+            logger.warning(f"Device ID {self.input_device_index} not found. Using Default.")
             self.input_device_index = None
 
         stream = None
@@ -88,9 +82,10 @@ class AudioInputWorker(QThread):
                             input=True,
                             input_device_index=self.input_device_index,
                             frames_per_buffer=self.CHUNK_SIZE)
-            logger.info("🎙️ Microphone stream opened successfully!")
+            logger.info(f"Microphone stream opened successfully! (Device ID: {self.input_device_index if self.input_device_index is not None else 'Default'})")
         except Exception as e:
-            logger.error(f"❌ Failed to open microphone: {e}")
+            logger.error(f"Failed to open microphone: {e}")
+            p.terminate()
             return
 
         speaking = False
@@ -117,7 +112,7 @@ class AudioInputWorker(QThread):
                     if not speaking:
                         speaking = True
                         self.voice_detected_signal.emit()
-                        logger.info("🗣️ User started speaking")
+                        logger.info("User started speaking")
                     
                     silence_chunks = 0
                     self.frames.append(data)
@@ -130,7 +125,7 @@ class AudioInputWorker(QThread):
                         if silence_chunks > self.silence_threshold:
                             speaking = False
                             self.silence_detected_signal.emit()
-                            logger.info(f"🤫 User stopped. Sending {len(self.frames)} frames.")
+                            logger.info(f"User stopped. Sending {len(self.frames)} frames.")
                             
                             full_audio = b''.join(self.frames)
                             self.audio_packet_ready.emit(full_audio)
@@ -139,15 +134,15 @@ class AudioInputWorker(QThread):
                             silence_chunks = 0
             
             except Exception as e:
-                logger.error(f"⚠️ Error in audio loop: {e}")
+                logger.error(f"Error in audio loop: {e}")
                 break
 
-        logger.info("🛑 Stopping Audio Stream...")
+        logger.info("Stopping Audio Stream...")
         if stream:
             stream.stop_stream()
             stream.close()
         p.terminate()
-        logger.info("✅ Audio Worker Stopped cleanly")
+        logger.info("Audio Worker Stopped cleanly")
 
     def stop(self):
         self.is_running = False
@@ -170,21 +165,21 @@ class STTWorker(QThread):
 
     def load_model(self):
         if self.model is None:
-            logger.info(f"⏳ Loading Faster-Whisper ({self.model_size}) on {self.device}...")
+            logger.info(f"Loading Faster-Whisper ({self.model_size}) on {self.device}...")
 
             try:
                 self.model = WhisperModel(self.model_size, device=self.device, compute_type=self.compute_type)
 
-                logger.info("✅ Faster-Whisper Loaded!")
+                logger.info("Faster-Whisper Loaded!")
                 self.status_signal.emit("Model Loaded")
             except Exception as e:
-                logger.error(f"❌ Error loading Whisper (Switching to CPU): {e}")
+                logger.error(f"Error loading Whisper (Switching to CPU): {e}")
                 self.device = "cpu"
                 self.compute_type = "int8"
                 
                 self.model = WhisperModel(self.model_size, device="cpu", compute_type="int8")
                     
-                logger.info("✅ Faster-Whisper Loaded on CPU!")
+                logger.info("Faster-Whisper Loaded on CPU!")
 
     def add_audio(self, audio_bytes):
         self.queue.append(audio_bytes)
@@ -192,7 +187,7 @@ class STTWorker(QThread):
     def run(self):
         self.load_model()
         
-        logger.info("🚀 STT Loop Started")
+        logger.info("STT Loop Started")
         
         while self.is_running:
             if len(self.queue) > 0:
@@ -210,7 +205,7 @@ class STTWorker(QThread):
                     hallucinations = [
                         "субтитры создавал", "редактор субтитров", "спасибо за просмотр", 
                         "подписывайтесь на канал", "продолжение следует", 
-                        "субтитры", "а. семенов", "перевод", "озвучка",
+                        "субтитры", "а. семенов", "перевод", "озвучка", "Thank you."
                         
                         "ВЕСЕЛАЯ МУЗЫКА", "СПОКОЙНАЯ МУЗЫКА", "ГРУСТНАЯ МЕЛОДИЯ", 
                         "ЛИРИЧЕСКАЯ МУЗЫКА", "ДИНАМИЧНАЯ МУЗЫКА", "ТАИНСТВЕННАЯ МУЗЫКА", 
@@ -251,18 +246,18 @@ class STTWorker(QThread):
                     is_hallucination = any(h in full_text.lower() for h in hallucinations)
 
                     if full_text and not is_hallucination and len(full_text) > 2:
-                        logger.info(f"📝 Text Recognized: {full_text}")
+                        logger.info(f"Text Recognized: {full_text}")
                         self.text_ready_signal.emit(full_text)
                     else:
                         logger.info("Empty audio fragment or hallucination ignored.")
                         
                 except Exception as e:
-                    logger.error(f"⚠️ STT Error: {e}")
+                    logger.error(f"STT Error: {e}")
             
             else:
                 self.msleep(50) 
         
-        logger.info("🛑 STT Worker Stopped")
+        logger.info("STT Worker Stopped")
 
     def stop(self):
         logger.info("Signaling Audio Worker to stop...")
