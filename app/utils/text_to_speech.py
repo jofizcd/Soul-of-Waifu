@@ -33,11 +33,13 @@ except ImportError:
 
 logger = logging.getLogger("Text-To-Speech Module")
 
-os.environ["HF_HOME"] = r"D:\Soul-of-Waifu-dev\app\models\hf_cache"
-os.environ["HUGGINGFACE_HUB_CACHE"] = r"D:\Soul-of-Waifu-dev\app\models\hf_cache"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CACHE_DIR = os.path.join(BASE_DIR, "app", "models", "hf_cache")
 
-custom_cache = r"D:\Soul-of-Waifu-dev\app\models\hf_cache"
-os.makedirs(custom_cache, exist_ok=True)
+os.environ["HF_HOME"] = CACHE_DIR
+os.environ["HUGGINGFACE_HUB_CACHE"] = CACHE_DIR
+
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 class ElevenLabs:
     def __init__(self):
