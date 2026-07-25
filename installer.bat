@@ -4,28 +4,6 @@ chcp 65001 >nul
 title Soul of Waifu v2.4.0 Installer
 color 0A
 
-net session >nul 2>&1
-if %errorlevel% == 0 (
-    echo =======================================================================
-    echo INSTALLATION ERROR: RUNNING AS ADMINISTRATOR DETECTED!
-    echo =======================================================================
-    echo.
-    echo This installer must NOT be run with Administrator privileges.
-    echo.
-    echo Why this is restricted:
-    echo 1. It creates folders and files with elevated permissions. Soul of Waifu
-    echo    will not be able to read or modify them under your normal user account.
-    echo 2. It can corrupt Miniconda paths and environment variables.
-    echo.
-    echo WHAT TO DO:
-    echo Close this window and run the script by simply double-clicking it.
-    echo Do NOT right-click and choose "Run as administrator".
-    echo.
-    echo =======================================================================
-    pause
-    exit /b 1
-)
-
 cd /d "%~dp0"
 
 echo Welcome to Soul of Waifu v2.4.0 Installer
