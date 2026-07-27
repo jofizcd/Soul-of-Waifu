@@ -452,20 +452,10 @@ class CharacterCardCharactersGateway(QtWidgets.QFrame):
         self.shadow_effect.setOffset(0, 5)
         self.setGraphicsEffect(self.shadow_effect)
 
-        self._hover_scale = 1.0
-        self.anim_scale = QtCore.QPropertyAnimation(self, b"hover_scale")
-        self.anim_scale.setDuration(350)
-        self.anim_scale.setEasingCurve(QtCore.QEasingCurve.Type.InOutCubic)
-
-        self._darkness_alpha = 100.0
-        self.anim_dark = QtCore.QPropertyAnimation(self, b"darkness_alpha")
-        self.anim_dark.setDuration(350)
-        self.anim_dark.setEasingCurve(QtCore.QEasingCurve.Type.InOutCubic)
-
-        self._info_alpha = 255.0
-        self.anim_info = QtCore.QPropertyAnimation(self, b"info_alpha")
-        self.anim_info.setDuration(300)
-        self.anim_info.setEasingCurve(QtCore.QEasingCurve.Type.InOutCubic)
+        self._hover_progress = 0.0
+        self.hover_anim = QtCore.QPropertyAnimation(self, b"hover_progress")
+        self.hover_anim.setDuration(350)
+        self.hover_anim.setEasingCurve(QtCore.QEasingCurve.Type.InOutCubic)
         
         self.action_panel = QtWidgets.QFrame(self)
         self.action_panel.setStyleSheet("background-color: rgba(20, 20, 22, 0.9); border-radius: 20px;")
@@ -479,41 +469,19 @@ class CharacterCardCharactersGateway(QtWidgets.QFrame):
         self.panel_anim.setEasingCurve(QtCore.QEasingCurve.Type.OutCubic)
 
     @QtCore.pyqtProperty(float)
-    def hover_scale(self):
-        return self._hover_scale
+    def hover_progress(self):
+        return self._hover_progress
 
-    @hover_scale.setter
-    def hover_scale(self, value):
-        self._hover_scale = value
-        self.update()
-
-    @QtCore.pyqtProperty(float)
-    def darkness_alpha(self):
-        return self._darkness_alpha
-
-    @darkness_alpha.setter
-    def darkness_alpha(self, value):
-        self._darkness_alpha = value
-        self.update()
-
-    @QtCore.pyqtProperty(float)
-    def info_alpha(self):
-        return self._info_alpha
-
-    @info_alpha.setter
-    def info_alpha(self, value):
-        self._info_alpha = value
+    @hover_progress.setter
+    def hover_progress(self, value):
+        self._hover_progress = value
         self.update()
 
     def enterEvent(self, event):
-        self.anim_scale.setEndValue(1.05)
-        self.anim_dark.setEndValue(0.0)
-        self.anim_info.setEndValue(0.0)
+        self.hover_anim.setEndValue(1.0)
         self.panel_anim.setEndValue(QtCore.QPoint(10, 220))
         
-        self.anim_scale.start()
-        self.anim_dark.start()
-        self.anim_info.start()
+        self.hover_anim.start()
         self.panel_anim.start()
         
         self.shadow_effect.setOffset(0, 8)
@@ -521,14 +489,10 @@ class CharacterCardCharactersGateway(QtWidgets.QFrame):
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self.anim_scale.setEndValue(1.0)
-        self.anim_dark.setEndValue(100.0)
-        self.anim_info.setEndValue(255.0)
+        self.hover_anim.setEndValue(0.0)
         self.panel_anim.setEndValue(QtCore.QPoint(10, 280))
         
-        self.anim_scale.start()
-        self.anim_dark.start()
-        self.anim_info.start()
+        self.hover_anim.start()
         self.panel_anim.start()
         
         self.shadow_effect.setOffset(0, 5)
@@ -548,22 +512,24 @@ class CharacterCardCharactersGateway(QtWidgets.QFrame):
 
         painter.save()
         scale_factor = max(rect.width() / self.pixmap.width(), rect.height() / self.pixmap.height())
-        final_scale = scale_factor * self._hover_scale
+        final_scale = scale_factor * (1.0 + self._hover_progress * 0.05)
         painter.translate(rect.center())
         painter.scale(final_scale, final_scale)
         painter.drawPixmap(-self.pixmap.width() // 2, -self.pixmap.height() // 2, self.pixmap)
         painter.restore()
 
-        if self._darkness_alpha > 0:
-            painter.fillRect(rect, QtGui.QColor(0, 0, 0, int(self._darkness_alpha)))
+        darkness_alpha = int(100 * (1.0 - self._hover_progress))
+        if darkness_alpha > 0:
+            painter.fillRect(rect, QtGui.QColor(0, 0, 0, darkness_alpha))
 
-        if self._info_alpha > 0:
+        info_alpha = int(255 * (1.0 - self._hover_progress))
+        if info_alpha > 0:
             gradient = QtGui.QLinearGradient(0, rect.height() * 0.4, 0, rect.height())
             gradient.setColorAt(0, QtGui.QColor(0, 0, 0, 0))
-            gradient.setColorAt(1, QtGui.QColor(0, 0, 0, int(min(220, self._info_alpha))))
+            gradient.setColorAt(1, QtGui.QColor(0, 0, 0, min(220, info_alpha)))
             painter.fillRect(rect, QtGui.QBrush(gradient))
 
-            painter.setPen(QtGui.QColor(255, 255, 255, int(self._info_alpha)))
+            painter.setPen(QtGui.QColor(255, 255, 255, info_alpha))
             font = QtGui.QFont("Inter Tight SemiBold", 13, QtGui.QFont.Weight.Bold)
             painter.setFont(font)
             
@@ -579,24 +545,24 @@ class CharacterCardCharactersGateway(QtWidgets.QFrame):
             painter.setFont(QtGui.QFont("Inter Tight SemiBold", 9))
             
             if hasattr(self, 'likes') and self.likes is not None:
-                painter.setPen(QtGui.QColor(230, 41, 41, int(self._info_alpha)))
+                painter.setPen(QtGui.QColor(230, 41, 41, info_alpha))
                 lk_text = f"\u2764 {self.likes}"
                 painter.drawText(stats_x, stats_y, lk_text)
                 stats_x += painter.fontMetrics().horizontalAdvance(lk_text) + 10
 
             if hasattr(self, 'downloads') and self.downloads is not None:
-                painter.setPen(QtGui.QColor(104, 128, 186, int(self._info_alpha)))
+                painter.setPen(QtGui.QColor(104, 128, 186, info_alpha))
                 dl_text = f"\ud83d\udcbe {self.downloads}"
                 painter.drawText(stats_x, stats_y, dl_text)
                 stats_x += painter.fontMetrics().horizontalAdvance(dl_text) + 10
 
             if hasattr(self, 'total_tokens') and self.total_tokens is not None:
-                painter.setPen(QtGui.QColor(104, 128, 186, int(self._info_alpha)))
+                painter.setPen(QtGui.QColor(104, 128, 186, info_alpha))
                 tk_text = f"\u2699 {self.total_tokens}"
                 painter.drawText(stats_x, stats_y, tk_text)
             
             if self.character_author:
-                painter.setPen(QtGui.QColor(104, 128, 186, int(self._info_alpha)))
+                painter.setPen(QtGui.QColor(104, 128, 186, info_alpha))
                 dl_text = f"✒️ {self.character_author}"
                 painter.drawText(stats_x, stats_y, dl_text)
                 stats_x += painter.fontMetrics().horizontalAdvance(dl_text) + 10
