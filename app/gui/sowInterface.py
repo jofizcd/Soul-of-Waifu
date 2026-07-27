@@ -935,6 +935,24 @@ class Ui_MainWindow(object):
         self.provider_group.buttons()[0].setChecked(True)
         
         layout_gen.addLayout(grid_providers)
+
+        self.label_character_provider_status = QtWidgets.QLabel()
+        self.label_character_provider_status.setFont(font_input)
+        self.label_character_provider_status.setStyleSheet(f"color: {self._TEXT_S}; background: transparent; border: none;")
+        layout_gen.addWidget(self.label_character_provider_status)
+
+        self.character_model_override_label = QtWidgets.QLabel("Model override (optional)")
+        self.character_model_override_label.setFont(font_label)
+        self.character_model_override_label.setStyleSheet(f"color: {self._TEXT_S}; background: transparent; border: none;")
+        self.comboBox_character_model_override = QtWidgets.QComboBox()
+        self.comboBox_character_model_override.setEditable(True)
+        self.comboBox_character_model_override.setFont(font_input)
+        self.comboBox_character_model_override.setFixedHeight(40)
+        self.comboBox_character_model_override.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.NoInsert)
+        self.comboBox_character_model_override.addItem("Use provider default", "")
+        self.comboBox_character_model_override.lineEdit().setPlaceholderText("Use provider default")
+        layout_gen.addWidget(self.character_model_override_label)
+        layout_gen.addWidget(self.comboBox_character_model_override)
         layout_gen.addSpacing(10)
 
         row_avatar_name = QtWidgets.QHBoxLayout()
@@ -2044,6 +2062,10 @@ class Ui_MainWindow(object):
         self.comboBox_conversation_method.setObjectName("comboBox_conversation_method")
         
         form_method.addRow(self.conversation_method_options_label, self.comboBox_conversation_method)
+        self.label_provider_verification = QtWidgets.QLabel()
+        self.label_provider_verification.setFont(font_input)
+        self.label_provider_verification.setWordWrap(True)
+        form_method.addRow("", self.label_provider_verification)
         l_method.addLayout(form_method)
         conf_layout.addWidget(card_method)
 

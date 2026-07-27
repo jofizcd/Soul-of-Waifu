@@ -232,7 +232,7 @@ class ConfigurationCharacters():
         with open(self.characters_path, 'w', encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
 
-    def save_character_card(self, character_name, character_title, character_avatar, character_description, character_personality, first_message, scenario, example_messages, alternate_greetings, selected_persona, selected_system_prompt_preset, selected_lorebook, elevenlabs_voice_id, voice_type, rvc_enabled, rvc_file, expression_images_folder, live2d_model_folder, vrm_model_file, conversation_method):
+    def save_character_card(self, character_name, character_title, character_avatar, character_description, character_personality, first_message, scenario, example_messages, alternate_greetings, selected_persona, selected_system_prompt_preset, selected_lorebook, elevenlabs_voice_id, voice_type, rvc_enabled, rvc_file, expression_images_folder, live2d_model_folder, vrm_model_file, conversation_method, model_override=None):
         """
         Saves or updates a character's card information in the configuration.
         
@@ -328,6 +328,7 @@ class ConfigurationCharacters():
             "live2d_model_folder": live2d_model_folder,
             "vrm_model_file": vrm_model_file,
             "conversation_method": conversation_method,
+            "model_override": model_override or None,
             "character_information": character_information,
             "current_chat": "default",
             "chats": {

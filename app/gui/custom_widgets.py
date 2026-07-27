@@ -8140,7 +8140,7 @@ class SummaryEditorDialog(QDialog):
             generation_successful = False
 
             try:
-                provider = AIFactory.get_provider(self.conversation_method)
+                provider = AIFactory.get_provider(self.conversation_method, char_data_root.get("model_override"))
                 if not provider:
                     logger.error(f"Cannot perform auto-summary: Provider '{self.conversation_method}' not found.")
                     return

@@ -895,7 +895,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 self.character_name, user_name, user_description, context_messages, user_text
             )
 
-            provider = AIFactory.get_provider(conversation_method)
+            provider = AIFactory.get_provider(conversation_method, char_info.get("model_override"))
             if not provider:
                 raise ValueError(f"Unknown method: {conversation_method}")
 

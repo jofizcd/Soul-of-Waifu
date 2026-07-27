@@ -15,7 +15,7 @@ logger = logging.getLogger("AI Factory")
 
 class AIFactory:
     @staticmethod
-    def get_provider(conversation_method: str):
+    def get_provider(conversation_method: str, model_override: str = None):
         """
         Factory method to instantiate the appropriate AI provider.
         """
@@ -24,7 +24,7 @@ class AIFactory:
 
         if conversation_method == "Open AI":
             api_key = config_api.get_token("OPEN_AI_API_TOKEN")
-            model = config_settings.get_main_setting("openai_model") or "gpt-4o-mini"
+            model = model_override or config_settings.get_main_setting("openai_model") or "gpt-4o-mini"
             base_url = config_api.get_token("CUSTOM_ENDPOINT_URL")
             if base_url and base_url.strip():
                 base_url = base_url.strip().rstrip('/')
@@ -37,44 +37,44 @@ class AIFactory:
 
         elif conversation_method == "OpenRouter":
             api_key = config_api.get_token("OPENROUTER_API_TOKEN")
-            model = config_settings.get_main_setting("openrouter_model")
+            model = model_override or config_settings.get_main_setting("openrouter_model")
             base_url = "https://openrouter.ai/api/v1"
 
             return OpenRouterProvider(api_key=api_key, model=model, base_url=base_url)
 
         elif conversation_method == "Mistral AI":
             api_key = config_api.get_token("MISTRAL_AI_API_TOKEN")
-            model = config_settings.get_main_setting("mistral_model_endpoint") or "mistral-small-latest"
+            model = model_override or config_settings.get_main_setting("mistral_model_endpoint") or "mistral-small-latest"
             return MistralProvider(api_key=api_key, model=model)
 
         elif conversation_method == "Anthropic":
             api_key = config_api.get_token("ANTHROPIC_API_TOKEN")
-            model = config_settings.get_main_setting("anthropic_model") or "claude-sonnet-4-6"
+            model = model_override or config_settings.get_main_setting("anthropic_model") or "claude-sonnet-4-6"
             return AnthropicProvider(api_key=api_key, model=model)
 
         elif conversation_method == "Google Gemini":
             api_key = config_api.get_token("GEMINI_API_TOKEN")
-            model = config_settings.get_main_setting("gemini_model") or "gemini-3.5-flash"
+            model = model_override or config_settings.get_main_setting("gemini_model") or "gemini-3.5-flash"
             return GeminiProvider(api_key=api_key, model=model)
 
         elif conversation_method == "DeepSeek":
             api_key = config_api.get_token("DEEPSEEK_API_TOKEN")
-            model = config_settings.get_main_setting("deepseek_model") or "deepseek-v4-flash"
+            model = model_override or config_settings.get_main_setting("deepseek_model") or "deepseek-v4-flash"
             return DeepSeekProvider(api_key=api_key, model=model)
 
         elif conversation_method == "Grok":
             api_key = config_api.get_token("GROK_API_TOKEN")
-            model = config_settings.get_main_setting("grok_model") or "grok-4.3"
+            model = model_override or config_settings.get_main_setting("grok_model") or "grok-4.3"
             return GrokProvider(api_key=api_key, model=model)
 
         elif conversation_method == "Qwen":
             api_key = config_api.get_token("QWEN_API_TOKEN")
-            model = config_settings.get_main_setting("qwen_model") or "qwen3.5-flash"
+            model = model_override or config_settings.get_main_setting("qwen_model") or "qwen3.5-flash"
             return QwenProvider(api_key=api_key, model=model)
 
         elif conversation_method == "Z.AI":
             api_key = config_api.get_token("ZAI_API_TOKEN")
-            model = config_settings.get_main_setting("zai_model") or "glm-4.7"
+            model = model_override or config_settings.get_main_setting("zai_model") or "glm-4.7"
             return ZAIProvider(api_key=api_key, model=model)
 
         elif conversation_method == "Local LLM":

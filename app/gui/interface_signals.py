@@ -101,6 +101,7 @@ class InterfaceSignals():
         self.filtered_models = []
         self._openrouter_models_task = None
         self._model_test_task = None
+        self._editor_provider_value = None
 
         self.emotion_task = None
 
@@ -261,6 +262,7 @@ class InterfaceSignals():
         
         self._selected_lorebooks_building = []
         self._replace_lorebook_building_with_button()
+        QtCore.QTimer.singleShot(0, self.refresh_provider_verification_status)
 
     def _replace_lorebook_building_with_button(self):
         self.ui.comboBox_lorebook_building.hide()
@@ -1144,7 +1146,15 @@ class InterfaceSignals():
         """
         character_configuration = self.configuration_characters.load_configuration()
         character_list = character_configuration["character_list"]
-        conversation_method = self.configuration_settings.get_main_setting("conversation_method")
+        conversation_method = self._editor_provider_value or self.configuration_settings.get_main_setting("conversation_method")
+        if self._editing_character_name is None and not self._editor_provider_value:
+            sow_toast(
+                parent=self.main_window,
+                title="Character Settings",
+                text="Check a provider model in Configuration before creating a character.",
+                msg_type="error"
+            )
+            return None
         
         def handle_generic_ai(method_name):
             """
@@ -1210,6 +1220,7 @@ class InterfaceSignals():
                         "selected_lorebook": selected_lorebook,
                         "selected_lorebooks": selected_lorebooks,
                         "conversation_method": method_name,
+                        "model_override": self._editor_model_override() or None,
                         "sow_variables": sow_variables
                     })
 
@@ -1279,6 +1290,7 @@ class InterfaceSignals():
                         live2d_model_folder=None,
                         vrm_model_file=None,
                         conversation_method=method_name,
+                        model_override=self._editor_model_override(),
                         selected_lorebooks=selected_lorebooks,
                         sow_variables=sow_variables
                     )
@@ -2105,7 +2117,7 @@ class InterfaceSignals():
             clean_data = session.orchestrator._get_clean_character_data(char_name)
 
             async def stream_wrapper():
-                provider = AIFactory.get_provider(c_method)
+                provider = AIFactory.get_provider(c_method, c_info.get("model_override"))
                 if not provider:
                     raise ValueError(f"Provider not found for method: {c_method}")
 
@@ -2512,7 +2524,7 @@ class InterfaceSignals():
             clean_data = session.orchestrator._get_clean_character_data(char_name)
 
             async def stream_wrapper():
-                provider = AIFactory.get_provider(c_method)
+                provider = AIFactory.get_provider(c_method, c_info.get("model_override"))
                 if not provider:
                     raise ValueError(f"Provider not found for method: {c_method}")
 
@@ -4310,16 +4322,70 @@ class InterfaceSignals():
             self.ui.comboBox_lorebook_building.addItem(name)
         self.ui.comboBox_lorebook_building.setCurrentIndex(0)
 
-        self.configuration_settings.update_main_setting("conversation_method", "Local LLM")
-        
-        if hasattr(self, 'provider_group') and self.provider_group:
-            self.provider_group.buttons()[0].setChecked(True)
+        self._editor_provider_value = None
+        self.refresh_character_provider_options()
 
         QtCore.QTimer.singleShot(0, lambda: self.ui.stackedWidget.setCurrentWidget(self.ui.create_character_page))
 
     def _on_provider_card_clicked(self, button):
         val = button.property("provider_value")
+        self._editor_provider_value = val
         self.configuration_settings.update_main_setting("conversation_method", val)
+        self.refresh_character_model_options()
+
+    def refresh_character_provider_options(self, configured_provider=None):
+        if not hasattr(self.ui, "provider_group"):
+            return
+        local_model = self.configuration_settings.get_main_setting("local_llm")
+        available = []
+        for button in self.ui.provider_group.buttons():
+            provider = button.property("provider_value")
+            enabled = bool(local_model and os.path.exists(local_model)) if provider == "Local LLM" else self._is_provider_verified(provider)
+            button.setVisible(enabled)
+            if enabled:
+                available.append(provider)
+
+        current = configured_provider or self._editor_provider_value
+        if not configured_provider and current not in available:
+            current = available[0] if available else None
+        self._editor_provider_value = current
+        for button in self.ui.provider_group.buttons():
+            if button.property("provider_value") == current:
+                button.setChecked(True)
+                break
+
+        if configured_provider and configured_provider not in available:
+            status = f"Configured provider: {configured_provider} (not currently confirmed)"
+        elif current:
+            status = f"Configured provider: {current}"
+        else:
+            status = "No confirmed provider. Check a model in Configuration first."
+        self.ui.label_character_provider_status.setText(status)
+        self.refresh_character_model_options()
+
+    def refresh_character_model_options(self, model_override=None):
+        if not hasattr(self.ui, "comboBox_character_model_override"):
+            return
+        combo = self.ui.comboBox_character_model_override
+        override = model_override if model_override is not None else combo.currentText()
+        if override == "Use provider default":
+            override = ""
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("Use provider default", "")
+        if self._editor_provider_value == "OpenRouter":
+            for model in self.models:
+                combo.addItem(model["name"], model["id"])
+        index = combo.findData(override)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        else:
+            combo.setEditText(override)
+        combo.blockSignals(False)
+
+    def _editor_model_override(self):
+        value = self.ui.comboBox_character_model_override.currentText().strip()
+        return "" if value == "Use provider default" else value
     
     def _get_groups(self) -> dict:
         cfg = self.configuration_settings.load_configuration()
@@ -5084,6 +5150,7 @@ class InterfaceSignals():
     def on_comboBox_conversation_method_changed(self, text):
         self.configuration_settings.update_main_setting("conversation_method", text)
         self.update_local_llm_settings_visibility(text)
+        self.refresh_provider_verification_status()
         if text == "OpenRouter":
             self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_api_value", "Write API value"))
             self.initialize_openrouter_models()
@@ -5091,6 +5158,58 @@ class InterfaceSignals():
             self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_base_api", "Write API value (Optional)"))
         else:
             self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_api_value", "Write API value"))
+
+    _MODEL_SETTINGS = {
+        "Open AI": "openai_model", "OpenRouter": "openrouter_model",
+        "Mistral AI": "mistral_model_endpoint", "Anthropic": "anthropic_model",
+        "Google Gemini": "gemini_model", "DeepSeek": "deepseek_model",
+        "Grok": "grok_model", "Qwen": "qwen_model", "Z.AI": "zai_model",
+    }
+
+    def _provider_model(self, provider):
+        setting = self._MODEL_SETTINGS.get(provider)
+        return self.configuration_settings.get_main_setting(setting) if setting else None
+
+    def _verified_providers(self):
+        verified = self.configuration_settings.get_main_setting("verified_provider_models") or {}
+        return verified if isinstance(verified, dict) else {}
+
+    def _is_provider_verified(self, provider):
+        verified = self._verified_providers()
+        return provider in verified and verified[provider] == self._provider_model(provider)
+
+    def _set_provider_verified(self, provider):
+        verified = self._verified_providers()
+        verified[provider] = self._provider_model(provider)
+        self.configuration_settings.update_main_setting("verified_provider_models", verified)
+
+    def _clear_provider_verification(self, provider):
+        verified = self._verified_providers()
+        if provider in verified:
+            del verified[provider]
+            self.configuration_settings.update_main_setting("verified_provider_models", verified)
+
+    def refresh_provider_verification_status(self):
+        if not hasattr(self.ui, "label_provider_verification"):
+            return
+        provider = self.ui.comboBox_conversation_method.currentText()
+        if provider == "Local LLM":
+            local_model = self.configuration_settings.get_main_setting("local_llm")
+            verified = bool(local_model and os.path.exists(local_model))
+            text = "Local model is available" if verified else "No local model is available."
+        else:
+            verified = self._is_provider_verified(provider)
+            text = "✓ Confirmed by model check" if verified else "Not confirmed. Check the selected model to enable it for characters."
+        self.ui.label_provider_verification.setStyleSheet(
+            "color: #4ADE80;" if verified else "color: rgba(255, 255, 255, 0.45);"
+        )
+        self.ui.label_provider_verification.setText(text)
+
+    def _save_model_setting(self, setting, value, provider):
+        if self.configuration_settings.get_main_setting(setting) != value:
+            self.configuration_settings.update_main_setting(setting, value)
+            self._clear_provider_verification(provider)
+            self.refresh_provider_verification_status()
 
     def update_local_llm_settings_visibility(self, conversation_method):
         is_local = conversation_method == "Local LLM"
@@ -5212,6 +5331,7 @@ class InterfaceSignals():
 
         try:
             self.models = await self.fetch_openrouter_api_models()
+            self.refresh_character_model_options()
             self.filtered_models = [
                 model for model in self.models
                 if search.text().lower() in model["name"].lower()
@@ -5279,7 +5399,7 @@ class InterfaceSignals():
     def on_comboBox_openrouter_models_changed(self, index):
         selected_model_id = self.ui.comboBox_openrouter_models.itemData(index)
         if selected_model_id:
-            self.configuration_settings.update_main_setting("openrouter_model", selected_model_id)
+            self._save_model_setting("openrouter_model", selected_model_id, "OpenRouter")
 
     def on_comboBox_translator_changed(self, index):
         self.configuration_settings.update_main_setting("translator", index)
@@ -5468,7 +5588,7 @@ class InterfaceSignals():
         )
         
         try:
-            provider = AIFactory.get_provider(conversation_method)
+            provider = AIFactory.get_provider(conversation_method, char_data.get("model_override"))
             if not provider:
                 logger.error(f"Cannot trigger manual memory: Provider '{conversation_method}' not found.")
                 return
@@ -6003,7 +6123,11 @@ class InterfaceSignals():
 
         api_key_name = token_map.get(selected_conversation_method)
         if api_key_name:
-            self.configuration_api.save_api_token(api_key_name, self.ui.lineEdit_api_token_options.text())
+            value = self.ui.lineEdit_api_token_options.text()
+            if self.configuration_api.get_token(api_key_name) != value:
+                self.configuration_api.save_api_token(api_key_name, value)
+                self._clear_provider_verification(selected_conversation_method)
+                self.refresh_provider_verification_status()
 
     def on_pushButton_test_model_clicked(self):
         if self._model_test_task and not self._model_test_task.done():
@@ -6019,8 +6143,8 @@ class InterfaceSignals():
         started = None
         first_response = None
 
+        method = self.ui.comboBox_conversation_method.currentText()
         try:
-            method = self.ui.comboBox_conversation_method.currentText()
             if method != "Local LLM" and not self.ui.lineEdit_api_token_options.text().strip():
                 raise ValueError("missing API token")
 
@@ -6045,7 +6169,13 @@ class InterfaceSignals():
 
             result.setStyleSheet("color: #4ADE80;")
             result.setText(f"Model is available. First response: {first_response:.2f}s. Total: {total:.2f}s.")
+            self._set_provider_verified(method)
+            self.refresh_provider_verification_status()
+            self.refresh_character_provider_options()
         except Exception:
+            self._clear_provider_verification(method)
+            self.refresh_provider_verification_status()
+            self.refresh_character_provider_options()
             result.setStyleSheet("color: #f87171;")
             if started is None:
                 result.setText("Model check failed. Check the API token, model name, and connection.")
@@ -6056,31 +6186,35 @@ class InterfaceSignals():
             button.setEnabled(True)
 
     def save_openai_model_in_real_time(self):
-        self.configuration_settings.update_main_setting("openai_model", self.ui.lineEdit_openai_model.text().strip())
+        self._save_model_setting("openai_model", self.ui.lineEdit_openai_model.text().strip(), "Open AI")
 
     def save_custom_url_in_real_time(self):
-        self.configuration_api.save_api_token("CUSTOM_ENDPOINT_URL", self.ui.lineEdit_base_url_options.text())
+        value = self.ui.lineEdit_base_url_options.text()
+        if self.configuration_api.get_token("CUSTOM_ENDPOINT_URL") != value:
+            self.configuration_api.save_api_token("CUSTOM_ENDPOINT_URL", value)
+            self._clear_provider_verification("Open AI")
+            self.refresh_provider_verification_status()
 
     def save_mistral_model_endpoint_in_real_time(self):
-        self.configuration_settings.update_main_setting("mistral_model_endpoint", self.ui.lineEdit_mistral_model.text())
+        self._save_model_setting("mistral_model_endpoint", self.ui.lineEdit_mistral_model.text(), "Mistral AI")
 
     def save_anthropic_model_in_real_time(self):
-        self.configuration_settings.update_main_setting("anthropic_model", self.ui.lineEdit_anthropic_model.text().strip())
+        self._save_model_setting("anthropic_model", self.ui.lineEdit_anthropic_model.text().strip(), "Anthropic")
 
     def save_gemini_model_in_real_time(self):
-        self.configuration_settings.update_main_setting("gemini_model", self.ui.lineEdit_gemini_model.text().strip())
+        self._save_model_setting("gemini_model", self.ui.lineEdit_gemini_model.text().strip(), "Google Gemini")
 
     def save_deepseek_model_in_real_time(self):
-        self.configuration_settings.update_main_setting("deepseek_model", self.ui.lineEdit_deepseek_model.text().strip())
+        self._save_model_setting("deepseek_model", self.ui.lineEdit_deepseek_model.text().strip(), "DeepSeek")
 
     def save_grok_model_in_real_time(self):
-        self.configuration_settings.update_main_setting("grok_model", self.ui.lineEdit_grok_model.text().strip())
+        self._save_model_setting("grok_model", self.ui.lineEdit_grok_model.text().strip(), "Grok")
 
     def save_qwen_model_in_real_time(self):
-        self.configuration_settings.update_main_setting("qwen_model", self.ui.lineEdit_qwen_model.text().strip())
+        self._save_model_setting("qwen_model", self.ui.lineEdit_qwen_model.text().strip(), "Qwen")
 
     def save_zai_model_in_real_time(self):
-        self.configuration_settings.update_main_setting("zai_model", self.ui.lineEdit_zai_model.text().strip())
+        self._save_model_setting("zai_model", self.ui.lineEdit_zai_model.text().strip(), "Z.AI")
     
     def initialize_lineEdit_customArgs(self):
         custom_args = self.configuration_settings.get_main_setting("custom_args")
@@ -7071,6 +7205,8 @@ class InterfaceSignals():
         
         self.ui.textEdit_creator_notes.setPlainText(char_data.get("character_title", ""))
         self.ui.textEdit_character_version.setPlainText(char_data.get("character_version", "1.0.0"))
+        self.refresh_character_provider_options(char_data.get("conversation_method", "Local LLM"))
+        self.refresh_character_model_options(char_data.get("model_override") or "")
 
         sow_variables = char_data.get("sow_variables", [])
         if hasattr(self.ui, 'add_blank_variable_row'):
@@ -7101,6 +7237,8 @@ class InterfaceSignals():
     def prepare_new_character_editor(self):
         self._editing_character_name = None
         self.clean_character_card()
+        self._editor_provider_value = None
+        self.refresh_character_provider_options()
         self.ui.editor_character_list.clearSelection()
         self.ui.pushButton_create_character_3.setText(self.translations.get("create_character_button_3", "Create Character"))
 
@@ -13462,7 +13600,7 @@ class InterfaceSignals():
                 character_name, user_name, user_description, context_messages, user_text
             )
 
-            provider = AIFactory.get_provider(conversation_method)
+            provider = AIFactory.get_provider(conversation_method, character_info.get("model_override"))
             if not provider:
                 raise ValueError(f"Unknown conversation method: {conversation_method}")
 
@@ -13751,7 +13889,7 @@ class InterfaceSignals():
                 character_name, user_name, user_description, context_messages, user_text
             )
 
-            provider = AIFactory.get_provider(conversation_method)
+            provider = AIFactory.get_provider(conversation_method, character_info.get("model_override"))
             if provider:
                 self.log_prompt_structure(messages)
                 generator = provider.generate_stream(messages)
@@ -13866,7 +14004,7 @@ class InterfaceSignals():
             current_summary = chat_data.get("summary_text", "")
             full_new_summary = ""
 
-            provider = AIFactory.get_provider(conversation_method)
+            provider = AIFactory.get_provider(conversation_method, char_data.get("model_override"))
             if not provider:
                 logger.error(f"Cannot perform auto-summary: Provider '{conversation_method}' not found.")
                 return
