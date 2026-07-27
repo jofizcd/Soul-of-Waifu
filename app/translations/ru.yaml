@@ -880,6 +880,13 @@ tts_selector_save_information_error: "Вы не выбрали голос пер
 tts_selector_select_button: "Выбрать голос"
 
 tts_selector_elevenlabs: "Конфигурация ElevenLabs"
+settings_voice: "   Настройки голоса"
+voice_settings_title: "Настройки голоса"
+voice_settings_description: "Подключите TTS-провайдеры, доступные для персонажей. API-ключи хранятся в общем защищённом хранилище."
+voice_settings_api_key: "API-ключ"
+voice_settings_show_key: "Показать API-ключ"
+voice_settings_local: "Локальный провайдер"
+voice_settings_save: "Сохранить настройки голоса"
 tts_selector_elevenlabs_2: "Введите ElevenLabs API-токен"
 tts_selector_elevenlabs_3: "Введите Voice ID из ElevenLabs"
 tts_selector_elevenlabs_lbl_1: "ELEVENLABS API КЛЮЧ"
