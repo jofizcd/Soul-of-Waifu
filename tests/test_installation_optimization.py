@@ -65,6 +65,7 @@ class InstallationManifestTest(unittest.TestCase):
         installer = (ROOT / "installer.bat").read_text(encoding="utf-8").lower()
 
         self.assertTrue(removed.isdisjoint(requirements))
+        self.assertNotIn("call :pip", installer)
         for package in {"beautifulsoup4", "davey", "ipython", "playwright", "pynacl"}:
             self.assertNotIn(package, installer)
 
