@@ -305,22 +305,6 @@ class MainWindow(QMainWindow):
         self.ui.target_language_translator_label.setText(self.translations.get("target_language_label", "Target Language"))
         self.ui.comboBox_target_language_translator.setItemText(0, self.translations.get("target_language_item_ru", "Russian"))
 
-        if hasattr(self.ui, 'options_menu'):
-            item0 = self.ui.options_menu.item(0)
-            if item0: item0.setText(self.translations.get("system_tab", "System & UI"))
-            
-            item1 = self.ui.options_menu.item(1)
-            if item1: item1.setText(self.translations.get("configuration_tab", "API & Providers"))
-            
-            item2 = self.ui.options_menu.item(2)
-            if item2: item2.setText(self.translations.get("local_llm_tab", "Local LLM"))
-            
-            item3 = self.ui.options_menu.item(3)
-            if item3: item3.setText(self.translations.get("tools_tab", "Tool Calling & MCP"))
-
-            item4 = self.ui.options_menu.item(4)
-            if item4: item4.setText(self.translations.get("sow_system_tab", "SoW Modules"))
-        
         # Chat
         self.ui.character_name_chat.setText(self.translations.get("character_name_chat", "Character name"))
         self.ui.textEdit_write_user_message.setPlaceholderText(self.translations.get("write_user_message_placeholder", "Write your message to character..."))
