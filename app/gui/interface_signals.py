@@ -2700,8 +2700,6 @@ class InterfaceSignals():
                 )
                 self.cards.append(folder_card)
                 folder_card.setVisible(True)
-                self.update_layout()
-                QApplication.processEvents()
 
             for character_name, data in characters.items():
                 conversation_method = data.get("conversation_method")
@@ -2745,8 +2743,6 @@ class InterfaceSignals():
 
                 character_widget.setVisible(character_name not in grouped_characters)
 
-                self.update_layout() 
-                QApplication.processEvents()
 
             QtCore.QTimer.singleShot(0, self.update_layout)
             self.ui.lineEdit_search_character_menu.textChanged.connect(self.filter_characters)
@@ -10147,8 +10143,9 @@ class InterfaceSignals():
                             data.get("character_book")
                         )
                         self.soul_cards.append(character_widget)
-                        QtCore.QTimer.singleShot(0, lambda: self.update_gate_layout("soul_gateway"))
-                        await asyncio.sleep(0.01)
+                        if i % 4 == 0:
+                            self.update_gate_layout("soul_gateway")
+                            await asyncio.sleep(0.01)
 
                     self.update_gate_layout("soul_gateway")
                 except Exception as e:
@@ -10197,7 +10194,6 @@ class InterfaceSignals():
                         example_dialogs, character_scenario, alternate_greetings
                     )
                     self.gate_cards.append(character_widget)
-                    QtCore.QTimer.singleShot(0, lambda: self.update_gate_layout("chub_ai"))
 
                 for i, node in enumerate(nodes[:50]):
                     await process_node(node)
