@@ -1695,14 +1695,14 @@ class Ui_MainWindow(object):
         self.options_sidebar_layout.addWidget(self.options_menu)
         
         tab_data = [
-            ("AI SETTINGS", None, None),
-            ("   API & Providers", "app/gui/icons/system.png", 1),
-            ("   LLM Settings", "app/gui/icons/ai.png", 2),
-            ("   Image Generation", "app/gui/icons/background_icon.png", 6),
-            ("   Integrations", "app/gui/icons/discord.png", 7),
-            ("System & UI", "app/gui/icons/config.png", 0),
-            ("SoW Modules", "app/gui/icons/tools.png", 4),
-            ("Tool Calling & MCP", "app/gui/icons/modules.png", 3),
+            (self.translations.get("settings_ai_group", "AI SETTINGS"), None, None),
+            (self.translations.get("settings_api_providers", "   API & Providers"), "app/gui/icons/system.png", 1),
+            (self.translations.get("settings_llm", "   LLM Settings"), "app/gui/icons/ai.png", 2),
+            (self.translations.get("settings_image_generation", "   Image Generation"), "app/gui/icons/background_icon.png", 6),
+            (self.translations.get("settings_integrations", "   Integrations"), "app/gui/icons/discord.png", 7),
+            (self.translations.get("settings_system_ui", "System & UI"), "app/gui/icons/config.png", 0),
+            (self.translations.get("settings_sow_modules", "SoW Modules"), "app/gui/icons/tools.png", 4),
+            (self.translations.get("settings_tool_calling", "Tool Calling & MCP"), "app/gui/icons/modules.png", 3),
         ]
 
         for name, icon_path, tab_index in tab_data:
@@ -3347,8 +3347,6 @@ class Ui_MainWindow(object):
         item.setData(QtCore.Qt.ItemDataRole.UserRole, 5)
         self.options_menu.addItem(item)
 
-        self.options_menu.setCurrentRow(1)
-        select_options_tab(self.options_menu.currentItem())
         self.gridLayout.addWidget(self.options_container, 0, 0, 1, 1)
         self.stackedWidget.addWidget(self.options_page)
 
@@ -4699,6 +4697,7 @@ class Ui_MainWindow(object):
         self.gateway_nav_rail.setCurrentRow(0)
         self.gateway_stacked_widget.setCurrentIndex(0)
         self.tabWidget_options.setCurrentIndex(0)
+        self.options_menu.setCurrentRow(5)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
     
     def _create_settings_card_page(self, title, subtitle, card):
