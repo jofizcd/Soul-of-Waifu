@@ -65,6 +65,8 @@ from app.configuration import configuration
 logger = logging.getLogger("Interface Signals")
 
 CACHE_DIR = os.path.join(os.getcwd(), "app/cache")
+GATEWAY_CACHE_TTL_SECONDS = 300
+IMAGE_CACHE_TTL_SECONDS = 24 * 60 * 60
 
 tiktoken_dir = Path(__file__).parent.parent.parent / "app" / "utils" / "ai_clients"
 if not (tiktoken_dir / "9b5ad71b2ce5302211f9c61530b329a4922fc6a4").exists():
@@ -109,6 +111,7 @@ class InterfaceSignals():
         self.gate_cards = []
         self.lorebook_cards = []
         self.scene_cards = []
+        self._gateway_tab_loaded_at = {}
 
         # --- Scroll Area Setup ---
         self.grid_layout = QtWidgets.QGridLayout()
@@ -9456,6 +9459,12 @@ class InterfaceSignals():
                         item.widget().deleteLater()
                         item.widget().setParent(None)
 
+    def _gateway_tab_is_cached(self, tab, cards):
+        return bool(cards) and time.monotonic() - self._gateway_tab_loaded_at.get(tab, 0) < GATEWAY_CACHE_TTL_SECONDS
+
+    def _mark_gateway_tab_loaded(self, tab):
+        self._gateway_tab_loaded_at[tab] = time.monotonic()
+
     def save_to_cache_character_card(self, url, data):
         file_name = os.path.basename(url)
         file_name = url.split("/")[-2] + "_" + url.split("/")[-1]
@@ -9468,7 +9477,6 @@ class InterfaceSignals():
         return file_path
 
     def get_from_cache_character_card(self, url):
-        CACHE_DIR = "cache"
         if not url or not isinstance(url, str) or "/" not in url:
             return None
 
@@ -9480,7 +9488,7 @@ class InterfaceSignals():
             file_name = parts[-2] + "_" + parts[-1]
             file_path = os.path.join(CACHE_DIR, file_name)
 
-            if os.path.exists(file_path):
+            if os.path.exists(file_path) and time.time() - os.path.getmtime(file_path) < IMAGE_CACHE_TTL_SECONDS:
                 return file_path
             else:
                 return None
@@ -9532,26 +9540,17 @@ class InterfaceSignals():
 
         self.ui.gateway_stacked_widget.setCurrentIndex(current_tab_index)
     
-        scroll_area_mapping = {
-            "soul_gateway": self.ui.scrollArea_soul_gateway,
-            "character_card_page": self.ui.scrollArea_character_card,
-            "lorebooks": self.ui.scrollArea_lorebooks,
-            "scenes": self.ui.scrollArea_scenes
-        }
-        for area in scroll_area_mapping.values():
-            self.clear_scroll_area(area)
-
-        self.soul_cards.clear()
-        self.gate_cards.clear()
-        self.lorebook_cards.clear()
-        self.scene_cards.clear()
-
         self.ui.stackedWidget.setCurrentWidget(self.ui.charactersgateway_page)
         
         match current_tab_index:
             case 0:  # Soul Gateway
                 self.ui.label_nsfw.hide()
                 self.ui.checkBox_enable_nsfw.hide()
+                if self._gateway_tab_is_cached("soul_gateway", self.soul_cards):
+                    self.update_gate_layout("soul_gateway")
+                    self.is_loading = False
+                    return
+                self.soul_cards.clear()
                 
                 if self.soul_gateway_container:
                     self.soul_gateway_container.deleteLater()
@@ -9620,12 +9619,18 @@ class InterfaceSignals():
                             await asyncio.sleep(0.02)
 
                     self.update_gate_layout("soul_gateway")
+                    self._mark_gateway_tab_loaded("soul_gateway")
                 except Exception as e:
                     logger.error(f"Error loading Soul Gateway: {e}")
 
             case 1:  # Chub AI Public Database
                 self.ui.checkBox_enable_nsfw.show()
                 self.ui.label_nsfw.show()
+                if self._gateway_tab_is_cached("chub_ai", self.gate_cards):
+                    self.update_gate_layout("chub_ai")
+                    self.is_loading = False
+                    return
+                self.gate_cards.clear()
 
                 if self.gate_container:
                     self.gate_container.deleteLater()
@@ -9675,26 +9680,35 @@ class InterfaceSignals():
                     )
 
                     self.gate_cards.append(character_widget)
-                    QtCore.QTimer.singleShot(0, lambda: self.update_gate_layout("chub_ai"))
 
-                for i, node in enumerate(nodes[:50]):
+                for i in range(0, min(len(nodes), 50), 8):
                     if self.abort_loading: break
-                    await process_node(node)
-                    if i % 4 == 0:
-                        self.update_gate_layout("chub_ai")
-                        await asyncio.sleep(0.05)
+                    await asyncio.gather(*(process_node(node) for node in nodes[i:i + 8]))
+                    self.update_gate_layout("chub_ai")
+                    await asyncio.sleep(0.05)
 
                 self.update_gate_layout("chub_ai")
+                self._mark_gateway_tab_loaded("chub_ai")
 
             case 2:  # World Lorebooks
                 self.ui.label_nsfw.hide()
                 self.ui.checkBox_enable_nsfw.hide()
+                if self._gateway_tab_is_cached("lorebooks", self.lorebook_cards):
+                    self.update_gate_layout("lorebooks")
+                    self.is_loading = False
+                    return
                 await self.load_shared_lorebooks()
+                self._mark_gateway_tab_loaded("lorebooks")
 
             case 3:  # Soul Stage Scenarios
                 self.ui.label_nsfw.hide()
                 self.ui.checkBox_enable_nsfw.hide()
+                if self._gateway_tab_is_cached("scenes", self.scene_cards):
+                    self.update_gate_layout("scenes")
+                    self.is_loading = False
+                    return
                 await self.load_shared_scenes()
+                self._mark_gateway_tab_loaded("scenes")
         
         self.is_loading = False
 
@@ -10061,6 +10075,9 @@ class InterfaceSignals():
         self.ui.lineEdit_search_character.clear()
 
         current_tab_index = self.ui.gateway_nav_rail.currentRow()
+        tab_names = ("soul_gateway", "chub_ai", "lorebooks", "scenes")
+        if 0 <= current_tab_index < len(tab_names):
+            self._gateway_tab_loaded_at.pop(tab_names[current_tab_index], None)
 
         scroll_area_mapping = {
             "soul_gateway": self.ui.scrollArea_soul_gateway,
