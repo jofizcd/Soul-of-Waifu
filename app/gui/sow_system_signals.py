@@ -126,6 +126,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         character_data = self.configuration_characters.load_configuration()
         character_info = character_data["character_list"][character_name]
+        self.current_sow_system_mode = character_info.get("current_sow_system_mode", "Nothing")
         self.conversation_method = character_info["conversation_method"]
         self.expression_images_folder = character_info.get("expression_images_folder", None)
         self.live2d_model_folder = character_info.get("live2d_model_folder", None)
@@ -227,7 +228,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 self.ui.set_voice_level(0.0)
         
         try:
-            current_mode = self.configuration_characters.load_configuration()["character_list"][self.character_name]["current_sow_system_mode"]
+            current_mode = self._get_current_mode()
             if current_mode == "VRM" and hasattr(self, 'vrm_webview'):
                 self.vrm_webview.page().runJavaScript(f"if (typeof window.setAppState !== 'undefined') window.setAppState('{state}');")
         except Exception as e:
@@ -356,7 +357,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
     
     def update_avatar_lips(self, mouth_value):
         """Update avatar lip sync and voice indicator animation."""
-        current_mode = self.configuration_characters.load_configuration()["character_list"][self.character_name]["current_sow_system_mode"]
+        current_mode = self._get_current_mode()
 
         # 1. LIVE2D
         if current_mode == "Live2D Model":
@@ -403,6 +404,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         conversation_method = character_info["conversation_method"]
         current_sow_system_mode = character_info["current_sow_system_mode"]
+        self.current_sow_system_mode = current_sow_system_mode
         expression_images_folder = character_info.get("expression_images_folder", None)
         live2d_model_folder = character_info.get("live2d_model_folder", None)
         vrm_model_file = character_info.get("vrm_model_file", None)
@@ -1844,6 +1846,8 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
     def _get_current_mode(self) -> str:
         """Return current_sow_system_mode string."""
+        if hasattr(self, "current_sow_system_mode"):
+            return self.current_sow_system_mode
         try:
             return self.configuration_characters.load_configuration()[
                 "character_list"][self.character_name]["current_sow_system_mode"]
