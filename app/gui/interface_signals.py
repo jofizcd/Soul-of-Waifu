@@ -7372,10 +7372,8 @@ class InterfaceSignals():
         def provider_is_ready(provider_name):
             saved_state = provider_state.get(provider_name, {})
             if provider_name in cloud_tokens:
-                return bool(saved_state.get("enabled")) and bool(
-                    self.configuration_api.get_token(cloud_tokens[provider_name])
-                )
-            return bool(saved_state.get("enabled"))
+                return bool(self.configuration_api.get_token(cloud_tokens[provider_name]))
+            return True
 
         engines_data = [("None", "Nothing", "app/gui/icons/none.png")]
         for display_name, provider_name, icon_path in (
@@ -7695,12 +7693,15 @@ class InterfaceSignals():
             return []
         return [(voice.get("displayName") or voice_id, voice_id) for voice in data.get("voices", []) if (voice_id := voice.get("voiceId"))]
 
-    async def preview_inworld_voice(self, api_key, voice_id, model_id):
+    async def preview_inworld_voice(self, api_key, voice_id, model_id, text=None):
         if not api_key or not voice_id or not model_id:
             return None
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-                async with session.get("https://api.inworld.ai/tts/v1/voice:preview", params={"voice_id": voice_id, "model_id": model_id}, headers={"Authorization": f"Basic {api_key}"}) as response:
+                params = {"voice_id": voice_id, "model_id": model_id}
+                if text:
+                    params["text"] = text
+                async with session.get("https://api.inworld.ai/tts/v1/voice:preview", params=params, headers={"Authorization": f"Basic {api_key}"}) as response:
                     if response.status != 200:
                         logger.error("Inworld preview request failed with status %s", response.status)
                         return None
@@ -7736,6 +7737,10 @@ class InterfaceSignals():
             api_key,
             voice_id,
             self.ui.comboBox_tts_inworld_model.currentText().strip(),
+            self.translations.get(
+                "tts_inworld_preview_text_ru" if self.ui.comboBox_tts_inworld_preview_language.currentText() == "RU" else "tts_inworld_preview_text_en",
+                "Привет! Это нейтральная проверка голоса." if self.ui.comboBox_tts_inworld_preview_language.currentText() == "RU" else "Hello! This is a neutral voice check.",
+            ),
         )
         if not audio:
             return
