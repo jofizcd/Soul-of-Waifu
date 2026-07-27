@@ -704,8 +704,6 @@ class InterfaceSignals():
             self.ui.pushButton_main,
             self.ui.pushButton_soul_stage,
             self.ui.pushButton_rp_editors,
-            self.ui.pushButton_image_generation,
-            self.ui.pushButton_integrations,
             self.ui.pushButton_characters_gateway,
             self.ui.pushButton_models_hub,
             self.ui.pushButton_options,
@@ -986,14 +984,6 @@ class InterfaceSignals():
     def on_pushButton_options_clicked(self):
         self.ui.pushButton_options.setChecked(True)
         self.ui.stackedWidget.setCurrentWidget(self.ui.options_page)
-
-    def on_pushButton_image_generation_clicked(self):
-        self.ui.pushButton_image_generation.setChecked(True)
-        self.ui.stackedWidget.setCurrentWidget(self.ui.image_generation_page)
-
-    def on_pushButton_integrations_clicked(self):
-        self.ui.pushButton_integrations.setChecked(True)
-        self.ui.stackedWidget.setCurrentWidget(self.ui.integrations_page)
 
     def on_pushButton_models_hub_clicked(self):
         self.ui.pushButton_models_hub.setChecked(True)
@@ -1446,8 +1436,6 @@ class InterfaceSignals():
             for btn in [
                 self.ui.pushButton_main,
                 self.ui.pushButton_rp_editors,
-                self.ui.pushButton_image_generation,
-                self.ui.pushButton_integrations,
                 self.ui.pushButton_characters_gateway,
                 self.ui.pushButton_models_hub,
                 self.ui.pushButton_options

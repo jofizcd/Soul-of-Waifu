@@ -1695,16 +1695,25 @@ class Ui_MainWindow(object):
         self.options_sidebar_layout.addWidget(self.options_menu)
         
         tab_data = [
-            ("API & Providers", "app/gui/icons/system.png"),
-            ("System & UI", "app/gui/icons/config.png"),
-            ("Local LLM", "app/gui/icons/ai.png"),
-            ("SoW Modules", "app/gui/icons/tools.png"),
-            ("Tool Calling & MCP", "app/gui/icons/modules.png")
+            ("AI SETTINGS", None, None),
+            ("   API & Providers", "app/gui/icons/system.png", 1),
+            ("   LLM Settings", "app/gui/icons/ai.png", 2),
+            ("   Image Generation", "app/gui/icons/background_icon.png", 6),
+            ("   Integrations", "app/gui/icons/discord.png", 7),
+            ("System & UI", "app/gui/icons/config.png", 0),
+            ("SoW Modules", "app/gui/icons/tools.png", 4),
+            ("Tool Calling & MCP", "app/gui/icons/modules.png", 3),
         ]
 
-        for name, icon_path in tab_data:
+        for name, icon_path, tab_index in tab_data:
             item = QtWidgets.QListWidgetItem(name)
-            item.setIcon(QtGui.QIcon(icon_path))
+            if icon_path:
+                item.setIcon(QtGui.QIcon(icon_path))
+            if tab_index is None:
+                item.setFlags(QtCore.Qt.ItemFlag.NoItemFlags)
+                item.setForeground(QtGui.QColor("#A8A39A"))
+            else:
+                item.setData(QtCore.Qt.ItemDataRole.UserRole, tab_index)
             self.options_menu.addItem(item)
             
         self.layout_options.addWidget(self.options_sidebar_container)
@@ -1713,7 +1722,15 @@ class Ui_MainWindow(object):
         self.tabWidget_options.setStyleSheet("background: transparent; border: none;")
         self.layout_options.addWidget(self.tabWidget_options)
 
-        self.options_menu.currentRowChanged.connect(self.tabWidget_options.setCurrentIndex)
+        def select_options_tab(item):
+            tab_index = item.data(QtCore.Qt.ItemDataRole.UserRole)
+            if tab_index is not None:
+                self.tabWidget_options.setCurrentIndex(tab_index)
+
+        self.options_menu.currentItemChanged.connect(
+            lambda item, _previous: select_options_tab(item) if item else None
+        )
+        self.options_menu.setCurrentRow(1)
 
         global_input_style = """
             QComboBox {
@@ -3325,9 +3342,11 @@ class Ui_MainWindow(object):
         
         item = QtWidgets.QListWidgetItem(self.translations.get("appearance_tab_name", "Appearance"))
         item.setIcon(QtGui.QIcon("app/gui/icons/color-palette.png"))
+        item.setData(QtCore.Qt.ItemDataRole.UserRole, 5)
         self.options_menu.addItem(item)
 
-        self.options_menu.setCurrentRow(0)
+        self.options_menu.setCurrentRow(1)
+        select_options_tab(self.options_menu.currentItem())
         self.gridLayout.addWidget(self.options_container, 0, 0, 1, 1)
         self.stackedWidget.addWidget(self.options_page)
 
@@ -4027,7 +4046,7 @@ class Ui_MainWindow(object):
             self.btn_open_image_gen,
         )
         self.image_generation_page.setObjectName("image_generation_page")
-        self.stackedWidget.addWidget(self.image_generation_page)
+        self.tabWidget_options.addWidget(self.image_generation_page)
 
         self.integrations_page = self._create_settings_card_page(
             self.translations.get("integrations_title", "Integrations"),
@@ -4035,7 +4054,7 @@ class Ui_MainWindow(object):
             self.btn_open_discord_bot,
         )
         self.integrations_page.setObjectName("integrations_page")
-        self.stackedWidget.addWidget(self.integrations_page)
+        self.tabWidget_options.addWidget(self.integrations_page)
         # =============================================================
 
         self.soul_stage_page = SoulStagePage()
@@ -4277,18 +4296,6 @@ class Ui_MainWindow(object):
         self.pushButton_rp_editors.setObjectName("pushButton_rp_editors")
         self.verticalLayout.addWidget(self.pushButton_rp_editors)
 
-        self.pushButton_image_generation = self._add_sidebar_button(
-            self.translations.get("image_generation_title", "Image Generation"),
-            "app/gui/icons/background_icon.png",
-            "pushButton_image_generation",
-        )
-
-        self.pushButton_integrations = self._add_sidebar_button(
-            self.translations.get("integrations_title", "Integrations"),
-            "app/gui/icons/discord.png",
-            "pushButton_integrations",
-        )
-        
         self.pushButton_characters_gateway = RippleButton(parent=self.SideBar_Left)
         self.pushButton_characters_gateway.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         font = QtGui.QFont()
