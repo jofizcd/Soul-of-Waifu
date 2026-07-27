@@ -7660,6 +7660,36 @@ class InterfaceSignals():
         widget.setLayout(layout)
         return widget
 
+    async def fetch_inworld_voices(self, api_key):
+        if not api_key:
+            return []
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                async with session.get("https://api.inworld.ai/voices/v1/voices", headers={"Authorization": f"Basic {api_key}"}) as response:
+                    if response.status != 200:
+                        logger.error("Inworld voices request failed with status %s", response.status)
+                        return []
+                    data = await response.json()
+        except (aiohttp.ClientError, ValueError):
+            logger.error("Inworld voices request failed")
+            return []
+        return [(voice.get("displayName") or voice_id, voice_id) for voice in data.get("voices", []) if (voice_id := voice.get("voiceId"))]
+
+    async def preview_inworld_voice(self, api_key, voice_id, model_id):
+        if not api_key or not voice_id or not model_id:
+            return None
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                async with session.get("https://api.inworld.ai/tts/v1/voice:preview", params={"voice_id": voice_id, "model_id": model_id}, headers={"Authorization": f"Basic {api_key}"}) as response:
+                    if response.status != 200:
+                        logger.error("Inworld preview request failed with status %s", response.status)
+                        return None
+                    audio_content = (await response.json()).get("audioContent")
+            return base64.b64decode(audio_content, validate=True) if audio_content else None
+        except (aiohttp.ClientError, ValueError):
+            logger.error("Inworld preview request failed")
+            return None
+
     def create_inworld_widgets(self, character_name):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -7678,19 +7708,38 @@ class InterfaceSignals():
 
         api_key_input = QLineEdit()
         api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        api_key_input.setStyleSheet("background-color: rgba(30, 30, 35, 0.5); color: #DEDAD2; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 10px;")
         api_key_input.setPlaceholderText(self.translations.get("tts_selector_inworld_key", "Inworld API key"))
         if self.configuration_api.get_token("INWORLD_API_TOKEN"):
             api_key_input.setPlaceholderText(self.translations.get("tts_selector_inworld_key_saved", "Saved API key — enter a new key to replace it"))
 
         character = self.configuration_characters.load_configuration()["character_list"].get(character_name, {})
-        voice_id_input = QLineEdit(character.get("inworld_voice_id", "Dennis"))
-        voice_id_input.setPlaceholderText(self.translations.get("tts_selector_inworld_voice", "Voice ID (for example, Dennis)"))
-        model_id_input = QLineEdit(character.get("inworld_model_id", "inworld-tts-2"))
-        model_id_input.setPlaceholderText(self.translations.get("tts_selector_inworld_model", "Model ID"))
+        api_key_row = QHBoxLayout()
+        api_key_row.addWidget(api_key_input)
+        show_key_button = QPushButton("👁")
+        show_key_button.setCheckable(True)
+        show_key_button.setFixedSize(40, 40)
+        show_key_button.setStyleSheet("QPushButton { background: rgba(22, 22, 26, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; }")
+        show_key_button.toggled.connect(lambda visible: api_key_input.setEchoMode(QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password))
+        api_key_row.addWidget(show_key_button)
 
-        form.addRow(self.translations.get("tts_selector_inworld_key_label", "INWORLD API KEY"), api_key_input)
-        form.addRow(self.translations.get("tts_selector_inworld_voice_label", "VOICE ID"), voice_id_input)
-        form.addRow(self.translations.get("tts_selector_inworld_model_label", "MODEL ID"), model_id_input)
+        combo_style = "QComboBox { background-color: rgba(30, 30, 35, 0.5); color: #DEDAD2; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 12px; } QComboBox:hover { border-color: rgba(255, 255, 255, 0.25); }"
+        voice_combo = QtWidgets.QComboBox()
+        voice_combo.setEditable(True)
+        voice_combo.setStyleSheet(combo_style)
+        voice_combo.setCurrentText(character.get("inworld_voice_id", "Dennis"))
+        model_combo = QtWidgets.QComboBox()
+        model_combo.setEditable(True)
+        model_combo.setStyleSheet(combo_style)
+        model_combo.addItems(["inworld-tts-1.5-mini", "inworld-tts-1.5-max", "inworld-tts-2"])
+        model_combo.setCurrentText(character.get("inworld_model_id", "inworld-tts-2"))
+
+        form.addRow(self.translations.get("tts_selector_inworld_key_label", "INWORLD API KEY"), api_key_row)
+        form.addRow(self.translations.get("tts_selector_inworld_voice_label", "VOICE ID"), voice_combo)
+        form.addRow(self.translations.get("tts_selector_inworld_model_label", "MODEL ID"), model_combo)
+        load_voices_button = QPushButton(self.translations.get("tts_selector_inworld_load_voices", "Load voices"))
+        load_voices_button.setFixedHeight(36)
+        form.addRow("", load_voices_button)
         layout.addWidget(card)
         layout.addStretch(1)
 
@@ -7698,17 +7747,60 @@ class InterfaceSignals():
         save_button.setFixedHeight(40)
         save_button.setCursor(Qt.CursorShape.PointingHandCursor)
         save_button.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; font-weight: bold; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
+        preview_button = QPushButton(self.translations.get("tts_selector_inworld_preview", "Preview voice"))
+        preview_button.setFixedHeight(40)
+        preview_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        preview_button.setStyleSheet(save_button.styleSheet())
+        layout.addWidget(preview_button)
         layout.addWidget(save_button)
 
+        def current_api_key():
+            return api_key_input.text().strip() or self.configuration_api.get_token("INWORLD_API_TOKEN")
+
+        def selected_voice_id():
+            return voice_combo.currentData() or voice_combo.currentText().strip()
+
+        async def load_voices():
+            key = current_api_key()
+            if not key:
+                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_key_required", "Enter an API key first."), msg_type="error")
+                return
+            voices = await self.fetch_inworld_voices(key)
+            if not voices:
+                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_voices_failed", "Could not load voices. Check the API key."), msg_type="error")
+                return
+            selected = selected_voice_id()
+            voice_combo.clear()
+            for display_name, voice_id in voices:
+                voice_combo.addItem(f"{display_name} ({voice_id})", voice_id)
+            index = voice_combo.findData(selected)
+            voice_combo.setCurrentIndex(index if index >= 0 else 0)
+
+        async def preview_voice():
+            audio = await self.preview_inworld_voice(current_api_key(), selected_voice_id(), model_combo.currentText().strip())
+            if not audio:
+                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_preview_failed", "Could not preview this voice."), msg_type="error")
+                return
+            output_dir = "app/voices/inworld_audio"
+            os.makedirs(output_dir, exist_ok=True)
+            output_file = os.path.join(output_dir, f"preview_{uuid.uuid4().hex}.mp3")
+            with open(output_file, "wb") as preview_file:
+                preview_file.write(audio)
+            self.playback_worker.add_audio_file(output_file)
+
+        load_voices_button.clicked.connect(lambda: asyncio.create_task(load_voices()))
+        api_key_input.editingFinished.connect(lambda: asyncio.create_task(load_voices()) if api_key_input.text().strip() else None)
+        preview_button.clicked.connect(lambda: asyncio.create_task(preview_voice()))
+
         def save_inworld_settings():
-            voice_id = voice_id_input.text().strip()
-            model_id = model_id_input.text().strip()
-            api_key = api_key_input.text().strip()
-            if not voice_id or not model_id or (not api_key and not self.configuration_api.get_token("INWORLD_API_TOKEN")):
+            voice_id = selected_voice_id()
+            model_id = model_combo.currentText().strip()
+            api_key = current_api_key()
+            if not voice_id or not model_id or not api_key:
                 sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_invalid", "Enter an API key, voice ID, and model ID."), msg_type="error")
                 return
 
-            if api_key:
+            if api_key_input.text().strip():
                 self.configuration_api.save_api_token("INWORLD_API_TOKEN", api_key)
 
             config = self.configuration_characters.load_configuration()
