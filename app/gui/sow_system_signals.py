@@ -2554,6 +2554,7 @@ class Live2DWidget(QOpenGLWidget):
         self.live2d_model_loaded = False
         self.opengl_initialized = False
         self.timerId = None
+        self._next_emotion_check = 0.0
 
         self.dragging = False
         self.right_button_pressed = False
@@ -2667,7 +2668,6 @@ class Live2DWidget(QOpenGLWidget):
         Updates the Live2D model and triggers a repaint.
         """
         self.update_live2d_emotion()
-        self.repaint()
         self.update()
 
     def update_live2d_emotion(self):
@@ -2676,6 +2676,10 @@ class Live2DWidget(QOpenGLWidget):
         """
         if not self.live2d_model:
             return
+
+        if time.monotonic() < self._next_emotion_check:
+            return
+        self._next_emotion_check = time.monotonic() + 0.1
 
         try:
             configuration_data = self.configuration_characters.load_configuration()
@@ -2905,6 +2909,7 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         self.live2d_model_loaded = False
         self.opengl_initialized = False
         self.timerId = None
+        self._next_emotion_check = 0.0
 
         self._click_through = False
         self._always_on_top = True
@@ -2952,6 +2957,10 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
     def update_live2d_emotion(self):
         if not self.live2d_model:
             return
+
+        if time.monotonic() < self._next_emotion_check:
+            return
+        self._next_emotion_check = time.monotonic() + 0.1
 
         try:
             configuration_data = self.configuration_characters.load_configuration()

@@ -4,6 +4,7 @@ import math
 import subprocess
 import logging
 import json
+import time
 import aiohttp
 import random
 from pathlib import Path
@@ -73,6 +74,7 @@ class Live2DWidget(QOpenGLWidget):
         self.live2d_model_loaded = False
         self.opengl_initialized = False
         self.timerId = None
+        self._next_emotion_check = 0.0
 
         self.dragging = False
         self.right_button_pressed = False
@@ -190,6 +192,10 @@ class Live2DWidget(QOpenGLWidget):
         """
         if not self.live2d_model:
             return
+
+        if time.monotonic() < self._next_emotion_check:
+            return
+        self._next_emotion_check = time.monotonic() + 0.1
 
         try:
             configuration_data = self.configuration_characters.load_configuration()
