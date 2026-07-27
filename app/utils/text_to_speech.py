@@ -127,7 +127,9 @@ class InworldTTS:
     async def generate_speech_with_inworld(self, text, character_name):
         api_key = self.configuration_api.get_token("INWORLD_API_TOKEN")
         character = self.configuration_characters.load_configuration()["character_list"][character_name]
-        provider = self.configuration_settings.get_main_setting("tts_providers") or {}
+        settings = getattr(self, "configuration_settings", None)
+        provider = settings.get_main_setting("tts_providers") if settings else {}
+        provider = provider or {}
         inworld = provider.get("Inworld", {})
         voice_id = character.get("inworld_voice_id") or inworld.get("default_voice_id", "Dennis")
         model_id = character.get("inworld_model_id") or inworld.get("default_model_id", "inworld-tts-2")
