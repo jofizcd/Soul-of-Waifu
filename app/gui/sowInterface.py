@@ -10,6 +10,12 @@ from PyQt6.QtGui import QColor, QPainter, QRadialGradient, QCursor, QFont, QPixm
 from app.gui.soul_stage_page import SoulStagePage
 from app.configuration import configuration
 
+class SmallPasswordMaskStyle(QtWidgets.QProxyStyle):
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QtWidgets.QStyle.StyleHint.SH_LineEdit_PasswordCharacter:
+            return ord("·")
+        return super().styleHint(hint, option, widget, returnData)
+
 class Ui_MainWindow(object):
     def __init__(self):
         self.translations = {}
@@ -2052,6 +2058,7 @@ class Ui_MainWindow(object):
         self.lineEdit_api_token_options.setFont(font_input)
         self.lineEdit_api_token_options.setFixedHeight(40)
         self.lineEdit_api_token_options.setObjectName("lineEdit_api_token_options")
+        self.lineEdit_api_token_options.setStyle(SmallPasswordMaskStyle(self.lineEdit_api_token_options.style()))
         self.lineEdit_api_token_options.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.show_api_token_button = QtWidgets.QToolButton()
         self.show_api_token_button.setText("👁")
