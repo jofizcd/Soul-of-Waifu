@@ -280,6 +280,10 @@ class InterfaceSignals():
             self.ui.button_tts_inworld_clone.clicked.connect(
                 lambda: asyncio.create_task(self.clone_global_inworld_voice())
             )
+        for provider_name, button in getattr(self.ui, "tts_local_test_buttons", {}).items():
+            button.clicked.connect(
+                lambda _checked=False, name=provider_name: asyncio.create_task(self.test_local_tts_provider(name))
+            )
         QtCore.QTimer.singleShot(0, self.refresh_provider_verification_status)
 
     def _replace_lorebook_building_with_button(self):
@@ -7744,6 +7748,39 @@ class InterfaceSignals():
     def load_global_inworld_voices_on_demand(self):
         if self._global_inworld_api_key() != getattr(self, "_global_inworld_voices_key", None):
             asyncio.create_task(self.load_global_inworld_voices())
+
+    async def test_local_tts_provider(self, provider_name):
+        status = self.ui.tts_local_status_labels.get(provider_name)
+        if status:
+            status.setText(self.translations.get("tts_local_testing", "Loading the engine and generating a short sample..."))
+        try:
+            text = "Привет, это проверка голоса." if self.configuration_settings.get_main_setting("program_language") == 1 else "Hello, this is a voice test."
+            if provider_name == "XTTSv2":
+                output_file = await XTTSv2_SOW_System().generate_preview(text, language="ru" if self.configuration_settings.get_main_setting("program_language") == 1 else "en")
+            elif provider_name == "Edge TTS":
+                output_file = await EdgeTTS().generate_preview(text, "ru-RU-SvetlanaNeural" if self.configuration_settings.get_main_setting("program_language") == 1 else "en-US-AvaMultilingualNeural")
+            elif provider_name == "Kokoro":
+                output_file = await KokoroTTS_SOW_System().generate_preview("Hello, this is a voice test.")
+            elif provider_name == "Silero":
+                output_file = await SileroTTS_SOW_System().generate_preview("Привет, это проверка голоса.")
+            elif provider_name == "Qwen-3 TTS":
+                model_size = "1.7B" if self.ui.comboBox_tts_qwen_model_size.currentIndex() == 1 else "0.6B"
+                device = "cuda" if self.ui.comboBox_tts_qwen_device.currentIndex() == 0 else "cpu"
+                providers = self.configuration_settings.get_main_setting("tts_providers") or {}
+                providers[provider_name] = {"enabled": True, "model_size": model_size, "device": device}
+                self.configuration_settings.update_main_setting("tts_providers", providers)
+                output_file = await Qwen3TTS_SOW_System().generate_preview("Hello, this is a voice test.", model_size, device)
+            else:
+                return
+            self.playback_worker.add_audio_file(output_file)
+            if status:
+                status.setText(self.translations.get("tts_local_test_ready", "Engine is ready. A short sample was added to playback."))
+        except Exception:
+            logger.exception("Local TTS test failed for %s", provider_name)
+            message = self.translations.get("tts_local_test_failed", "The engine could not be loaded or produce a sample. Check its local runtime requirements.")
+            if status:
+                status.setText(message)
+            sow_toast(parent=self.main_window, title=provider_name, text=message, msg_type="error")
 
     async def preview_global_inworld_voice(self):
         api_key = self._global_inworld_api_key()

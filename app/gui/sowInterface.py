@@ -2322,6 +2322,8 @@ class Ui_MainWindow(object):
         self.tts_provider_api_keys = {}
         self.tts_provider_panels = {}
         self.tts_provider_save_buttons = {}
+        self.tts_local_test_buttons = {}
+        self.tts_local_status_labels = {}
 
         def add_key_row(form, provider_name, token_name):
             key_input = QtWidgets.QLineEdit(self.tts_configuration_api.get_token(token_name) or "")
@@ -2373,6 +2375,39 @@ class Ui_MainWindow(object):
                 hint.setStyleSheet("color: #6F6B63; background: transparent; border: none;")
                 form.addRow(status)
                 form.addRow(hint)
+                availability = QtWidgets.QLabel(self.translations.get(
+                    f"tts_local_{provider_name.lower().replace(' ', '_').replace('-', '_')}_status",
+                    "The engine is loaded on demand when you run a test.",
+                ))
+                availability.setWordWrap(True)
+                availability.setStyleSheet("color: #6F6B63; background: transparent; border: none;")
+                form.addRow(availability)
+
+                if provider_name == "Qwen-3 TTS":
+                    qwen = saved_tts_providers.get(provider_name, {})
+                    self.comboBox_tts_qwen_model_size = QtWidgets.QComboBox()
+                    self.comboBox_tts_qwen_model_size.addItems(["0.6B (Fast)", "1.7B (High Quality)"])
+                    self.comboBox_tts_qwen_model_size.setCurrentIndex(1 if qwen.get("model_size", "1.7B") == "1.7B" else 0)
+                    self.comboBox_tts_qwen_device = QtWidgets.QComboBox()
+                    self.comboBox_tts_qwen_device.addItems(["CUDA (GPU)", "CPU"])
+                    self.comboBox_tts_qwen_device.setCurrentIndex(0 if qwen.get("device", "cuda") == "cuda" else 1)
+                    for combo in (self.comboBox_tts_qwen_model_size, self.comboBox_tts_qwen_device):
+                        combo.setFont(font_input)
+                        combo.setFixedHeight(40)
+                        combo.setStyleSheet(global_input_style)
+                    form.addRow(self.translations.get("tts_qwen_model_size", "Model size"), self.comboBox_tts_qwen_model_size)
+                    form.addRow(self.translations.get("tts_qwen_device", "Compute device"), self.comboBox_tts_qwen_device)
+
+                test_button = QtWidgets.QPushButton(self.translations.get("tts_local_test", "Load and test engine"))
+                test_button.setFont(font_input)
+                test_button.setFixedHeight(40)
+                test_button.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
+                result = QtWidgets.QLabel()
+                result.setWordWrap(True)
+                result.setStyleSheet("color: #6F6B63; background: transparent; border: none;")
+                form.addRow(test_button, result)
+                self.tts_local_test_buttons[provider_name] = test_button
+                self.tts_local_status_labels[provider_name] = result
 
             if provider_name == "Inworld":
                 inworld = saved_tts_providers.get("Inworld", {})

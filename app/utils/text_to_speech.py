@@ -266,6 +266,24 @@ class XTTSv2_SOW_System:
 
         return base_output_file
 
+    async def generate_preview(self, text, voice_type="Female", language="en"):
+        await asyncio.to_thread(self._load_tts_sync)
+        speaker_wav = {
+            "Female Calm": "app/voices/calm_female.wav",
+            "Female": "app/voices/female.wav",
+            "Male": "app/voices/male.wav",
+        }.get(voice_type, "app/voices/female.wav")
+        os.makedirs("app/voices/xttsv2_audio", exist_ok=True)
+        output_file = f"app/voices/xttsv2_audio/preview_{uuid.uuid4().hex}.wav"
+        await asyncio.to_thread(
+            self.tts.tts_to_file,
+            text=text,
+            speaker_wav=speaker_wav,
+            language=language,
+            file_path=output_file,
+        )
+        return output_file
+
 
 class EdgeTTS:
     def __init__(self):
@@ -356,6 +374,18 @@ class EdgeTTS:
 
     async def generate_speech_with_edge_tts_sow_system(self, text, character_name):
         return await self._generate_base(text, character_name)
+
+    async def generate_preview(self, text, voice="en-US-AvaMultilingualNeural"):
+        unique_id = uuid.uuid4().hex
+        audio_file = os.path.join(self.output_dir, f"preview_{unique_id}.mp3")
+        wav_file = os.path.join(self.output_dir, f"preview_{unique_id}.wav")
+        await edge_tts.Communicate(text, voice).save(audio_file)
+        try:
+            await self._convert_mp3_to_wav(audio_file, wav_file)
+        finally:
+            if os.path.exists(audio_file):
+                await asyncio.to_thread(os.remove, audio_file)
+        return wav_file
 
     async def play_audio(self, file_path):
         def _play():
@@ -460,6 +490,20 @@ class KokoroTTS_SOW_System:
 
         return base_output_file
 
+    async def generate_preview(self, text, voice="af_heart"):
+        await self._load_tts()
+
+        def _generate():
+            return [audio for _, _, audio in self.pipeline(text, voice=voice)]
+
+        chunks = await asyncio.to_thread(_generate)
+        if not chunks:
+            raise RuntimeError("Kokoro generated no audio")
+        os.makedirs("app/voices/kokoro_audio", exist_ok=True)
+        output_file = f"app/voices/kokoro_audio/preview_{uuid.uuid4().hex}.wav"
+        await asyncio.to_thread(sf.write, output_file, np.concatenate(chunks), 24000)
+        return output_file
+
 
 class SileroTTS_SOW_System:
     def __init__(self):
@@ -552,6 +596,14 @@ class SileroTTS_SOW_System:
 
         return base_output_file
 
+    async def generate_preview(self, text, voice="xenia"):
+        await self._load_tts()
+        os.makedirs("app/voices/silero_audio", exist_ok=True)
+        output_file = f"app/voices/silero_audio/preview_{uuid.uuid4().hex}.wav"
+        audio = await asyncio.to_thread(self.model.apply_tts, text=text, speaker=voice, sample_rate=48000)
+        await asyncio.to_thread(sf.write, output_file, audio.cpu().numpy(), 48000)
+        return output_file
+
 class Qwen3TTS_SOW_System:
     def __init__(self):
         self.configuration_settings = configuration.ConfigurationSettings()
@@ -564,15 +616,18 @@ class Qwen3TTS_SOW_System:
         self.rvc = None
         self.rvc_loaded = False
 
-    async def _load_tts(self, character_name: str):
+    async def _load_tts(self, character_name: str = None, model_size: str = None, qwen_device: str = None):
         if not self.tts_loaded:
             try:
-                configuration_data = self.configuration_characters.load_configuration()
-                char_config = configuration_data["character_list"].get(character_name, {})
+                char_config = {}
+                if character_name:
+                    configuration_data = self.configuration_characters.load_configuration()
+                    char_config = configuration_data["character_list"].get(character_name, {})
+                provider_defaults = (self.configuration_settings.get_main_setting("tts_providers") or {}).get("Qwen-3 TTS", {})
 
-                model_size = char_config.get("qwen_model_size", "1.7B")
+                model_size = model_size or char_config.get("qwen_model_size") or provider_defaults.get("model_size", "1.7B")
                 qwen_mode = char_config.get("qwen_mode", "presets")
-                qwen_device = char_config.get("qwen_device", "cpu")
+                qwen_device = qwen_device or char_config.get("qwen_device") or provider_defaults.get("device", "cpu")
 
                 if qwen_device == "cuda" and torch.cuda.is_available():
                     self.device = "cuda"
@@ -761,6 +816,31 @@ class Qwen3TTS_SOW_System:
             return rvc_output_file
 
         return base_output_file
+
+    async def generate_preview(self, text, model_size="1.7B", qwen_device="cpu"):
+        await self._load_tts(model_size=model_size, qwen_device=qwen_device)
+        os.makedirs("app/voices/qwen_audio", exist_ok=True)
+        output_file = f"app/voices/qwen_audio/preview_{uuid.uuid4().hex}.wav"
+
+        def _generate():
+            wavs, sample_rate = self.model.generate_custom_voice(
+                speaker="Serena",
+                instruct="",
+                text=text,
+                language="English",
+                max_new_tokens=1500,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            audio_data = wavs[0]
+            if isinstance(audio_data, torch.Tensor):
+                audio_data = audio_data.detach().cpu().to(torch.float32).numpy()
+            elif isinstance(audio_data, np.ndarray):
+                audio_data = audio_data.astype(np.float32)
+            sf.write(output_file, audio_data, sample_rate)
+
+        await asyncio.to_thread(_generate)
+        return output_file
 
 class AudioPlaybackWorker(QThread):
     queue_empty_signal = pyqtSignal()
