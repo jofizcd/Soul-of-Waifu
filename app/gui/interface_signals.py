@@ -7341,18 +7341,34 @@ class InterfaceSignals():
             }}
         """)
 
-        engines_data = [
-            ("None", "app/gui/icons/none.png"),
-            ("ElevenLabs", "app/gui/icons/tts_logo/elevenlabs.png"),
-            ("XTTSv2", "app/gui/icons/tts_logo/xttsv2.png"),
-            ("Edge TTS", "app/gui/icons/tts_logo/edgetts.png"),
-            ("Kokoro", "app/gui/icons/tts_logo/kokorotts.png"),
-            ("Silero (RU)", "app/gui/icons/tts_logo/silerotts.png"),
-            ("Qwen-3 TTS", "app/gui/icons/tts_logo/qwentts.png"),
-            ("Inworld", "app/gui/icons/tts_logo/elevenlabs.png")
-        ]
+        provider_state = self.configuration_settings.get_main_setting("tts_providers") or {}
+        cloud_tokens = {
+            "ElevenLabs": "ELEVENLABS_API_TOKEN",
+            "Inworld": "INWORLD_API_TOKEN",
+        }
 
-        for name, icon_path in engines_data:
+        def provider_is_ready(provider_name):
+            saved_state = provider_state.get(provider_name, {})
+            if provider_name in cloud_tokens:
+                return bool(saved_state.get("enabled")) and bool(
+                    self.configuration_api.get_token(cloud_tokens[provider_name])
+                )
+            return bool(saved_state.get("enabled"))
+
+        engines_data = [("None", "Nothing", "app/gui/icons/none.png")]
+        for display_name, provider_name, icon_path in (
+            ("ElevenLabs", "ElevenLabs", "app/gui/icons/tts_logo/elevenlabs.png"),
+            ("XTTSv2", "XTTSv2", "app/gui/icons/tts_logo/xttsv2.png"),
+            ("Edge TTS", "Edge TTS", "app/gui/icons/tts_logo/edgetts.png"),
+            ("Kokoro", "Kokoro", "app/gui/icons/tts_logo/kokorotts.png"),
+            ("Silero (RU)", "Silero", "app/gui/icons/tts_logo/silerotts.png"),
+            ("Qwen-3 TTS", "Qwen-3 TTS", "app/gui/icons/tts_logo/qwentts.png"),
+            ("Inworld", "Inworld", "app/gui/icons/tts_logo/elevenlabs.png"),
+        ):
+            if provider_is_ready(provider_name):
+                engines_data.append((display_name, provider_name, icon_path))
+
+        for name, _provider_name, icon_path in engines_data:
             item = QtWidgets.QListWidgetItem(name)
             item.setIcon(QtGui.QIcon(icon_path))
             sidebar_menu.addItem(item)
@@ -7371,38 +7387,35 @@ class InterfaceSignals():
         stacked_widget = QStackedWidget(content_frame)
         stacked_widget.setStyleSheet("background: transparent; border: none;")
         
-        stacked_widget.addWidget(self.create_voice_nothing_widgets(character_name))
-        stacked_widget.addWidget(self.create_elevenlabs_widgets(character_name))
-        stacked_widget.addWidget(self.create_xttsv2_widgets(character_name, voice_type, rvc_enabled, rvc_file))
-        stacked_widget.addWidget(self.create_edge_tts_widgets(character_name, voice_type, rvc_enabled, rvc_file, stacked_widget))
-        stacked_widget.addWidget(self.create_kokoro_widgets(character_name, voice_type, rvc_enabled, rvc_file))
-        stacked_widget.addWidget(self.create_silero_widgets(character_name, voice_type, rvc_enabled, rvc_file))
-        stacked_widget.addWidget(self.create_qwen3_widgets(character_name, voice_type, rvc_enabled, rvc_file))
-        stacked_widget.addWidget(self.create_inworld_widgets(character_name))
+        widget_factories = {
+            "Nothing": lambda: self.create_voice_nothing_widgets(character_name),
+            "ElevenLabs": lambda: self.create_elevenlabs_widgets(character_name),
+            "XTTSv2": lambda: self.create_xttsv2_widgets(character_name, voice_type, rvc_enabled, rvc_file),
+            "Edge TTS": lambda: self.create_edge_tts_widgets(character_name, voice_type, rvc_enabled, rvc_file, stacked_widget),
+            "Kokoro": lambda: self.create_kokoro_widgets(character_name, voice_type, rvc_enabled, rvc_file),
+            "Silero": lambda: self.create_silero_widgets(character_name, voice_type, rvc_enabled, rvc_file),
+            "Qwen-3 TTS": lambda: self.create_qwen3_widgets(character_name, voice_type, rvc_enabled, rvc_file),
+            "Inworld": lambda: self.create_inworld_widgets(character_name),
+        }
+        for _display_name, provider_name, _icon_path in engines_data:
+            stacked_widget.addWidget(widget_factories[provider_name]())
         
         content_layout.addWidget(stacked_widget)
         main_layout.addWidget(content_frame, 1)
 
         sidebar_menu.currentRowChanged.connect(stacked_widget.setCurrentIndex)
 
-        self.set_initial_sidebar_selection(current_text_to_speech, sidebar_menu)
+        self.set_initial_sidebar_selection(
+            current_text_to_speech,
+            sidebar_menu,
+            {provider_name: index for index, (_display_name, provider_name, _icon_path) in enumerate(engines_data)},
+        )
 
         dialog.setLayout(main_layout)
         return dialog
 
-    def set_initial_sidebar_selection(self, current_text_to_speech, sidebar_menu):
-        engine_map = {
-            "Nothing": 0,
-            "ElevenLabs": 1,
-            "XTTSv2": 2,
-            "Edge TTS": 3,
-            "Kokoro": 4,
-            "Silero": 5,
-            "Qwen-3 TTS": 6,
-            "Inworld": 7
-        }
-        
-        row_idx = engine_map.get(current_text_to_speech, 0)
+    def set_initial_sidebar_selection(self, current_text_to_speech, sidebar_menu, engine_map=None):
+        row_idx = (engine_map or {}).get(current_text_to_speech, 0)
         sidebar_menu.setCurrentRow(row_idx)
     
     def _create_rvc_params_widget(self, character_name):
@@ -7599,19 +7612,6 @@ class InterfaceSignals():
         gen_layout.setContentsMargins(12, 12, 12, 12)
         gen_layout.setSpacing(10)
 
-        lbl_token = QLabel(self.translations.get("tts_selector_elevenlabs_lbl_1", "ELEVENLABS API KEY"))
-        lbl_token.setFont(f_label)
-        lbl_token.setStyleSheet(lbl_style)
-        
-        token_input = QtWidgets.QLineEdit()
-        token_input.setFont(f_input)
-        token_input.setPlaceholderText(self.translations.get("tts_selector_elevenlabs_2", 'Enter your ElevenLabs API token...'))
-        token_input.setStyleSheet(input_style)
-        
-        elevenlabs_api = self.configuration_api.get_token("ELEVENLABS_API_TOKEN")
-        if elevenlabs_api:
-            token_input.setText(elevenlabs_api)
-
         lbl_voice_id = QLabel("VOICE ID")
         lbl_voice_id.setFont(f_label)
         lbl_voice_id.setStyleSheet(lbl_style)
@@ -7625,8 +7625,6 @@ class InterfaceSignals():
         if elevenlabs_voice_id:
             voice_id_input.setText(elevenlabs_voice_id)
 
-        gen_layout.addWidget(lbl_token)
-        gen_layout.addWidget(token_input)
         gen_layout.addWidget(lbl_voice_id)
         gen_layout.addWidget(voice_id_input)
         layout.addWidget(gen_card)
@@ -7654,7 +7652,7 @@ class InterfaceSignals():
         """)
         layout.addWidget(select_voice_button)
 
-        select_voice_button.clicked.connect(lambda: self.select_voice("ElevenLabs", character_name, voice_id_input.text(), token_input.text()))
+        select_voice_button.clicked.connect(lambda: self.select_voice("ElevenLabs", character_name, voice_id_input.text()))
 
         widget = QWidget()
         widget.setLayout(layout)
@@ -7706,23 +7704,7 @@ class InterfaceSignals():
         form.setContentsMargins(12, 12, 12, 12)
         form.setSpacing(10)
 
-        api_key_input = QLineEdit()
-        api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        api_key_input.setStyleSheet("background-color: rgba(30, 30, 35, 0.5); color: #DEDAD2; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 10px;")
-        api_key_input.setPlaceholderText(self.translations.get("tts_selector_inworld_key", "Inworld API key"))
-        if self.configuration_api.get_token("INWORLD_API_TOKEN"):
-            api_key_input.setPlaceholderText(self.translations.get("tts_selector_inworld_key_saved", "Saved API key — enter a new key to replace it"))
-
         character = self.configuration_characters.load_configuration()["character_list"].get(character_name, {})
-        api_key_row = QHBoxLayout()
-        api_key_row.addWidget(api_key_input)
-        show_key_button = QPushButton("👁")
-        show_key_button.setCheckable(True)
-        show_key_button.setFixedSize(40, 40)
-        show_key_button.setStyleSheet("QPushButton { background: rgba(22, 22, 26, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; }")
-        show_key_button.toggled.connect(lambda visible: api_key_input.setEchoMode(QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password))
-        api_key_row.addWidget(show_key_button)
-
         combo_style = "QComboBox { background-color: rgba(30, 30, 35, 0.5); color: #DEDAD2; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 12px; } QComboBox:hover { border-color: rgba(255, 255, 255, 0.25); }"
         voice_combo = QtWidgets.QComboBox()
         voice_combo.setEditable(True)
@@ -7734,7 +7716,6 @@ class InterfaceSignals():
         model_combo.addItems(["inworld-tts-1.5-mini", "inworld-tts-1.5-max", "inworld-tts-2"])
         model_combo.setCurrentText(character.get("inworld_model_id", "inworld-tts-2"))
 
-        form.addRow(self.translations.get("tts_selector_inworld_key_label", "INWORLD API KEY"), api_key_row)
         form.addRow(self.translations.get("tts_selector_inworld_voice_label", "VOICE ID"), voice_combo)
         form.addRow(self.translations.get("tts_selector_inworld_model_label", "MODEL ID"), model_combo)
         load_voices_button = QPushButton(self.translations.get("tts_selector_inworld_load_voices", "Load voices"))
@@ -7755,7 +7736,7 @@ class InterfaceSignals():
         layout.addWidget(save_button)
 
         def current_api_key():
-            return api_key_input.text().strip() or self.configuration_api.get_token("INWORLD_API_TOKEN")
+            return self.configuration_api.get_token("INWORLD_API_TOKEN")
 
         def selected_voice_id():
             return voice_combo.currentData() or voice_combo.currentText().strip()
@@ -7763,7 +7744,7 @@ class InterfaceSignals():
         async def load_voices():
             key = current_api_key()
             if not key:
-                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_key_required", "Enter an API key first."), msg_type="error")
+                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_provider_required", "Enable Inworld and add its API key in Voice Settings."), msg_type="error")
                 return
             voices = await self.fetch_inworld_voices(key)
             if not voices:
@@ -7789,7 +7770,6 @@ class InterfaceSignals():
             self.playback_worker.add_audio_file(output_file)
 
         load_voices_button.clicked.connect(lambda: asyncio.create_task(load_voices()))
-        api_key_input.editingFinished.connect(lambda: asyncio.create_task(load_voices()) if api_key_input.text().strip() else None)
         preview_button.clicked.connect(lambda: asyncio.create_task(preview_voice()))
 
         def save_inworld_settings():
@@ -7797,11 +7777,8 @@ class InterfaceSignals():
             model_id = model_combo.currentText().strip()
             api_key = current_api_key()
             if not voice_id or not model_id or not api_key:
-                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_invalid", "Enter an API key, voice ID, and model ID."), msg_type="error")
+                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_provider_required", "Enable Inworld and add its API key in Voice Settings."), msg_type="error")
                 return
-
-            if api_key_input.text().strip():
-                self.configuration_api.save_api_token("INWORLD_API_TOKEN", api_key)
 
             config = self.configuration_characters.load_configuration()
             character = config["character_list"][character_name]
@@ -9108,12 +9085,10 @@ class InterfaceSignals():
         widget.setLayout(layout)
         return widget
 
-    def select_voice(self, tts_method, character_name, data, elevenlabs_api, mode=None):
+    def select_voice(self, tts_method, character_name, data):
         match tts_method:
             case "ElevenLabs":
                 voice_id = data
-                
-                self.configuration_api.save_api_token("ELEVENLABS_API_TOKEN", elevenlabs_api)
                 
                 configuration_data = self.configuration_characters.load_configuration()
                 configuration_data["character_list"][character_name]["elevenlabs_voice_id"] = voice_id
