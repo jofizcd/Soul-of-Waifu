@@ -267,6 +267,9 @@ class InterfaceSignals():
             self.ui.tts_provider_save_buttons["Inworld"].clicked.connect(
                 lambda: asyncio.create_task(self.load_global_inworld_voices())
             )
+            self.ui.comboBox_tts_inworld_voice.popupOpened.connect(
+                self.load_global_inworld_voices_on_demand
+            )
             self.ui.button_tts_inworld_load_voices.clicked.connect(
                 lambda: asyncio.create_task(self.load_global_inworld_voices())
             )
@@ -7371,14 +7374,12 @@ class InterfaceSignals():
             }}
         """)
 
-        provider_state = self.configuration_settings.get_main_setting("tts_providers") or {}
         cloud_tokens = {
             "ElevenLabs": "ELEVENLABS_API_TOKEN",
             "Inworld": "INWORLD_API_TOKEN",
         }
 
         def provider_is_ready(provider_name):
-            saved_state = provider_state.get(provider_name, {})
             if provider_name in cloud_tokens:
                 return bool(self.configuration_api.get_token(cloud_tokens[provider_name]))
             return True
@@ -7726,9 +7727,11 @@ class InterfaceSignals():
     async def load_global_inworld_voices(self):
         api_key = self._global_inworld_api_key()
         if not api_key:
+            sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_key_required", "Save an Inworld API key first."), msg_type="error")
             return
         voices = await self.fetch_inworld_voices(api_key)
         if not voices:
+            sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_voices_failed", "Could not load voices. Check the API key."), msg_type="error")
             return
         combo = self.ui.comboBox_tts_inworld_voice
         selected = combo.currentData() or combo.currentText().strip()
@@ -7736,6 +7739,11 @@ class InterfaceSignals():
         for display_name, voice_id in voices:
             combo.addItem(f"{display_name} ({voice_id})", voice_id)
         combo.setCurrentIndex(max(combo.findData(selected), 0))
+        self._global_inworld_voices_key = api_key
+
+    def load_global_inworld_voices_on_demand(self):
+        if self._global_inworld_api_key() != getattr(self, "_global_inworld_voices_key", None):
+            asyncio.create_task(self.load_global_inworld_voices())
 
     async def preview_global_inworld_voice(self):
         api_key = self._global_inworld_api_key()
@@ -7842,15 +7850,14 @@ class InterfaceSignals():
         combo_style = "QComboBox { background-color: rgba(30, 30, 35, 0.98); color: #DEDAD2; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 12px; } QComboBox:hover { border-color: rgba(255, 255, 255, 0.25); } QComboBox QAbstractItemView { background-color: #1e1e23; color: #DEDAD2; border: 1px solid rgba(255, 255, 255, 0.16); selection-background-color: rgba(75, 184, 255, 0.28); outline: none; padding: 4px; } QComboBox QAbstractItemView::item { min-height: 30px; padding: 4px 10px; }"
         button_style = "QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; font-weight: bold; padding: 0 12px; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }"
         voice_combo = QtWidgets.QComboBox()
-        voice_combo.setEditable(True)
         voice_combo.setFixedHeight(40)
         voice_combo.setMaxVisibleItems(5)
         voice_combo.setStyleSheet(combo_style)
         voice_combo.view().setMinimumWidth(360)
         voice_combo.view().setMaximumHeight(220)
-        voice_combo.setCurrentText(character.get("inworld_voice_id") or inworld_defaults.get("default_voice_id", "Dennis"))
+        initial_voice_id = character.get("inworld_voice_id") or inworld_defaults.get("default_voice_id", "Dennis")
+        voice_combo.addItem(initial_voice_id, initial_voice_id)
         model_combo = QtWidgets.QComboBox()
-        model_combo.setEditable(True)
         model_combo.setFixedHeight(40)
         model_combo.setMaxVisibleItems(5)
         model_combo.setStyleSheet(combo_style)
@@ -7916,6 +7923,8 @@ class InterfaceSignals():
 
         load_voices_button.clicked.connect(lambda: asyncio.create_task(load_voices()))
         preview_button.clicked.connect(lambda: asyncio.create_task(preview_voice()))
+        if current_api_key():
+            QtCore.QTimer.singleShot(0, lambda: asyncio.create_task(load_voices()))
 
         def save_inworld_settings():
             voice_id = selected_voice_id()

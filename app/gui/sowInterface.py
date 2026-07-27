@@ -30,6 +30,14 @@ def visibility_icon(hidden=False):
     return QtGui.QIcon(pixmap)
 
 
+class LazyLoadComboBox(QtWidgets.QComboBox):
+    popupOpened = QtCore.pyqtSignal()
+
+    def showPopup(self):
+        self.popupOpened.emit()
+        super().showPopup()
+
+
 class Ui_MainWindow(object):
     def __init__(self):
         self.translations = {}
@@ -2285,14 +2293,32 @@ class Ui_MainWindow(object):
             ("Qwen-3 TTS", None),
             ("Inworld", "INWORLD_API_TOKEN"),
         )
+        title = QtWidgets.QLabel(self.translations.get("voice_settings_title", "Voice Settings"))
+        title.setFont(QtGui.QFont("Inter Tight", 14, QtGui.QFont.Weight.Bold))
+        title.setStyleSheet("color: #DEDAD2; background: transparent; border: none;")
+        description = QtWidgets.QLabel(self.translations.get("voice_settings_description", "Connect and configure speech providers."))
+        description.setWordWrap(True)
+        description.setStyleSheet("color: #6F6B63; background: transparent; border: none;")
+        voice_layout.addWidget(title)
+        voice_layout.addWidget(description)
         self.comboBox_tts_provider = QtWidgets.QComboBox()
         self.comboBox_tts_provider.setFont(font_input)
         self.comboBox_tts_provider.setFixedHeight(40)
         self.comboBox_tts_provider.setObjectName("comboBox_tts_provider")
+        self.comboBox_tts_provider.setStyleSheet(global_input_style)
+        self.comboBox_tts_provider.setMaxVisibleItems(7)
+        self.comboBox_tts_provider.view().setStyleSheet("QListView { background: #1e1e23; color: #DEDAD2; border: 1px solid rgba(255,255,255,0.18); outline: none; padding: 4px; } QListView::item { min-height: 34px; padding: 6px 12px; } QListView::item:selected { background: rgba(75,184,255,0.28); }")
         self.comboBox_tts_provider.addItems([name for name, _token in self.tts_provider_rows])
         voice_layout.addWidget(self.comboBox_tts_provider)
 
-        self.tts_provider_stack = QtWidgets.QStackedWidget()
+        self.tts_provider_container = QtWidgets.QWidget()
+        self.tts_provider_container.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Preferred,
+            QtWidgets.QSizePolicy.Policy.Maximum,
+        )
+        self.tts_provider_container_layout = QtWidgets.QVBoxLayout(self.tts_provider_container)
+        self.tts_provider_container_layout.setContentsMargins(0, 0, 0, 0)
+        self.tts_provider_container_layout.setSpacing(0)
         self.tts_provider_api_keys = {}
         self.tts_provider_panels = {}
         self.tts_provider_save_buttons = {}
@@ -2331,7 +2357,22 @@ class Ui_MainWindow(object):
             if token_name:
                 add_key_row(form, provider_name, token_name)
             else:
-                form.addRow(QtWidgets.QLabel(self.translations.get("voice_settings_local", "Local provider")))
+                configured = sum(
+                    character.get("current_text_to_speech") == provider_name
+                    for character in configuration.ConfigurationCharacters().load_configuration().get("character_list", {}).values()
+                )
+                status = QtWidgets.QLabel(
+                    self.translations.get("tts_local_configured", "Configured characters: {count}").format(count=configured)
+                )
+                status.setStyleSheet("color: #DEDAD2; background: transparent; border: none;")
+                hint = QtWidgets.QLabel(self.translations.get(
+                    "tts_local_character_hint",
+                    "Choose the voice and optional RVC parameters for each character in Character Settings.",
+                ))
+                hint.setWordWrap(True)
+                hint.setStyleSheet("color: #6F6B63; background: transparent; border: none;")
+                form.addRow(status)
+                form.addRow(hint)
 
             if provider_name == "Inworld":
                 inworld = saved_tts_providers.get("Inworld", {})
@@ -2340,17 +2381,16 @@ class Ui_MainWindow(object):
                     self.translations.get("tts_inworld_source_library", "Inworld library"),
                     self.translations.get("tts_inworld_source_clone", "My voice"),
                 ])
-                self.comboBox_tts_inworld_voice = QtWidgets.QComboBox()
-                self.comboBox_tts_inworld_voice.setEditable(True)
+                self.comboBox_tts_inworld_voice = LazyLoadComboBox()
                 self.comboBox_tts_inworld_voice.setFont(font_input)
                 self.comboBox_tts_inworld_voice.setFixedHeight(40)
                 self.comboBox_tts_inworld_voice.setMaxVisibleItems(5)
                 self.comboBox_tts_inworld_voice.setStyleSheet(global_input_style)
                 self.comboBox_tts_inworld_voice.view().setMinimumWidth(360)
                 self.comboBox_tts_inworld_voice.view().setMaximumHeight(220)
-                self.comboBox_tts_inworld_voice.setCurrentText(inworld.get("default_voice_id", "Dennis"))
+                saved_voice_id = inworld.get("default_voice_id", "Dennis")
+                self.comboBox_tts_inworld_voice.addItem(saved_voice_id, saved_voice_id)
                 self.comboBox_tts_inworld_model = QtWidgets.QComboBox()
-                self.comboBox_tts_inworld_model.setEditable(True)
                 self.comboBox_tts_inworld_model.setFont(font_input)
                 self.comboBox_tts_inworld_model.setFixedHeight(40)
                 self.comboBox_tts_inworld_model.setStyleSheet(global_input_style)
@@ -2389,19 +2429,21 @@ class Ui_MainWindow(object):
                 self.comboBox_tts_inworld_source.currentIndexChanged.connect(self.widget_tts_inworld_clone.setVisible)
                 self.widget_tts_inworld_clone.setVisible(False)
 
-            save_button = QtWidgets.QPushButton(self.translations.get("voice_settings_save", "Save voice settings"))
-            save_button.setFont(font_input)
-            save_button.setFixedHeight(40)
-            save_button.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
-            save_button.clicked.connect(lambda _checked=False, name=provider_name: self.save_tts_provider_settings(name))
-            self.tts_provider_save_buttons[provider_name] = save_button
             card_layout.addLayout(form)
-            card_layout.addWidget(save_button)
+            if token_name:
+                save_button = QtWidgets.QPushButton(self.translations.get("voice_settings_save", "Save voice settings"))
+                save_button.setFont(font_input)
+                save_button.setFixedHeight(40)
+                save_button.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
+                save_button.clicked.connect(lambda _checked=False, name=provider_name: self.save_tts_provider_settings(name))
+                self.tts_provider_save_buttons[provider_name] = save_button
+                card_layout.addWidget(save_button)
             self.tts_provider_panels[provider_name] = card
-            self.tts_provider_stack.addWidget(card)
+            card.setVisible(provider_name == self.tts_provider_rows[0][0])
+            self.tts_provider_container_layout.addWidget(card)
 
-        self.comboBox_tts_provider.currentIndexChanged.connect(self.tts_provider_stack.setCurrentIndex)
-        voice_layout.addWidget(self.tts_provider_stack)
+        self.comboBox_tts_provider.currentIndexChanged.connect(self.show_tts_provider_panel)
+        voice_layout.addWidget(self.tts_provider_container)
         voice_layout.addStretch()
         self.update_tts_provider_checks()
         self.tabWidget_options.addWidget(self.voice_settings_tab)
@@ -4875,9 +4917,14 @@ class Ui_MainWindow(object):
             QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton
         )
         for index, (provider_name, token_name) in enumerate(self.tts_provider_rows):
-            provider = (self.configuration.get_main_setting("tts_providers") or {}).get(provider_name, {})
-            ready = bool(self.tts_configuration_api.get_token(token_name)) if token_name else True
+            ready = bool(self.tts_configuration_api.get_token(token_name)) if token_name else False
             self.comboBox_tts_provider.setItemIcon(index, ready_icon if ready else QtGui.QIcon())
+
+    def show_tts_provider_panel(self, index):
+        provider_name = self.tts_provider_rows[index][0]
+        for name, panel in self.tts_provider_panels.items():
+            panel.setVisible(name == provider_name)
+        self.tts_provider_container.adjustSize()
 
     def _create_settings_card_page(self, title, subtitle, card):
         page = QtWidgets.QWidget()
