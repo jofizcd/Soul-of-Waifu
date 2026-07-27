@@ -34,6 +34,15 @@ def load_clone_methods():
     return namespace
 
 
+def load_global_preview_methods():
+    names = {"global_inworld_preview_text", "preview_global_inworld_voice"}
+    methods = [node for node in SIGNALS_CLASS.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in names]
+    module = ast.Module(body=[ast.ClassDef(name="InterfaceSignals", bases=[], keywords=[], body=methods, decorator_list=[])], type_ignores=[])
+    namespace = {"asyncio": asyncio, "os": os, "uuid": uuid}
+    exec(compile(ast.fix_missing_locations(module), "interface_signals.py", "exec"), namespace)
+    return namespace
+
+
 class InworldTtsTest(unittest.IsolatedAsyncioTestCase):
     async def test_request_contract_and_wav_output(self):
         namespace = load_inworld_class()
@@ -154,6 +163,50 @@ class InworldTtsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls["json"]["langCode"], "RU_RU")
         self.assertTrue(calls["json"]["audioProcessingConfig"]["removeBackgroundNoise"])
         self.assertEqual(calls["selected"], 0)
+
+    async def test_global_preview_uses_selected_language_text(self):
+        namespace = load_global_preview_methods()
+        provider = namespace["InterfaceSignals"].__new__(namespace["InterfaceSignals"])
+        calls = []
+
+        class Combo:
+            def __init__(self, value): self.value = value
+            def currentData(self): return None
+            def currentText(self): return self.value
+
+        class VoiceCombo:
+            def currentData(self): return "voice-id"
+            def currentText(self): return "voice-id"
+
+        class Playback:
+            def add_audio_file(self, path): calls.append(("play", path))
+
+        provider.translations = {
+            "tts_inworld_preview_text_ru": "Русский тест.",
+            "tts_inworld_preview_text_en": "English test.",
+        }
+        provider._global_inworld_api_key = lambda: "secret-key"
+        provider.playback_worker = Playback()
+
+        async def preview(api_key, voice_id, model_id, text):
+            calls.append((api_key, voice_id, model_id, text))
+            return b"audio"
+
+        provider.preview_inworld_voice = preview
+        for language, expected_text in (("RU", "Русский тест."), ("EN", "English test.")):
+            provider.ui = type("Ui", (), {
+                "comboBox_tts_inworld_preview_language": Combo(language),
+                "comboBox_tts_inworld_voice": VoiceCombo(),
+                "comboBox_tts_inworld_model": Combo("inworld-tts-2"),
+            })()
+            with tempfile.TemporaryDirectory() as directory:
+                original_cwd = os.getcwd()
+                os.chdir(directory)
+                try:
+                    await provider.preview_global_inworld_voice()
+                finally:
+                    os.chdir(original_cwd)
+            self.assertEqual(calls[-2], ("secret-key", "voice-id", "inworld-tts-2", expected_text))
 
 
 if __name__ == "__main__":

@@ -7749,6 +7749,19 @@ class InterfaceSignals():
         if self._global_inworld_api_key() != getattr(self, "_global_inworld_voices_key", None):
             asyncio.create_task(self.load_global_inworld_voices())
 
+    def global_inworld_preview_text(self):
+        language = self.ui.comboBox_tts_inworld_preview_language.currentData()
+        language = language or self.ui.comboBox_tts_inworld_preview_language.currentText()
+        if str(language).upper().startswith("RU"):
+            return self.translations.get(
+                "tts_inworld_preview_text_ru",
+                "Привет! Это нейтральная проверка голоса.",
+            )
+        return self.translations.get(
+            "tts_inworld_preview_text_en",
+            "Hello! This is a neutral voice check.",
+        )
+
     async def test_local_tts_provider(self, provider_name):
         status = self.ui.tts_local_status_labels.get(provider_name)
         if status:
@@ -7790,10 +7803,7 @@ class InterfaceSignals():
             api_key,
             voice_id,
             self.ui.comboBox_tts_inworld_model.currentText().strip(),
-            self.translations.get(
-                "tts_inworld_preview_text_ru" if self.ui.comboBox_tts_inworld_preview_language.currentText() == "RU" else "tts_inworld_preview_text_en",
-                "Привет! Это нейтральная проверка голоса." if self.ui.comboBox_tts_inworld_preview_language.currentText() == "RU" else "Hello! This is a neutral voice check.",
-            ),
+            self.global_inworld_preview_text(),
         )
         if not audio:
             return
