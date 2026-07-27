@@ -119,6 +119,7 @@ class ElevenLabs:
 class InworldTTS:
     def __init__(self):
         self.configuration_api = configuration.ConfigurationAPI()
+        self.configuration_settings = configuration.ConfigurationSettings()
         self.configuration_characters = configuration.ConfigurationCharacters()
         self.output_dir = "app/voices/inworld_audio"
         os.makedirs(self.output_dir, exist_ok=True)
@@ -126,8 +127,12 @@ class InworldTTS:
     async def generate_speech_with_inworld(self, text, character_name):
         api_key = self.configuration_api.get_token("INWORLD_API_TOKEN")
         character = self.configuration_characters.load_configuration()["character_list"][character_name]
-        voice_id = character.get("inworld_voice_id", "Dennis").strip()
-        model_id = character.get("inworld_model_id", "inworld-tts-2").strip()
+        provider = self.configuration_settings.get_main_setting("tts_providers") or {}
+        inworld = provider.get("Inworld", {})
+        voice_id = character.get("inworld_voice_id") or inworld.get("default_voice_id", "Dennis")
+        model_id = character.get("inworld_model_id") or inworld.get("default_model_id", "inworld-tts-2")
+        voice_id = voice_id.strip()
+        model_id = model_id.strip()
 
         if not api_key or not voice_id or not model_id:
             logger.error("Inworld TTS is not configured")

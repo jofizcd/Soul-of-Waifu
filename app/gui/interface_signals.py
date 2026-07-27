@@ -262,6 +262,13 @@ class InterfaceSignals():
         
         self._selected_lorebooks_building = []
         self._replace_lorebook_building_with_button()
+        if hasattr(self.ui, "button_tts_inworld_load_voices"):
+            self.ui.button_tts_inworld_load_voices.clicked.connect(
+                lambda: asyncio.create_task(self.load_global_inworld_voices())
+            )
+            self.ui.button_tts_inworld_preview.clicked.connect(
+                lambda: asyncio.create_task(self.preview_global_inworld_voice())
+            )
         QtCore.QTimer.singleShot(0, self.refresh_provider_verification_status)
 
     def _replace_lorebook_building_with_button(self):
@@ -5203,6 +5210,21 @@ class InterfaceSignals():
             "color: #4ADE80;" if verified else "color: rgba(255, 255, 255, 0.45);"
         )
         self.ui.label_provider_verification.setText(text)
+        self.update_conversation_provider_checks()
+
+    def update_conversation_provider_checks(self):
+        combo = self.ui.comboBox_conversation_method
+        ready_icon = QtWidgets.QApplication.style().standardIcon(
+            QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton
+        )
+        for index in range(combo.count()):
+            provider = combo.itemText(index)
+            if provider == "Local LLM":
+                model_path = self.configuration_settings.get_main_setting("local_llm")
+                ready = bool(model_path and os.path.exists(model_path))
+            else:
+                ready = self._is_provider_verified(provider)
+            combo.setItemIcon(index, ready_icon if ready else QtGui.QIcon())
 
     def _save_model_setting(self, setting, value, provider):
         if self.configuration_settings.get_main_setting(setting) != value:
@@ -7688,6 +7710,42 @@ class InterfaceSignals():
             logger.error("Inworld preview request failed")
             return None
 
+    def _global_inworld_api_key(self):
+        token = self.ui.tts_provider_api_keys.get("Inworld")
+        return token[1].text().strip() if token else None
+
+    async def load_global_inworld_voices(self):
+        api_key = self._global_inworld_api_key()
+        if not api_key:
+            return
+        voices = await self.fetch_inworld_voices(api_key)
+        if not voices:
+            return
+        combo = self.ui.comboBox_tts_inworld_voice
+        selected = combo.currentData() or combo.currentText().strip()
+        combo.clear()
+        for display_name, voice_id in voices:
+            combo.addItem(f"{display_name} ({voice_id})", voice_id)
+        combo.setCurrentIndex(max(combo.findData(selected), 0))
+
+    async def preview_global_inworld_voice(self):
+        api_key = self._global_inworld_api_key()
+        voice_combo = self.ui.comboBox_tts_inworld_voice
+        voice_id = voice_combo.currentData() or voice_combo.currentText().strip()
+        audio = await self.preview_inworld_voice(
+            api_key,
+            voice_id,
+            self.ui.comboBox_tts_inworld_model.currentText().strip(),
+        )
+        if not audio:
+            return
+        output_dir = "app/voices/inworld_audio"
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, f"preview_{uuid.uuid4().hex}.mp3")
+        with open(output_file, "wb") as preview_file:
+            preview_file.write(audio)
+        self.playback_worker.add_audio_file(output_file)
+
     def create_inworld_widgets(self, character_name):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -7705,16 +7763,17 @@ class InterfaceSignals():
         form.setSpacing(10)
 
         character = self.configuration_characters.load_configuration()["character_list"].get(character_name, {})
+        inworld_defaults = (self.configuration_settings.get_main_setting("tts_providers") or {}).get("Inworld", {})
         combo_style = "QComboBox { background-color: rgba(30, 30, 35, 0.5); color: #DEDAD2; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 12px; } QComboBox:hover { border-color: rgba(255, 255, 255, 0.25); }"
         voice_combo = QtWidgets.QComboBox()
         voice_combo.setEditable(True)
         voice_combo.setStyleSheet(combo_style)
-        voice_combo.setCurrentText(character.get("inworld_voice_id", "Dennis"))
+        voice_combo.setCurrentText(character.get("inworld_voice_id") or inworld_defaults.get("default_voice_id", "Dennis"))
         model_combo = QtWidgets.QComboBox()
         model_combo.setEditable(True)
         model_combo.setStyleSheet(combo_style)
         model_combo.addItems(["inworld-tts-1.5-mini", "inworld-tts-1.5-max", "inworld-tts-2"])
-        model_combo.setCurrentText(character.get("inworld_model_id", "inworld-tts-2"))
+        model_combo.setCurrentText(character.get("inworld_model_id") or inworld_defaults.get("default_model_id", "inworld-tts-2"))
 
         form.addRow(self.translations.get("tts_selector_inworld_voice_label", "VOICE ID"), voice_combo)
         form.addRow(self.translations.get("tts_selector_inworld_model_label", "MODEL ID"), model_combo)

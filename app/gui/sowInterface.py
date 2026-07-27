@@ -16,6 +16,20 @@ class SmallPasswordMaskStyle(QtWidgets.QProxyStyle):
             return ord("·")
         return super().styleHint(hint, option, widget, returnData)
 
+def visibility_icon(hidden=False):
+    pixmap = QtGui.QPixmap(20, 20)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QtGui.QPainter(pixmap)
+    painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+    painter.setPen(QtGui.QPen(QtGui.QColor("#DEDAD2"), 1.6))
+    painter.drawEllipse(2, 6, 16, 8)
+    painter.drawEllipse(8, 8, 4, 4)
+    if hidden:
+        painter.drawLine(3, 3, 17, 17)
+    painter.end()
+    return QtGui.QIcon(pixmap)
+
+
 class Ui_MainWindow(object):
     def __init__(self):
         self.translations = {}
@@ -2100,12 +2114,15 @@ class Ui_MainWindow(object):
         self.lineEdit_api_token_options.setStyle(SmallPasswordMaskStyle(self.lineEdit_api_token_options.style()))
         self.lineEdit_api_token_options.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.show_api_token_button = QtWidgets.QToolButton()
-        self.show_api_token_button.setText("👁")
+        self.show_api_token_button.setIcon(visibility_icon(hidden=True))
         self.show_api_token_button.setCheckable(True)
         self.show_api_token_button.setToolTip("Show API token")
         self.show_api_token_button.toggled.connect(
-            lambda shown: self.lineEdit_api_token_options.setEchoMode(
-                QtWidgets.QLineEdit.EchoMode.Normal if shown else QtWidgets.QLineEdit.EchoMode.Password
+            lambda shown: (
+                self.lineEdit_api_token_options.setEchoMode(
+                    QtWidgets.QLineEdit.EchoMode.Normal if shown else QtWidgets.QLineEdit.EchoMode.Password
+                ),
+                self.show_api_token_button.setIcon(visibility_icon(hidden=not shown)),
             )
         )
         api_token_layout = QtWidgets.QHBoxLayout()
@@ -2258,27 +2275,8 @@ class Ui_MainWindow(object):
         # =================================================================
         self.voice_settings_tab, voice_layout = create_scroll_page()
         self.voice_settings_tab.setObjectName("voice_settings_tab")
-        voice_api = configuration.ConfigurationAPI()
-        voice_providers = self.configuration.get_main_setting("tts_providers") or {}
-
-        voice_card, voice_card_layout = create_glass_card(
-            self.translations.get("voice_settings_title", "Voice Settings")
-        )
-        voice_intro = QtWidgets.QLabel(
-            self.translations.get(
-                "voice_settings_description",
-                "Connect the TTS providers that characters may use. API keys stay in the shared secure configuration."
-            )
-        )
-        voice_intro.setWordWrap(True)
-        voice_intro.setFont(font_input)
-        voice_intro.setStyleSheet("color: #6F6B63; background: transparent; border: none;")
-        voice_card_layout.addWidget(voice_intro)
-
-        provider_form = QtWidgets.QFormLayout()
-        provider_form.setVerticalSpacing(14)
-        provider_form.setHorizontalSpacing(24)
-        provider_rows = (
+        self.tts_configuration_api = configuration.ConfigurationAPI()
+        self.tts_provider_rows = (
             ("ElevenLabs", "ELEVENLABS_API_TOKEN"),
             ("XTTSv2", None),
             ("Edge TTS", None),
@@ -2287,66 +2285,88 @@ class Ui_MainWindow(object):
             ("Qwen-3 TTS", None),
             ("Inworld", "INWORLD_API_TOKEN"),
         )
+        self.comboBox_tts_provider = QtWidgets.QComboBox()
+        self.comboBox_tts_provider.setFont(font_input)
+        self.comboBox_tts_provider.setFixedHeight(40)
+        self.comboBox_tts_provider.setObjectName("comboBox_tts_provider")
+        self.comboBox_tts_provider.addItems([name for name, _token in self.tts_provider_rows])
+        voice_layout.addWidget(self.comboBox_tts_provider)
+
+        self.tts_provider_stack = QtWidgets.QStackedWidget()
         self.tts_provider_enabled = {}
         self.tts_provider_api_keys = {}
+        self.tts_provider_panels = {}
 
-        for provider_name, token_name in provider_rows:
-            enabled = QtWidgets.QCheckBox(provider_name)
-            enabled.setFont(font_input)
-            default_enabled = bool(voice_api.get_token(token_name)) if token_name else True
-            enabled.setChecked(voice_providers.get(provider_name, {}).get("enabled", default_enabled))
-            self.tts_provider_enabled[provider_name] = enabled
-
-            if token_name:
-                key_input = QtWidgets.QLineEdit(voice_api.get_token(token_name) or "")
-                key_input.setFont(font_input)
-                key_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-                key_input.setPlaceholderText(self.translations.get("voice_settings_api_key", "API key"))
-                key_input.setStyleSheet(global_input_style)
-                show_key = QtWidgets.QPushButton("👁")
-                show_key.setCheckable(True)
-                show_key.setFixedSize(36, 36)
-                show_key.setToolTip(self.translations.get("voice_settings_show_key", "Show API key"))
-                show_key.toggled.connect(
-                    lambda shown, field=key_input: field.setEchoMode(
-                        QtWidgets.QLineEdit.EchoMode.Normal if shown else QtWidgets.QLineEdit.EchoMode.Password
-                    )
+        def add_key_row(form, provider_name, token_name):
+            key_input = QtWidgets.QLineEdit(self.tts_configuration_api.get_token(token_name) or "")
+            key_input.setFont(font_input)
+            key_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+            key_input.setPlaceholderText(self.translations.get("voice_settings_api_key", "API key"))
+            key_input.setStyleSheet(global_input_style)
+            show_key = QtWidgets.QToolButton()
+            show_key.setCheckable(True)
+            show_key.setIcon(visibility_icon(hidden=True))
+            show_key.setToolTip(self.translations.get("voice_settings_show_key", "Show API key"))
+            show_key.toggled.connect(
+                lambda shown, field=key_input, button=show_key: (
+                    field.setEchoMode(QtWidgets.QLineEdit.EchoMode.Normal if shown else QtWidgets.QLineEdit.EchoMode.Password),
+                    button.setIcon(visibility_icon(hidden=not shown)),
                 )
-                key_row = QtWidgets.QHBoxLayout()
-                key_row.setContentsMargins(0, 0, 0, 0)
-                key_row.addWidget(key_input)
-                key_row.addWidget(show_key)
-                provider_form.addRow(enabled, key_row)
-                self.tts_provider_api_keys[provider_name] = (token_name, key_input)
-            else:
-                provider_form.addRow(enabled, QtWidgets.QLabel(
-                    self.translations.get("voice_settings_local", "Local provider")
-                ))
-
-        voice_card_layout.addLayout(provider_form)
-        save_voice_settings = QtWidgets.QPushButton(
-            self.translations.get("voice_settings_save", "Save voice settings")
-        )
-        save_voice_settings.setFont(font_input)
-        save_voice_settings.setFixedHeight(40)
-        save_voice_settings.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
-
-        def save_tts_providers():
-            provider_state = {}
-            for name, checkbox in self.tts_provider_enabled.items():
-                token = self.tts_provider_api_keys.get(name)
-                provider_state[name] = {"enabled": checkbox.isChecked() and (not token or bool(token[1].text().strip()))}
-            self.configuration.update_main_setting(
-                "tts_providers",
-                provider_state,
             )
-            for token_name, key_input in self.tts_provider_api_keys.values():
-                voice_api.save_api_token(token_name, key_input.text().strip())
+            row = QtWidgets.QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.addWidget(key_input)
+            row.addWidget(show_key)
+            form.addRow(self.translations.get("voice_settings_api_key", "API key"), row)
+            self.tts_provider_api_keys[provider_name] = (token_name, key_input)
 
-        save_voice_settings.clicked.connect(save_tts_providers)
-        voice_card_layout.addWidget(save_voice_settings)
-        voice_layout.addWidget(voice_card)
+        saved_tts_providers = self.configuration.get_main_setting("tts_providers") or {}
+        for provider_name, token_name in self.tts_provider_rows:
+            card, card_layout = create_glass_card(provider_name)
+            form = QtWidgets.QFormLayout()
+            form.setVerticalSpacing(14)
+            form.setHorizontalSpacing(24)
+            enabled = QtWidgets.QCheckBox(self.translations.get("voice_settings_enabled", "Provider is ready"))
+            enabled.setFont(font_input)
+            enabled.setChecked(bool(saved_tts_providers.get(provider_name, {}).get("enabled")))
+            self.tts_provider_enabled[provider_name] = enabled
+            form.addRow(enabled)
+            if token_name:
+                add_key_row(form, provider_name, token_name)
+            else:
+                form.addRow(QtWidgets.QLabel(self.translations.get("voice_settings_local", "Local provider")))
+
+            if provider_name == "Inworld":
+                inworld = saved_tts_providers.get("Inworld", {})
+                self.comboBox_tts_inworld_voice = QtWidgets.QComboBox()
+                self.comboBox_tts_inworld_voice.setEditable(True)
+                self.comboBox_tts_inworld_voice.setFont(font_input)
+                self.comboBox_tts_inworld_voice.setCurrentText(inworld.get("default_voice_id", "Dennis"))
+                self.comboBox_tts_inworld_model = QtWidgets.QComboBox()
+                self.comboBox_tts_inworld_model.setEditable(True)
+                self.comboBox_tts_inworld_model.setFont(font_input)
+                self.comboBox_tts_inworld_model.addItems(["inworld-tts-1.5-mini", "inworld-tts-1.5-max", "inworld-tts-2"])
+                self.comboBox_tts_inworld_model.setCurrentText(inworld.get("default_model_id", "inworld-tts-2"))
+                self.button_tts_inworld_load_voices = QtWidgets.QPushButton(self.translations.get("tts_selector_inworld_load_voices", "Load voices"))
+                self.button_tts_inworld_preview = QtWidgets.QPushButton(self.translations.get("tts_selector_inworld_preview", "Preview voice"))
+                form.addRow(self.translations.get("tts_selector_inworld_voice_label", "VOICE ID"), self.comboBox_tts_inworld_voice)
+                form.addRow(self.translations.get("tts_selector_inworld_model_label", "MODEL ID"), self.comboBox_tts_inworld_model)
+                form.addRow(self.button_tts_inworld_load_voices, self.button_tts_inworld_preview)
+
+            save_button = QtWidgets.QPushButton(self.translations.get("voice_settings_save", "Save voice settings"))
+            save_button.setFont(font_input)
+            save_button.setFixedHeight(40)
+            save_button.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
+            save_button.clicked.connect(lambda _checked=False, name=provider_name: self.save_tts_provider_settings(name))
+            card_layout.addLayout(form)
+            card_layout.addWidget(save_button)
+            self.tts_provider_panels[provider_name] = card
+            self.tts_provider_stack.addWidget(card)
+
+        self.comboBox_tts_provider.currentIndexChanged.connect(self.tts_provider_stack.setCurrentIndex)
+        voice_layout.addWidget(self.tts_provider_stack)
         voice_layout.addStretch()
+        self.update_tts_provider_checks()
         self.tabWidget_options.addWidget(self.voice_settings_tab)
 
         # =================================================================
@@ -4795,7 +4815,35 @@ class Ui_MainWindow(object):
         self.tabWidget_options.setCurrentIndex(0)
         self.options_menu.setCurrentRow(5)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
-    
+
+    def save_tts_provider_settings(self, provider_name):
+        providers = self.configuration.get_main_setting("tts_providers") or {}
+        token = self.tts_provider_api_keys.get(provider_name)
+        enabled = self.tts_provider_enabled[provider_name].isChecked()
+        if token:
+            token_name, key_input = token
+            api_key = key_input.text().strip()
+            self.tts_configuration_api.save_api_token(token_name, api_key)
+            enabled = enabled and bool(api_key)
+        provider = {"enabled": enabled}
+        if provider_name == "Inworld":
+            provider["default_voice_id"] = self.comboBox_tts_inworld_voice.currentData() or self.comboBox_tts_inworld_voice.currentText().strip()
+            provider["default_model_id"] = self.comboBox_tts_inworld_model.currentText().strip()
+        providers[provider_name] = provider
+        self.configuration.update_main_setting("tts_providers", providers)
+        self.update_tts_provider_checks()
+
+    def update_tts_provider_checks(self):
+        ready_icon = QtWidgets.QApplication.style().standardIcon(
+            QtWidgets.QStyle.StandardPixmap.SP_DialogApplyButton
+        )
+        for index, (provider_name, token_name) in enumerate(self.tts_provider_rows):
+            provider = (self.configuration.get_main_setting("tts_providers") or {}).get(provider_name, {})
+            ready = bool(provider.get("enabled")) and (
+                not token_name or bool(self.tts_configuration_api.get_token(token_name))
+            )
+            self.comboBox_tts_provider.setItemIcon(index, ready_icon if ready else QtGui.QIcon())
+
     def _create_settings_card_page(self, title, subtitle, card):
         page = QtWidgets.QWidget()
         page.setStyleSheet("background: transparent;")
