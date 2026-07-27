@@ -2236,7 +2236,9 @@ class Ui_MainWindow(object):
         
         form_api.addRow(self.openrouter_models_options_label, self.openrouter_layout_widget)
 
-        self.pushButton_test_model = QtWidgets.QPushButton("Check model")
+        self.pushButton_test_model = QtWidgets.QPushButton(
+            self.translations.get("check_model", "Check model")
+        )
         self.pushButton_test_model.setFont(font_input)
         self.pushButton_test_model.setFixedHeight(40)
         self.pushButton_test_model.setObjectName("pushButton_test_model")

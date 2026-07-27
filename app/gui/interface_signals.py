@@ -5138,6 +5138,7 @@ class InterfaceSignals():
     def on_comboBox_conversation_method_changed(self, text):
         self.configuration_settings.update_main_setting("conversation_method", text)
         self.update_local_llm_settings_visibility(text)
+        self._reset_model_test_result()
         self.refresh_provider_verification_status()
         if text == "OpenRouter":
             self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_api_value", "Write API value"))
@@ -5177,6 +5178,12 @@ class InterfaceSignals():
             del verified[provider]
             self.configuration_settings.update_main_setting("verified_provider_models", verified)
 
+    def _reset_model_test_result(self):
+        self.ui.label_model_test_result.clear()
+        self.ui.label_model_test_result.setStyleSheet("color: rgba(255, 255, 255, 0.45);")
+        if self._model_test_task and not self._model_test_task.done():
+            self._model_test_task.cancel()
+
     def refresh_provider_verification_status(self):
         if not hasattr(self.ui, "label_provider_verification"):
             return
@@ -5197,6 +5204,7 @@ class InterfaceSignals():
         if self.configuration_settings.get_main_setting(setting) != value:
             self.configuration_settings.update_main_setting(setting, value)
             self._clear_provider_verification(provider)
+            self._reset_model_test_result()
             self.refresh_provider_verification_status()
 
     def update_local_llm_settings_visibility(self, conversation_method):
@@ -6115,6 +6123,7 @@ class InterfaceSignals():
             if self.configuration_api.get_token(api_key_name) != value:
                 self.configuration_api.save_api_token(api_key_name, value)
                 self._clear_provider_verification(selected_conversation_method)
+                self._reset_model_test_result()
                 self.refresh_provider_verification_status()
 
     def on_pushButton_test_model_clicked(self):
@@ -6181,6 +6190,7 @@ class InterfaceSignals():
         if self.configuration_api.get_token("CUSTOM_ENDPOINT_URL") != value:
             self.configuration_api.save_api_token("CUSTOM_ENDPOINT_URL", value)
             self._clear_provider_verification("Open AI")
+            self._reset_model_test_result()
             self.refresh_provider_verification_status()
 
     def save_mistral_model_endpoint_in_real_time(self):

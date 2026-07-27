@@ -328,6 +328,7 @@ openrouter_models_label: "Model"
 openrouter_models_loading: "Loading models..."
 openrouter_models_load_error: "Couldn't load the OpenRouter model list. Click Refresh to try again."
 openrouter_models_refresh: "Refresh OpenRouter models"
+check_model: "Check model"
 placeholder_base_url: "Write your custom endpoint url (Optional)"
 placeholder_base_api: "Write API value (Optional)"
 

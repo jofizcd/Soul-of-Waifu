@@ -330,6 +330,7 @@ openrouter_models_label: "Модель"
 openrouter_models_loading: "Загрузка моделей..."
 openrouter_models_load_error: "Не удалось загрузить список моделей OpenRouter. Нажмите «Обновить», чтобы повторить попытку."
 openrouter_models_refresh: "Обновить список моделей OpenRouter"
+check_model: "Проверить модель"
 placeholder_base_url: "URL пользовательского эндпоинта (Опционально)"
 placeholder_base_api: "API токен (Опционально)"
 
