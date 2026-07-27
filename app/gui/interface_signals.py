@@ -12,6 +12,7 @@ import datetime
 import time
 import webbrowser
 import urllib.request
+import wave
 from pathlib import Path
 
 import yaml
@@ -263,11 +264,18 @@ class InterfaceSignals():
         self._selected_lorebooks_building = []
         self._replace_lorebook_building_with_button()
         if hasattr(self.ui, "button_tts_inworld_load_voices"):
+            self.ui.tts_provider_save_buttons["Inworld"].clicked.connect(
+                lambda: asyncio.create_task(self.load_global_inworld_voices())
+            )
             self.ui.button_tts_inworld_load_voices.clicked.connect(
                 lambda: asyncio.create_task(self.load_global_inworld_voices())
             )
             self.ui.button_tts_inworld_preview.clicked.connect(
                 lambda: asyncio.create_task(self.preview_global_inworld_voice())
+            )
+            self.ui.button_tts_inworld_clone_file.clicked.connect(self.choose_global_inworld_clone_file)
+            self.ui.button_tts_inworld_clone.clicked.connect(
+                lambda: asyncio.create_task(self.clone_global_inworld_voice())
             )
         QtCore.QTimer.singleShot(0, self.refresh_provider_verification_status)
 
@@ -7750,6 +7758,68 @@ class InterfaceSignals():
         with open(output_file, "wb") as preview_file:
             preview_file.write(audio)
         self.playback_worker.add_audio_file(output_file)
+
+    def choose_global_inworld_clone_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.main_window,
+            self.translations.get("tts_inworld_clone_choose_file", "Choose audio file"),
+            "",
+            "Audio files (*.wav *.mp3 *.webm)",
+        )
+        if file_path:
+            self.ui.lineEdit_tts_inworld_clone_file.setText(file_path)
+
+    async def clone_global_inworld_voice(self):
+        api_key = self._global_inworld_api_key()
+        file_path = self.ui.lineEdit_tts_inworld_clone_file.text().strip()
+        display_name = self.ui.lineEdit_tts_inworld_clone_name.text().strip()
+        if not api_key or not file_path or not display_name or not self.ui.checkBox_tts_inworld_clone_rights.isChecked():
+            sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_clone_required", "Choose a file, name the voice, and confirm your rights."), msg_type="error")
+            return
+        if not os.path.isfile(file_path) or os.path.getsize(file_path) > 4 * 1024 * 1024:
+            sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_clone_file_invalid", "Use a WAV, MP3, or WebM file up to 4 MB."), msg_type="error")
+            return
+        if file_path.lower().endswith(".wav"):
+            try:
+                with wave.open(file_path, "rb") as wav_file:
+                    duration = wav_file.getnframes() / wav_file.getframerate()
+                if not 5 <= duration <= 15:
+                    raise ValueError("invalid duration")
+            except (OSError, wave.Error, ValueError):
+                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_clone_duration_invalid", "Use a WAV sample from 5 to 15 seconds."), msg_type="error")
+                return
+        try:
+            with open(file_path, "rb") as audio_file:
+                audio_data = base64.b64encode(audio_file.read()).decode("ascii")
+            payload = {
+                "displayName": display_name,
+                "langCode": self.ui.comboBox_tts_inworld_clone_language.currentText(),
+                "voiceSamples": [{"audioData": audio_data, "transcription": "Voice sample."}],
+                "audioProcessingConfig": {"removeBackgroundNoise": True},
+            }
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    "https://api.inworld.ai/voices/v1/voices:clone",
+                    json=payload,
+                    headers={"Authorization": f"Basic {api_key}"},
+                ) as response:
+                    if response.status not in (200, 201):
+                        raise ValueError("clone request failed")
+                    data = await response.json()
+        except (OSError, aiohttp.ClientError, ValueError):
+            sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_clone_failed", "Voice creation failed. Check the audio and connection."), msg_type="error")
+            return
+
+        voice_id = data.get("voiceId") or data.get("voice", {}).get("voiceId")
+        if not voice_id:
+            sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_clone_failed", "Voice creation failed. Check the audio and connection."), msg_type="error")
+            return
+        await self.load_global_inworld_voices()
+        combo = self.ui.comboBox_tts_inworld_voice
+        index = combo.findData(voice_id)
+        if index >= 0:
+            combo.setCurrentIndex(index)
 
     def create_inworld_widgets(self, character_name):
         layout = QVBoxLayout()

@@ -2295,6 +2295,7 @@ class Ui_MainWindow(object):
         self.tts_provider_stack = QtWidgets.QStackedWidget()
         self.tts_provider_api_keys = {}
         self.tts_provider_panels = {}
+        self.tts_provider_save_buttons = {}
 
         def add_key_row(form, provider_name, token_name):
             key_input = QtWidgets.QLineEdit(self.tts_configuration_api.get_token(token_name) or "")
@@ -2334,6 +2335,11 @@ class Ui_MainWindow(object):
 
             if provider_name == "Inworld":
                 inworld = saved_tts_providers.get("Inworld", {})
+                self.comboBox_tts_inworld_source = QtWidgets.QComboBox()
+                self.comboBox_tts_inworld_source.addItems([
+                    self.translations.get("tts_inworld_source_library", "Inworld library"),
+                    self.translations.get("tts_inworld_source_clone", "My voice"),
+                ])
                 self.comboBox_tts_inworld_voice = QtWidgets.QComboBox()
                 self.comboBox_tts_inworld_voice.setEditable(True)
                 self.comboBox_tts_inworld_voice.setFont(font_input)
@@ -2348,6 +2354,22 @@ class Ui_MainWindow(object):
                 self.comboBox_tts_inworld_preview_language = QtWidgets.QComboBox()
                 self.comboBox_tts_inworld_preview_language.setFixedWidth(68)
                 self.comboBox_tts_inworld_preview_language.addItems(["RU", "EN"])
+                self.lineEdit_tts_inworld_clone_file = QtWidgets.QLineEdit()
+                self.lineEdit_tts_inworld_clone_file.setReadOnly(True)
+                self.lineEdit_tts_inworld_clone_name = QtWidgets.QLineEdit()
+                self.comboBox_tts_inworld_clone_language = QtWidgets.QComboBox()
+                self.comboBox_tts_inworld_clone_language.addItems(["RU_RU", "EN_US"])
+                self.checkBox_tts_inworld_clone_rights = QtWidgets.QCheckBox(self.translations.get("tts_inworld_clone_rights", "I have the right to clone this voice"))
+                self.button_tts_inworld_clone_file = QtWidgets.QPushButton(self.translations.get("tts_inworld_clone_choose_file", "Choose audio file"))
+                self.button_tts_inworld_clone = QtWidgets.QPushButton(self.translations.get("tts_inworld_clone_action", "Create voice"))
+                clone_form = QtWidgets.QFormLayout()
+                clone_form.addRow(self.button_tts_inworld_clone_file, self.lineEdit_tts_inworld_clone_file)
+                clone_form.addRow(self.translations.get("tts_inworld_clone_name", "Voice name"), self.lineEdit_tts_inworld_clone_name)
+                clone_form.addRow(self.translations.get("tts_inworld_clone_language", "Language"), self.comboBox_tts_inworld_clone_language)
+                clone_form.addRow(self.checkBox_tts_inworld_clone_rights)
+                clone_form.addRow(self.button_tts_inworld_clone)
+                self.widget_tts_inworld_clone = QtWidgets.QWidget()
+                self.widget_tts_inworld_clone.setLayout(clone_form)
                 form.addRow(self.translations.get("tts_selector_inworld_voice_label", "VOICE ID"), self.comboBox_tts_inworld_voice)
                 form.addRow(self.translations.get("tts_selector_inworld_model_label", "MODEL ID"), self.comboBox_tts_inworld_model)
                 preview_row = QtWidgets.QHBoxLayout()
@@ -2355,12 +2377,17 @@ class Ui_MainWindow(object):
                 preview_row.addWidget(self.button_tts_inworld_preview)
                 preview_row.addWidget(self.comboBox_tts_inworld_preview_language)
                 form.addRow(self.button_tts_inworld_load_voices, preview_row)
+                form.addRow(self.translations.get("tts_inworld_voice_source", "Voice source"), self.comboBox_tts_inworld_source)
+                form.addRow(self.widget_tts_inworld_clone)
+                self.comboBox_tts_inworld_source.currentIndexChanged.connect(self.widget_tts_inworld_clone.setVisible)
+                self.widget_tts_inworld_clone.setVisible(False)
 
             save_button = QtWidgets.QPushButton(self.translations.get("voice_settings_save", "Save voice settings"))
             save_button.setFont(font_input)
             save_button.setFixedHeight(40)
             save_button.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
             save_button.clicked.connect(lambda _checked=False, name=provider_name: self.save_tts_provider_settings(name))
+            self.tts_provider_save_buttons[provider_name] = save_button
             card_layout.addLayout(form)
             card_layout.addWidget(save_button)
             self.tts_provider_panels[provider_name] = card
