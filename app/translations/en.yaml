@@ -926,6 +926,16 @@ tts_selector_qwen3_lbl_4: "DESCRIBE VOICE IN ENGLISH (PROMPT)"
 tts_selector_qwen3_lbl_5: "REFERENCE AUDIO FILE (.WAV)"
 tts_selector_qwen3_lbl_6: "No reference audio selected"
 
+tts_selector_inworld: "Inworld TTS Configuration"
+tts_selector_inworld_key_label: "INWORLD API KEY"
+tts_selector_inworld_key: "Inworld API key"
+tts_selector_inworld_key_saved: "Saved API key — enter a new key to replace it"
+tts_selector_inworld_voice_label: "VOICE ID"
+tts_selector_inworld_voice: "Voice ID (for example, Dennis)"
+tts_selector_inworld_model_label: "MODEL ID"
+tts_selector_inworld_model: "Model ID"
+tts_selector_inworld_invalid: "Enter an API key, voice ID, and model ID."
+
 
 # ──────────────────────────────────────────────────────────
 # EXPRESSIONS SELECTOR

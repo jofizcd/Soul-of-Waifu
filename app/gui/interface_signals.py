@@ -36,7 +36,7 @@ from PyQt6.QtWidgets import (
     QApplication, QInputDialog, QLabel, QMessageBox, QPushButton,
     QWidget, QHBoxLayout, QDialog, QVBoxLayout, QStackedWidget, QFileDialog,
     QGraphicsDropShadowEffect, QFrame, QMenu, QTextEdit, QLineEdit, QColorDialog, QSlider, QSpinBox,
-    QScrollArea, QSizePolicy, QGridLayout
+    QScrollArea, QSizePolicy, QGridLayout, QFormLayout
 )
 
 from app.utils.ai_clients.local_server_manager import LocalServerManager
@@ -7348,7 +7348,8 @@ class InterfaceSignals():
             ("Edge TTS", "app/gui/icons/tts_logo/edgetts.png"),
             ("Kokoro", "app/gui/icons/tts_logo/kokorotts.png"),
             ("Silero (RU)", "app/gui/icons/tts_logo/silerotts.png"),
-            ("Qwen-3 TTS", "app/gui/icons/tts_logo/qwentts.png")
+            ("Qwen-3 TTS", "app/gui/icons/tts_logo/qwentts.png"),
+            ("Inworld", "app/gui/icons/tts_logo/elevenlabs.png")
         ]
 
         for name, icon_path in engines_data:
@@ -7377,6 +7378,7 @@ class InterfaceSignals():
         stacked_widget.addWidget(self.create_kokoro_widgets(character_name, voice_type, rvc_enabled, rvc_file))
         stacked_widget.addWidget(self.create_silero_widgets(character_name, voice_type, rvc_enabled, rvc_file))
         stacked_widget.addWidget(self.create_qwen3_widgets(character_name, voice_type, rvc_enabled, rvc_file))
+        stacked_widget.addWidget(self.create_inworld_widgets(character_name))
         
         content_layout.addWidget(stacked_widget)
         main_layout.addWidget(content_frame, 1)
@@ -7396,7 +7398,8 @@ class InterfaceSignals():
             "Edge TTS": 3,
             "Kokoro": 4,
             "Silero": 5,
-            "Qwen-3 TTS": 6
+            "Qwen-3 TTS": 6,
+            "Inworld": 7
         }
         
         row_idx = engine_map.get(current_text_to_speech, 0)
@@ -7653,6 +7656,70 @@ class InterfaceSignals():
 
         select_voice_button.clicked.connect(lambda: self.select_voice("ElevenLabs", character_name, voice_id_input.text(), token_input.text()))
 
+        widget = QWidget()
+        widget.setLayout(layout)
+        return widget
+
+    def create_inworld_widgets(self, character_name):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        title = QLabel(self.translations.get("tts_selector_inworld", "Inworld TTS Configuration"))
+        title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; background: transparent; border: none;")
+        layout.addWidget(title)
+
+        card = QFrame()
+        card.setStyleSheet("QFrame { background-color: rgba(255, 255, 255, 0.015); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; }")
+        form = QFormLayout(card)
+        form.setContentsMargins(12, 12, 12, 12)
+        form.setSpacing(10)
+
+        api_key_input = QLineEdit()
+        api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        api_key_input.setPlaceholderText(self.translations.get("tts_selector_inworld_key", "Inworld API key"))
+        if self.configuration_api.get_token("INWORLD_API_TOKEN"):
+            api_key_input.setPlaceholderText(self.translations.get("tts_selector_inworld_key_saved", "Saved API key — enter a new key to replace it"))
+
+        character = self.configuration_characters.load_configuration()["character_list"].get(character_name, {})
+        voice_id_input = QLineEdit(character.get("inworld_voice_id", "Dennis"))
+        voice_id_input.setPlaceholderText(self.translations.get("tts_selector_inworld_voice", "Voice ID (for example, Dennis)"))
+        model_id_input = QLineEdit(character.get("inworld_model_id", "inworld-tts-2"))
+        model_id_input.setPlaceholderText(self.translations.get("tts_selector_inworld_model", "Model ID"))
+
+        form.addRow(self.translations.get("tts_selector_inworld_key_label", "INWORLD API KEY"), api_key_input)
+        form.addRow(self.translations.get("tts_selector_inworld_voice_label", "VOICE ID"), voice_id_input)
+        form.addRow(self.translations.get("tts_selector_inworld_model_label", "MODEL ID"), model_id_input)
+        layout.addWidget(card)
+        layout.addStretch(1)
+
+        save_button = QPushButton(self.translations.get("tts_selector_save_button", "Save Selection"))
+        save_button.setFixedHeight(40)
+        save_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_button.setStyleSheet("QPushButton { background: rgba(75, 184, 255, 0.12); border: 1px solid rgba(75, 184, 255, 0.25); border-radius: 8px; color: #4BB8FF; font-weight: bold; } QPushButton:hover { background: rgba(75, 184, 255, 0.25); }")
+        layout.addWidget(save_button)
+
+        def save_inworld_settings():
+            voice_id = voice_id_input.text().strip()
+            model_id = model_id_input.text().strip()
+            api_key = api_key_input.text().strip()
+            if not voice_id or not model_id or (not api_key and not self.configuration_api.get_token("INWORLD_API_TOKEN")):
+                sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_inworld_invalid", "Enter an API key, voice ID, and model ID."), msg_type="error")
+                return
+
+            if api_key:
+                self.configuration_api.save_api_token("INWORLD_API_TOKEN", api_key)
+
+            config = self.configuration_characters.load_configuration()
+            character = config["character_list"][character_name]
+            character["current_text_to_speech"] = "Inworld"
+            character["inworld_voice_id"] = voice_id
+            character["inworld_model_id"] = model_id
+            self.configuration_characters.save_configuration_edit(config)
+            sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_selector_save_information", "Voice successfully saved!"), msg_type="success")
+
+        save_button.clicked.connect(save_inworld_settings)
         widget = QWidget()
         widget.setLayout(layout)
         return widget

@@ -927,6 +927,16 @@ tts_selector_qwen3_lbl_6: "Не выбрано ни одного примерн�
 
 
 # ──────────────────────────────────────────────────────────
+tts_selector_inworld: "Конфигурация Inworld TTS"
+tts_selector_inworld_key_label: "INWORLD API КЛЮЧ"
+tts_selector_inworld_key: "API-ключ Inworld"
+tts_selector_inworld_key_saved: "Ключ сохранён — введите новый, чтобы заменить"
+tts_selector_inworld_voice_label: "VOICE ID"
+tts_selector_inworld_voice: "Voice ID (например, Dennis)"
+tts_selector_inworld_model_label: "MODEL ID"
+tts_selector_inworld_model: "ID модели"
+tts_selector_inworld_invalid: "Введите API-ключ, Voice ID и ID модели."
+
 # EXPRESSIONS SELECTOR
 # ──────────────────────────────────────────────────────────
 expressions_selector_title: "Выбор выражения"

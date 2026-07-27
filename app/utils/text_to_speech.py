@@ -7,6 +7,8 @@ import time
 import torch
 import asyncio
 import logging
+import base64
+import aiohttp
 import edge_tts
 import contextlib
 import numpy as np
@@ -112,6 +114,59 @@ class ElevenLabs:
 
     def clear_audio_cache(self):
         self.audio_cache = AudioSegment.empty()
+
+
+class InworldTTS:
+    def __init__(self):
+        self.configuration_api = configuration.ConfigurationAPI()
+        self.configuration_characters = configuration.ConfigurationCharacters()
+        self.output_dir = "app/voices/inworld_audio"
+        os.makedirs(self.output_dir, exist_ok=True)
+
+    async def generate_speech_with_inworld(self, text, character_name):
+        api_key = self.configuration_api.get_token("INWORLD_API_TOKEN")
+        character = self.configuration_characters.load_configuration()["character_list"][character_name]
+        voice_id = character.get("inworld_voice_id", "Dennis").strip()
+        model_id = character.get("inworld_model_id", "inworld-tts-2").strip()
+
+        if not api_key or not voice_id or not model_id:
+            logger.error("Inworld TTS is not configured")
+            return None
+
+        payload = {
+            "text": text,
+            "voiceId": voice_id,
+            "modelId": model_id,
+            "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": 22050},
+        }
+        headers = {"Authorization": f"Basic {api_key}", "Content-Type": "application/json"}
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post("https://api.inworld.ai/tts/v1/voice", json=payload, headers=headers) as response:
+                    if response.status != 200:
+                        logger.error("Inworld TTS request failed with status %s", response.status)
+                        return None
+                    data = await response.json()
+
+            audio_content = data.get("audioContent") or data.get("result", {}).get("audioContent")
+            if not audio_content:
+                logger.error("Inworld TTS response has no audio content")
+                return None
+
+            output_file = os.path.join(self.output_dir, f"output_{uuid.uuid4().hex}.wav")
+            audio_data = base64.b64decode(audio_content, validate=True)
+            await asyncio.to_thread(self._write_audio, output_file, audio_data)
+            return output_file
+        except (aiohttp.ClientError, ValueError, OSError) as error:
+            logger.error("Inworld TTS generation failed (%s)", type(error).__name__)
+            return None
+
+    @staticmethod
+    def _write_audio(output_file, audio_data):
+        with open(output_file, "wb") as audio_file:
+            audio_file.write(audio_data)
 
 
 class XTTSv2_SOW_System:
@@ -833,6 +888,7 @@ class TTSWorker(QThread):
         self.silero = SileroTTS_SOW_System()
         self.qwen = Qwen3TTS_SOW_System()
         self.eleven = ElevenLabs()
+        self.inworld = InworldTTS()
 
         self.playback_worker = AudioPlaybackWorker(self.device_index)
         self.playback_worker.start()
@@ -929,6 +985,10 @@ class TTSWorker(QThread):
                     elif self.tts_method == "ElevenLabs":
                         output_file = loop.run_until_complete(
                             self.eleven.generate_speech_with_elevenlabs_sow_system(text, self.voice_id)
+                        )
+                    elif self.tts_method == "Inworld":
+                        output_file = loop.run_until_complete(
+                            self.inworld.generate_speech_with_inworld(text, self.character_name)
                         )
 
                     if self.discard_current:
