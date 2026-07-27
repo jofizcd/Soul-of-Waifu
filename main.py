@@ -437,6 +437,7 @@ class MainWindow(QMainWindow):
 
         # LineEdits
         self.ui.lineEdit_api_token_options.textChanged.connect(self.interface_signals.save_api_token_in_real_time)
+        self.ui.pushButton_test_model.clicked.connect(self.interface_signals.on_pushButton_test_model_clicked)
         self.ui.lineEdit_base_url_options.textChanged.connect(self.interface_signals.save_custom_url_in_real_time)
         self.ui.lineEdit_openai_model.textChanged.connect(self.interface_signals.save_openai_model_in_real_time)
         self.ui.lineEdit_mistral_model.textChanged.connect(self.interface_signals.save_mistral_model_endpoint_in_real_time)

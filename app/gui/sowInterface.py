@@ -2197,6 +2197,15 @@ class Ui_MainWindow(object):
         
         form_api.addRow(self.openrouter_models_options_label, self.openrouter_layout_widget)
 
+        self.pushButton_test_model = QtWidgets.QPushButton("Check model")
+        self.pushButton_test_model.setFont(font_input)
+        self.pushButton_test_model.setFixedHeight(40)
+        self.pushButton_test_model.setObjectName("pushButton_test_model")
+        self.label_model_test_result = QtWidgets.QLabel()
+        self.label_model_test_result.setFont(font_input)
+        self.label_model_test_result.setWordWrap(True)
+        form_api.addRow(self.pushButton_test_model, self.label_model_test_result)
+
         l_api.addLayout(form_api)
         conf_layout.addWidget(self.card_api)
         

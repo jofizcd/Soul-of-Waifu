@@ -9,6 +9,7 @@ import hashlib
 import logging
 import threading
 import datetime
+import time
 import webbrowser
 import urllib.request
 from pathlib import Path
@@ -99,6 +100,7 @@ class InterfaceSignals():
         self.models = []
         self.filtered_models = []
         self._openrouter_models_task = None
+        self._model_test_task = None
 
         self.emotion_task = None
 
@@ -5990,6 +5992,56 @@ class InterfaceSignals():
         api_key_name = token_map.get(selected_conversation_method)
         if api_key_name:
             self.configuration_api.save_api_token(api_key_name, self.ui.lineEdit_api_token_options.text())
+
+    def on_pushButton_test_model_clicked(self):
+        if self._model_test_task and not self._model_test_task.done():
+            return
+        self._model_test_task = asyncio.create_task(self.test_selected_model())
+
+    async def test_selected_model(self):
+        button = self.ui.pushButton_test_model
+        result = self.ui.label_model_test_result
+        button.setEnabled(False)
+        result.setStyleSheet("color: #facc15;")
+        result.setText("Checking model...")
+        started = None
+        first_response = None
+
+        try:
+            method = self.ui.comboBox_conversation_method.currentText()
+            if method != "Local LLM" and not self.ui.lineEdit_api_token_options.text().strip():
+                raise ValueError("missing API token")
+
+            provider = AIFactory.get_provider(method)
+            if not provider:
+                raise ValueError("unsupported provider")
+
+            started = time.perf_counter()
+            async for chunk in provider.generate_stream(
+                [{"role": "user", "content": "Reply with OK."}],
+                max_tokens=1,
+                temperature=0,
+            ):
+                if "API Error:" in chunk or chunk.lstrip().startswith("⚠️"):
+                    raise RuntimeError("provider rejected the request")
+                if first_response is None and chunk:
+                    first_response = time.perf_counter() - started
+
+            total = time.perf_counter() - started
+            if first_response is None:
+                raise RuntimeError("model returned no text")
+
+            result.setStyleSheet("color: #4ADE80;")
+            result.setText(f"Model is available. First response: {first_response:.2f}s. Total: {total:.2f}s.")
+        except Exception:
+            result.setStyleSheet("color: #f87171;")
+            if started is None:
+                result.setText("Model check failed. Check the API token, model name, and connection.")
+            else:
+                total = time.perf_counter() - started
+                result.setText(f"Model check failed. Total: {total:.2f}s. Check the API token, model name, and connection.")
+        finally:
+            button.setEnabled(True)
 
     def save_openai_model_in_real_time(self):
         self.configuration_settings.update_main_setting("openai_model", self.ui.lineEdit_openai_model.text().strip())
