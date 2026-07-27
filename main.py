@@ -835,12 +835,14 @@ if __name__ == "__main__":
 
     current_version = "v2.4.0"
 
-    def deferred_update_check():
-        latest_version, github_url = main_window.check_for_updates(current_version)
+    async def deferred_update_check():
+        latest_version, github_url = await asyncio.to_thread(
+            main_window.check_for_updates, current_version
+        )
         if latest_version:
             main_window.show_update_dialog(latest_version, github_url)
 
-    QtCore.QTimer.singleShot(0, deferred_update_check)
+    QtCore.QTimer.singleShot(0, lambda: asyncio.ensure_future(deferred_update_check()))
     
     asyncio.ensure_future(main_window.startup_sequence())
 
