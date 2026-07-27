@@ -2052,7 +2052,23 @@ class Ui_MainWindow(object):
         self.lineEdit_api_token_options.setFont(font_input)
         self.lineEdit_api_token_options.setFixedHeight(40)
         self.lineEdit_api_token_options.setObjectName("lineEdit_api_token_options")
-        form_api.addRow(self.conversation_method_token_title_label, self.lineEdit_api_token_options)
+        self.lineEdit_api_token_options.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self.show_api_token_button = QtWidgets.QToolButton()
+        self.show_api_token_button.setText("👁")
+        self.show_api_token_button.setCheckable(True)
+        self.show_api_token_button.setToolTip("Show API token")
+        self.show_api_token_button.toggled.connect(
+            lambda shown: self.lineEdit_api_token_options.setEchoMode(
+                QtWidgets.QLineEdit.EchoMode.Normal if shown else QtWidgets.QLineEdit.EchoMode.Password
+            )
+        )
+        api_token_layout = QtWidgets.QHBoxLayout()
+        api_token_layout.setContentsMargins(0, 0, 0, 0)
+        api_token_layout.addWidget(self.lineEdit_api_token_options)
+        api_token_layout.addWidget(self.show_api_token_button)
+        api_token_widget = QtWidgets.QWidget()
+        api_token_widget.setLayout(api_token_layout)
+        form_api.addRow(self.conversation_method_token_title_label, api_token_widget)
 
         self.label_base_url = QtWidgets.QLabel("Base URL")
         self.label_base_url.setFont(font_label)
