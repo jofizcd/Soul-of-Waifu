@@ -3987,8 +3987,6 @@ class Ui_MainWindow(object):
             self.btn_open_prompts,
             self.btn_open_lorebook,
             self.btn_open_soul_stage,
-            self.btn_open_image_gen,
-            self.btn_open_discord_bot
         ]
 
         QtCore.QTimer.singleShot(0, self.update_rp_layout)
@@ -4000,6 +3998,22 @@ class Ui_MainWindow(object):
         main_rp_layout.addWidget(self.rp_scroll_area)
 
         self.stackedWidget.addWidget(self.rp_editors_page)
+
+        self.image_generation_page = self._create_settings_card_page(
+            self.translations.get("image_generation_title", "Image Generation"),
+            self.translations.get("image_generation_subtitle", "Configure AI image generation for your characters and stories."),
+            self.btn_open_image_gen,
+        )
+        self.image_generation_page.setObjectName("image_generation_page")
+        self.stackedWidget.addWidget(self.image_generation_page)
+
+        self.integrations_page = self._create_settings_card_page(
+            self.translations.get("integrations_title", "Integrations"),
+            self.translations.get("integrations_subtitle", "Connect Soul of Waifu to external services."),
+            self.btn_open_discord_bot,
+        )
+        self.integrations_page.setObjectName("integrations_page")
+        self.stackedWidget.addWidget(self.integrations_page)
         # =============================================================
 
         self.soul_stage_page = SoulStagePage()
@@ -4240,6 +4254,18 @@ class Ui_MainWindow(object):
         self.pushButton_rp_editors.setAutoExclusive(True)
         self.pushButton_rp_editors.setObjectName("pushButton_rp_editors")
         self.verticalLayout.addWidget(self.pushButton_rp_editors)
+
+        self.pushButton_image_generation = self._add_sidebar_button(
+            self.translations.get("image_generation_title", "Image Generation"),
+            "app/gui/icons/background_icon.png",
+            "pushButton_image_generation",
+        )
+
+        self.pushButton_integrations = self._add_sidebar_button(
+            self.translations.get("integrations_title", "Integrations"),
+            "app/gui/icons/discord.png",
+            "pushButton_integrations",
+        )
         
         self.pushButton_characters_gateway = RippleButton(parent=self.SideBar_Left)
         self.pushButton_characters_gateway.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -4644,6 +4670,46 @@ class Ui_MainWindow(object):
         self.tabWidget_options.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
     
+    def _create_settings_card_page(self, title, subtitle, card):
+        page = QtWidgets.QWidget()
+        page.setStyleSheet("background: transparent;")
+        layout = QtWidgets.QVBoxLayout(page)
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(20)
+
+        title_label = QtWidgets.QLabel(title)
+        title_label.setFont(QtGui.QFont("Inter Tight SemiBold", 20, QtGui.QFont.Weight.Bold))
+        title_label.setStyleSheet("color: rgba(255, 255, 255, 0.95); border: none; background: transparent;")
+        layout.addWidget(title_label)
+
+        subtitle_label = QtWidgets.QLabel(subtitle)
+        subtitle_label.setFont(QtGui.QFont("Inter Tight Medium", 12))
+        subtitle_label.setStyleSheet("color: rgba(255, 255, 255, 0.5); border: none; background: transparent;")
+        layout.addWidget(subtitle_label)
+
+        card.setFixedSize(320, 210)
+        layout.addWidget(card, 0, QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
+        layout.addStretch()
+        return page
+
+    def _add_sidebar_button(self, text, icon_path, object_name):
+        button = RippleButton(parent=self.SideBar_Left)
+        button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        button.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed))
+        font = QtGui.QFont("Comfortaa", 9, QtGui.QFont.Weight.Bold)
+        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        button.setFont(font)
+        button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        button.setStyleSheet(self.pushButton_rp_editors.styleSheet())
+        button.setIcon(QtGui.QIcon(icon_path))
+        button.setIconSize(QtCore.QSize(21, 21))
+        button.setCheckable(True)
+        button.setAutoExclusive(True)
+        button.setText(text)
+        button.setObjectName(object_name)
+        self.verticalLayout.addWidget(button)
+        return button
+
     def update_rp_layout(self):
         """
         Updates the responsive grid layout for RP Editors cards.

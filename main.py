@@ -375,6 +375,8 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_characters_gateway.clicked.connect(self._on_characters_gateway_clicked)
         self.ui.pushButton_models_hub.clicked.connect(self.interface_signals.on_pushButton_models_hub_clicked)
         self.ui.pushButton_options.clicked.connect(self.interface_signals.on_pushButton_options_clicked)
+        self.ui.pushButton_image_generation.clicked.connect(self.interface_signals.on_pushButton_image_generation_clicked)
+        self.ui.pushButton_integrations.clicked.connect(self.interface_signals.on_pushButton_integrations_clicked)
         self.ui.pushButton_rp_editors.clicked.connect(self.on_rp_editors_clicked)
         self.ui.pushButton_soul_stage.clicked.connect(self.interface_signals._open_soul_stage_page)
         self.ui.about_btn.clicked.connect(self.interface_signals.set_about_program_button)

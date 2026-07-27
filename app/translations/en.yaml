@@ -279,6 +279,10 @@ rp_card_discord_bot_title: "Discord Gateway"
 rp_card_discord_bot_desc: "Connect your characters to Discord and chat with them anywhere."
 rp_card_image_gen_title: "Image Generation"
 rp_card_image_gen_desc: "Configure AI image generation settings for your characters and stories."
+image_generation_title: "Image Generation"
+image_generation_subtitle: "Configure AI image generation for your characters and stories."
+integrations_title: "Integrations"
+integrations_subtitle: "Connect Soul of Waifu to external services."
 
 
 # ──────────────────────────────────────────────────────────
