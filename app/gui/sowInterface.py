@@ -1696,13 +1696,13 @@ class Ui_MainWindow(object):
         
         tab_data = [
             (self.translations.get("settings_ai_group", "AI SETTINGS"), None, None),
-            (self.translations.get("settings_api_providers", "   API & Providers"), "app/gui/icons/system.png", 1),
-            (self.translations.get("settings_llm", "   LLM Settings"), "app/gui/icons/ai.png", 2),
-            (self.translations.get("settings_image_generation", "   Image Generation"), "app/gui/icons/background_icon.png", 6),
-            (self.translations.get("settings_integrations", "   Integrations"), "app/gui/icons/discord.png", 7),
-            (self.translations.get("settings_system_ui", "System & UI"), "app/gui/icons/config.png", 0),
-            (self.translations.get("settings_sow_modules", "SoW Modules"), "app/gui/icons/tools.png", 4),
-            (self.translations.get("settings_tool_calling", "Tool Calling & MCP"), "app/gui/icons/modules.png", 3),
+            (self.translations.get("settings_api_providers", "   API & Providers"), "app/gui/icons/system.png", "configuration_tab"),
+            (self.translations.get("settings_llm", "   LLM Settings"), "app/gui/icons/ai.png", "llm_tab"),
+            (self.translations.get("settings_image_generation", "   Image Generation"), "app/gui/icons/background_icon.png", "image_generation_page"),
+            (self.translations.get("settings_integrations", "   Integrations"), "app/gui/icons/discord.png", "integrations_page"),
+            (self.translations.get("settings_system_ui", "System & UI"), "app/gui/icons/config.png", "system_tab"),
+            (self.translations.get("settings_sow_modules", "SoW Modules"), "app/gui/icons/tools.png", "sow_system_tab"),
+            (self.translations.get("settings_tool_calling", "Tool Calling & MCP"), "app/gui/icons/modules.png", "tools_tab"),
         ]
 
         for name, icon_path, tab_index in tab_data:
@@ -1723,14 +1723,13 @@ class Ui_MainWindow(object):
         self.layout_options.addWidget(self.tabWidget_options)
 
         def select_options_tab(item):
-            tab_index = item.data(QtCore.Qt.ItemDataRole.UserRole)
-            if tab_index is not None:
-                self.tabWidget_options.setCurrentIndex(tab_index)
+            page_name = item.data(QtCore.Qt.ItemDataRole.UserRole)
+            if page_name:
+                self.tabWidget_options.setCurrentWidget(getattr(self, page_name))
 
         self.options_menu.currentItemChanged.connect(
             lambda item, _previous: select_options_tab(item) if item else None
         )
-        self.options_menu.setCurrentRow(1)
 
         global_input_style = """
             QComboBox {
@@ -3344,7 +3343,7 @@ class Ui_MainWindow(object):
         
         item = QtWidgets.QListWidgetItem(self.translations.get("appearance_tab_name", "Appearance"))
         item.setIcon(QtGui.QIcon("app/gui/icons/color-palette.png"))
-        item.setData(QtCore.Qt.ItemDataRole.UserRole, 5)
+        item.setData(QtCore.Qt.ItemDataRole.UserRole, "appearance_settings_tab")
         self.options_menu.addItem(item)
 
         self.gridLayout.addWidget(self.options_container, 0, 0, 1, 1)
