@@ -96,6 +96,9 @@ class InterfaceSignals():
         # --- Model & Session Data ---
         self.model = None
         self.tokenizer = None
+        self.models = []
+        self.filtered_models = []
+        self._openrouter_models_task = None
 
         self.emotion_task = None
 
@@ -248,6 +251,9 @@ class InterfaceSignals():
         self.ui.appearance_settings_tab.requestChatPreviewUpdate.connect(self.on_request_chat_preview_update)
         self.ui.appearance_settings_tab.resetAppearanceRequested.connect(self.on_reset_appearance)
         self.ui.appearance_settings_tab.saveChatAppearanceRequested.connect(self.on_save_chat_appearance)
+        self.ui.lineEdit_search_openrouter_models.textChanged.connect(self.filter_models)
+        self.ui.comboBox_openrouter_models.currentIndexChanged.connect(self.on_comboBox_openrouter_models_changed)
+        self.ui.pushButton_reload_openrouter_models.clicked.connect(self.initialize_openrouter_models)
         QtCore.QTimer.singleShot(100, lambda: self.apply_gui_theme(self.get_gui_theme()))
         self.apply_window_theme()
         
@@ -5150,68 +5156,88 @@ class InterfaceSignals():
         if hasattr(self, 'ambient_player'):
             self.ambient_player.set_device(real_index)
     
-    async def fetch_openrouter_api_models(self):       
-        url = "https://openrouter.ai/api/v1/models"       
-        timeout = aiohttp.ClientTimeout(total=4)
-        
-        try:
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        models = []
-                        for model in data.get("data", []):
-                            models.append({
-                                "id": model.get("id"),
-                                "name": model.get("name"),
-                                "description": model.get("description", "")
-                            })
-                        return models
-                    else:
-                        logger.error(f"Error: Received status code {response.status} while fetching model data.")
-                        return []
-                        
-        except asyncio.TimeoutError:
-            logger.error("Error: The request timed out. Please check your internet connection or try again later.")
-            return []
-        except aiohttp.ClientError as e:
-            logger.error(f"Error: A network error occurred - {e}")
-            return []
-        except Exception as e:
-            logger.error(f"Unexpected error while loading OpenRouter models: {e}")
-            return []
+    async def fetch_openrouter_api_models(self):
+        def request_models():
+            with urllib.request.urlopen("https://openrouter.ai/api/v1/models", timeout=15) as response:
+                return json.load(response)
+
+        data = await asyncio.to_thread(request_models)
+        models = []
+        for model in data.get("data", []):
+            model_id = model.get("id")
+            if model_id:
+                models.append({
+                    "id": model_id,
+                    "name": model.get("name") or model_id,
+                    "description": model.get("description") or ""
+                })
+
+        if not models:
+            raise ValueError("OpenRouter returned an empty model list")
+
+        return models
         
     def initialize_openrouter_models(self):
-        self.models = []
-        self.filtered_models = []
+        if self._openrouter_models_task and not self._openrouter_models_task.done():
+            return
 
-        self.ui.lineEdit_search_openrouter_models.textChanged.connect(self.filter_models)
-        self.ui.comboBox_openrouter_models.currentIndexChanged.connect(self.on_comboBox_openrouter_models_changed)
-
-        asyncio.create_task(self._load_and_populate_open_models())
+        self._openrouter_models_task = asyncio.create_task(self._load_and_populate_open_models())
 
     async def _load_and_populate_open_models(self):
-        self.ui.comboBox_openrouter_models.setEnabled(False)
-        self.ui.comboBox_openrouter_models.clear()
-        self.ui.comboBox_openrouter_models.addItem("Loading models...")
+        combo = self.ui.comboBox_openrouter_models
+        search = self.ui.lineEdit_search_openrouter_models
+        refresh_button = self.ui.pushButton_reload_openrouter_models
 
-        fetched_models = await self.fetch_openrouter_api_models()
-        
-        self.models = fetched_models
-        self.filtered_models = fetched_models[:]
+        combo.setEnabled(False)
+        search.setEnabled(False)
+        refresh_button.setEnabled(False)
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem(self.translations.get("openrouter_models_loading", "Loading models..."))
+        combo.blockSignals(False)
 
-        self.ui.comboBox_openrouter_models.setEnabled(True)
+        try:
+            self.models = await self.fetch_openrouter_api_models()
+            self.filtered_models = [
+                model for model in self.models
+                if search.text().lower() in model["name"].lower()
+            ]
 
-        self.ui.comboBox_openrouter_models.blockSignals(True)
-        
-        self.load_openrouter_models()
-            
-        self.ui.comboBox_openrouter_models.blockSignals(False)
+            combo.blockSignals(True)
+            self.load_openrouter_models()
+            combo.blockSignals(False)
 
-        if self.models:
             current_active_index = self.ui.comboBox_openrouter_models.currentIndex()
             self.on_comboBox_openrouter_models_changed(max(0, current_active_index))
+        except Exception:
+            logger.exception("Failed to load OpenRouter models")
+            self.filtered_models = [
+                model for model in self.models
+                if search.text().lower() in model["name"].lower()
+            ]
+
+            combo.blockSignals(True)
+            self.load_openrouter_models()
+            if not self.models:
+                combo.addItem(self.translations.get(
+                    "openrouter_models_load_error",
+                    "Couldn't load models. Click Refresh to try again."
+                ))
+            combo.blockSignals(False)
+
+            sow_toast(
+                parent=self.main_window,
+                title="OpenRouter",
+                text=self.translations.get(
+                    "openrouter_models_load_error",
+                    "Couldn't load models. Click Refresh to try again."
+                ),
+                msg_type="error"
+            )
+        finally:
+            combo.setEnabled(bool(self.models))
+            search.setEnabled(bool(self.models))
+            refresh_button.setEnabled(True)
 
     def filter_models(self, text):
         text = text.lower()
@@ -5883,6 +5909,7 @@ class InterfaceSignals():
         self.ui.openrouter_models_options_label.hide()
         self.ui.lineEdit_search_openrouter_models.hide()
         self.ui.comboBox_openrouter_models.hide()
+        self.ui.pushButton_reload_openrouter_models.hide()
 
         self.ui.conversation_method_token_title_label.show()
         self.ui.lineEdit_api_token_options.show()
@@ -5903,6 +5930,7 @@ class InterfaceSignals():
             self.ui.openrouter_models_options_label.show()
             self.ui.lineEdit_search_openrouter_models.show()
             self.ui.comboBox_openrouter_models.show()
+            self.ui.pushButton_reload_openrouter_models.show()
             api_token = self.configuration_api.get_token("OPENROUTER_API_TOKEN")
 
         elif selected_conversation_method == "Anthropic":

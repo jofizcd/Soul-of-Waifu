@@ -2170,9 +2170,23 @@ class Ui_MainWindow(object):
         self.comboBox_openrouter_models.setFixedHeight(40)
         self.comboBox_openrouter_models.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.comboBox_openrouter_models.setObjectName("comboBox_openrouter_models")
+
+        self.pushButton_reload_openrouter_models = QtWidgets.QPushButton()
+        self.pushButton_reload_openrouter_models.setFixedSize(40, 40)
+        self.pushButton_reload_openrouter_models.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pushButton_reload_openrouter_models.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_reload_openrouter_models.setIcon(QtGui.QIcon("app/gui/icons/reload.png"))
+        openrouter_refresh_text = self.translations.get(
+            "openrouter_models_refresh",
+            "Refresh OpenRouter models"
+        )
+        self.pushButton_reload_openrouter_models.setToolTip(openrouter_refresh_text)
+        self.pushButton_reload_openrouter_models.setAccessibleName(openrouter_refresh_text)
+        self.pushButton_reload_openrouter_models.setObjectName("pushButton_reload_openrouter_models")
         
         openrouter_layout.addWidget(self.lineEdit_search_openrouter_models, 1)
         openrouter_layout.addWidget(self.comboBox_openrouter_models, 2)
+        openrouter_layout.addWidget(self.pushButton_reload_openrouter_models)
         
         form_api.addRow(self.openrouter_models_options_label, self.openrouter_layout_widget)
 
