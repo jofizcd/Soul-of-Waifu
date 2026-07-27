@@ -1474,18 +1474,20 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             return
 
         if self.tokenizer is None or self.session is None:
-            tokenizer_path = os.path.join("app", "utils", "emotions", "detector")
-            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-            model_path = os.path.join("app", "utils", "emotions", "detector")
-            self.session = AutoModelForSequenceClassification.from_pretrained(model_path)
+            def _load_model():
+                model_path = os.path.join("app", "utils", "emotions", "detector")
+                return (
+                    AutoTokenizer.from_pretrained(model_path),
+                    AutoModelForSequenceClassification.from_pretrained(model_path),
+                )
+            self.tokenizer, self.session = await asyncio.to_thread(_load_model)
 
-        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+        def _run_inference():
+            inputs = self.tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+            with torch.no_grad():
+                return torch.argmax(self.session(**inputs).logits, dim=1).item()
 
-        with torch.no_grad():
-            outputs = self.session(**inputs)
-
-        logits = outputs.logits
-        predicted_class_id = torch.argmax(logits, dim=1).item()
+        predicted_class_id = await asyncio.to_thread(_run_inference)
         
         emotions = [
             "admiration", "amusement", "anger", "annoyance", "approval", "caring", "confusion", "curiosity",
