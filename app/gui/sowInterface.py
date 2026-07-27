@@ -2033,7 +2033,7 @@ class Ui_MainWindow(object):
         self.comboBox_conversation_method.setFixedHeight(40)
         self.comboBox_conversation_method.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.comboBox_conversation_method.addItems([
-            "Mistral AI", "Open AI", "OpenRouter", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI"
+            "Mistral AI", "Open AI", "Local LLM", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI", "OpenRouter"
         ])
         self.comboBox_conversation_method.setObjectName("comboBox_conversation_method")
         
@@ -2300,7 +2300,7 @@ class Ui_MainWindow(object):
         # -----------------------------------------------------------------
         # CARD 2: Server & Hardware
         # -----------------------------------------------------------------
-        card_llm_hw, l_llm_hw = create_glass_card(self.translations.get("llm_hw_title", "Hardware & Backend"))
+        self.card_llm_hw, l_llm_hw = create_glass_card(self.translations.get("llm_hw_title", "Hardware & Backend"))
         form_llm_hw = QtWidgets.QFormLayout()
         form_llm_hw.setVerticalSpacing(20)
         form_llm_hw.setHorizontalSpacing(30)
@@ -2497,7 +2497,7 @@ class Ui_MainWindow(object):
         
         l_llm_hw.addLayout(custom_args_layout)
 
-        llm_layout.addWidget(card_llm_hw)
+        llm_layout.addWidget(self.card_llm_hw)
 
         # -----------------------------------------------------------------
         # CARD 3: Prompting & Formatting
@@ -2534,7 +2534,7 @@ class Ui_MainWindow(object):
         # -----------------------------------------------------------------
         # CARD 4: Advanced Local LLM Sampling
         # -----------------------------------------------------------------
-        card_llm_adv, l_llm_adv = create_glass_card(self.translations.get("llm_adv_title", "Advanced Local LLM Sampling"))
+        self.card_llm_adv, l_llm_adv = create_glass_card(self.translations.get("llm_adv_title", "Advanced Local LLM Sampling"))
         
         self.checkBox_enable_advanced_sampling = QtWidgets.QCheckBox(self.translations.get("enable_adv_sampling_text", "Enable Advanced Sampling"))
         self.checkBox_enable_advanced_sampling.setFont(font_input)
@@ -2645,7 +2645,7 @@ class Ui_MainWindow(object):
         
         self.adv_samplers_widget.setEnabled(False)
 
-        llm_layout.addWidget(card_llm_adv)
+        llm_layout.addWidget(self.card_llm_adv)
 
         llm_layout.addStretch()
         self.tabWidget_options.addWidget(self.llm_tab)

@@ -5063,6 +5063,7 @@ class InterfaceSignals():
     ### SETUP COMBOBOXES AND OTHER =======================================================================
     def on_comboBox_conversation_method_changed(self, text):
         self.configuration_settings.update_main_setting("conversation_method", text)
+        self.update_local_llm_settings_visibility(text)
         if text == "OpenRouter":
             self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_api_value", "Write API value"))
             self.initialize_openrouter_models()
@@ -5070,6 +5071,13 @@ class InterfaceSignals():
             self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_base_api", "Write API value (Optional)"))
         else:
             self.ui.lineEdit_api_token_options.setPlaceholderText(self.translations.get("placeholder_api_value", "Write API value"))
+
+    def update_local_llm_settings_visibility(self, conversation_method):
+        is_local = conversation_method == "Local LLM"
+        self.ui.card_llm_hw.setVisible(is_local)
+        self.ui.card_llm_adv.setVisible(is_local)
+        self.ui.chat_template_label.setVisible(is_local)
+        self.ui.comboBox_chat_template.setVisible(is_local)
 
     def load_audio_devices(self):
         input_device_index = self.configuration_settings.get_main_setting("input_device")
@@ -5582,6 +5590,7 @@ class InterfaceSignals():
         Loads the settings to the Combobox's and Checkbox's of the interface from the configuration.
         """
         self.ui.comboBox_conversation_method.setCurrentText(self.configuration_settings.get_main_setting("conversation_method"))
+        self.update_local_llm_settings_visibility(self.ui.comboBox_conversation_method.currentText())
         self.ui.comboBox_program_language.setCurrentIndex(self.configuration_settings.get_main_setting("program_language"))
         self.ui.comboBox_input_devices.setCurrentIndex(self.configuration_settings.get_main_setting("input_device"))
         self.ui.comboBox_output_devices.setCurrentIndex(self.configuration_settings.get_main_setting("output_device_combo_index"))
