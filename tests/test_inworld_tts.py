@@ -109,10 +109,10 @@ class InworldTtsTest(unittest.IsolatedAsyncioTestCase):
         calls = {}
 
         class Response:
-            status = 201
+            status = 200
             async def __aenter__(self): return self
             async def __aexit__(self, *args): return False
-            async def json(self): return {"voiceId": "new-voice"}
+            async def json(self): return {"voice": {"voiceId": "new-voice"}}
 
         class Session:
             async def __aenter__(self): return self
@@ -161,6 +161,10 @@ class InworldTtsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls["url"], "https://api.inworld.ai/voices/v1/voices:clone")
         self.assertEqual(calls["headers"]["Authorization"], "Basic secret-key")
         self.assertEqual(calls["json"]["langCode"], "RU_RU")
+        self.assertEqual(
+            calls["json"]["voiceSamples"],
+            [{"audioData": calls["json"]["voiceSamples"][0]["audioData"]}],
+        )
         self.assertTrue(calls["json"]["audioProcessingConfig"]["removeBackgroundNoise"])
         self.assertEqual(calls["selected"], 0)
 

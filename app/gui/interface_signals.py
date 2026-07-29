@@ -7831,7 +7831,11 @@ class InterfaceSignals():
         if not api_key or not file_path or not display_name or not self.ui.checkBox_tts_inworld_clone_rights.isChecked():
             sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_clone_required", "Choose a file, name the voice, and confirm your rights."), msg_type="error")
             return
-        if not os.path.isfile(file_path) or os.path.getsize(file_path) > 4 * 1024 * 1024:
+        if (
+            not os.path.isfile(file_path)
+            or os.path.splitext(file_path)[1].lower() not in {".wav", ".mp3", ".webm"}
+            or os.path.getsize(file_path) > 4 * 1024 * 1024
+        ):
             sow_toast(parent=self.main_window, title="Inworld TTS", text=self.translations.get("tts_inworld_clone_file_invalid", "Use a WAV, MP3, or WebM file up to 4 MB."), msg_type="error")
             return
         if file_path.lower().endswith(".wav"):
@@ -7849,7 +7853,7 @@ class InterfaceSignals():
             payload = {
                 "displayName": display_name,
                 "langCode": self.ui.comboBox_tts_inworld_clone_language.currentText(),
-                "voiceSamples": [{"audioData": audio_data, "transcription": "Voice sample."}],
+                "voiceSamples": [{"audioData": audio_data}],
                 "audioProcessingConfig": {"removeBackgroundNoise": True},
             }
             timeout = aiohttp.ClientTimeout(total=60)
