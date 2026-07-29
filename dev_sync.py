@@ -110,12 +110,9 @@ def load_manifest(path: Path) -> set[str]:
 
 
 def safe_runtime_path(runtime_root: Path, relative_path: str) -> Path:
-    candidate = runtime_root / relative_path
-    # Git paths are relative, but keep the write boundary explicit.
-    if (
-        ".." in Path(relative_path).parts
-        or candidate.parent != candidate.parent.resolve()
-    ):
+    runtime_root = runtime_root.resolve()
+    candidate = (runtime_root / relative_path).resolve()
+    if candidate == runtime_root or runtime_root not in candidate.parents:
         raise RuntimeError(f"Unsafe tracked path: {relative_path}")
     return candidate
 
