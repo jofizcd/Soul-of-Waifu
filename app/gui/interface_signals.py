@@ -4372,7 +4372,11 @@ class InterfaceSignals():
         combo.blockSignals(False)
 
     def _editor_model_override(self):
-        value = self.ui.comboBox_character_model_override.currentText().strip()
+        combo = self.ui.comboBox_character_model_override
+        value = combo.currentData()
+        if value is None:
+            value = combo.currentText()
+        value = value.strip()
         return "" if value == "Use provider default" else value
     
     def _get_groups(self) -> dict:
