@@ -1,5 +1,6 @@
 # Local tooling
 .codegraph/
+.soul_stage/
 
 # Python environments and caches
 .venv/
