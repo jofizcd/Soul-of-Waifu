@@ -1,12 +1,12 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
-title Soul of Waifu v2.4.0 Installer
+title Soul of Waifu v2.4.5 Installer
 color 0A
 
 cd /d "%~dp0"
 
-echo Welcome to Soul of Waifu v2.4.0 Installer
+echo Welcome to Soul of Waifu v2.4.5 Installer
 echo.
 
 if not exist "app\data\" (
@@ -60,15 +60,14 @@ pip install --no-cache-dir --force-reinstall numpy==1.26.4
 
 pip install --no-cache-dir PyQt6==6.9.0 PyQt6-WebEngine==6.9.0 qasync==0.27.1
 pip install --no-cache-dir beautifulsoup4 mss
-pip install --no-cache-dir ddgs
+pip install --no-cache-dir ddgs pypdf python-docx
 pip install --no-cache-dir discord.py PyNaCl davey
 pip install --no-cache-dir sentence-transformers==5.1.0
 pip install --no-cache-dir openai==1.70.0 mistralai==1.5.0
 pip install --no-cache-dir edge-tts==7.2.7 elevenlabs==1.52.0 kokoro==0.9.4
 pip install --no-cache-dir qwen-tts
 pip install --no-cache-dir faster-whisper
-pip install --no-cache-dir playwright==1.52.0
-playwright install
+pip install --no-cache-dir curl_cffi
 pip install --no-cache-dir translators==6.0.1 psutil==7.0.0 GPUtil==1.4.0
 pip install --no-cache-dir sounddevice==0.5.1 soundfile==0.13.1 pydub==0.25.1
 pip install --no-cache-dir PyOpenGL==3.1.9 live2d-py==0.5.4
