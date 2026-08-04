@@ -1,40 +1,75 @@
 import os
 import gc
-import asyncio
+import re
 import logging
+import threading
+import asyncio
+from pathlib import Path
+from typing import Optional
+
 import tiktoken
 import numpy as np
-import re
-
-from pathlib import Path
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+
 from app.configuration import configuration
 
 logger = logging.getLogger("Prompt Engine")
 
-tiktoken_dir = Path(__file__).parent.parent.parent / "app" / "utils" / "ai_clients"
-if (tiktoken_dir / "9b5ad71b2ce5302211f9c61530b329a4922fc6a4").exists():
-    os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_dir)
+ai_clients_dir = Path(__file__).resolve().parent
+tiktoken_file = ai_clients_dir / "9b5ad71b2ce5302211f9c61530b329a4922fc6a4"
+
+if tiktoken_file.exists():
+    os.environ["TIKTOKEN_CACHE_DIR"] = str(ai_clients_dir)
 
 class EmbeddingCache:
-    _instance = None
-    _model = None
-    
+    _model: Optional[SentenceTransformer] = None
+    _lock: threading.Lock = threading.Lock()
+    _failed: bool = False
+
     @classmethod
-    def get_model(cls):
-        if cls._model is None:
-            cls._model = SentenceTransformer('app/utils/all-MiniLM-L6-v2')
-            logger.info("Embedding model loaded to memory")
+    def get_model(
+        cls, 
+        model_path: str = "app/utils/all-MiniLM-L6-v2", 
+        device: str = "cpu"
+    ) -> Optional[SentenceTransformer]:
+        if cls._model is None and not cls._failed:
+            with cls._lock:
+                if cls._model is None and not cls._failed:
+                    try:
+                        project_root = Path(__file__).resolve().parent.parent.parent
+                        local_model_path = project_root / model_path
+
+                        target_path = str(local_model_path) if local_model_path.exists() else model_path
+
+                        logger.info(f"Loading embedding model on device='{device}' from '{target_path}'...")
+                        cls._model = SentenceTransformer(target_path, device=device)
+                        logger.info("Embedding model successfully loaded to memory")
+
+                    except Exception as e:
+                        logger.error(f"Failed to load embedding model: {e}", exc_info=True)
+                        cls._model = None
+                        cls._failed = True
+
         return cls._model
-    
+
     @classmethod
     def clear(cls):
-        if cls._model:
-            del cls._model
-            cls._model = None
-            gc.collect()
-            logger.info("Embedding model unloaded")
+        with cls._lock:
+            if cls._model is not None:
+                del cls._model
+                cls._model = None
+                cls._failed = False
+                gc.collect()
+
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except ImportError:
+                    pass
+
+                logger.info("Embedding model unloaded from memory")
 
 class PromptEngine:
     """
@@ -57,6 +92,8 @@ class PromptEngine:
         self.max_context_tokens = raw_size if raw_size is not None else 8192
         self.response_reserve = 500
 
+        self.IMAGE_TOKEN_ESTIMATE = 300
+
     def is_soul_memory_enabled(self) -> bool:
         try:
             return self.configuration_settings.get_main_setting("soul_memory")
@@ -68,6 +105,17 @@ class PromptEngine:
             return 0
 
         return len(self.encoder.encode(text, disallowed_special=()))
+
+    def _merge_consecutive_roles(self, messages):
+        merged = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+            if merged and merged[-1]["role"] == role:
+                merged[-1]["content"] += "\n\n" + content
+            else:
+                merged.append({"role": role, "content": content})
+        return merged
 
     def get_activated_lorebook_entries(self, lorebook_name, chat_messages, character_name, user_name, user_message):
         config = self.configuration_settings.load_configuration()
@@ -244,15 +292,40 @@ class PromptEngine:
         for i, msg in enumerate(messages):
             role = msg.get('role', 'unknown').upper()
             content = msg.get('content', '')
-            length = len(content)
-            total_chars += length
 
-            header = f" [ BLOCK {i+1} | {role} | {length} chars ] "
-            header_line = f"{header:-^80}"
-            
-            log_output.append(header_line)
-            log_output.append(content.strip())
-            log_output.append("")
+            if isinstance(content, list):
+                text_parts = []
+                image_count = 0
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    block_type = block.get("type")
+                    if block_type == "text":
+                        text_parts.append(block.get("text", ""))
+                    elif block_type in ("image_url", "image"):
+                        image_count += 1
+                display_text = "\n".join(text_parts)
+                length = len(display_text)
+                total_chars += length
+
+                header = f" [ BLOCK {i+1} | {role} | {length} chars + {image_count} image(s) ] "
+                header_line = f"{header:-^80}"
+
+                log_output.append(header_line)
+                log_output.append(display_text.strip())
+                log_output.append("")
+
+            else:
+                display_text = str(content) if content is not None else ""
+                length = len(display_text)
+                total_chars += length
+
+                header = f" [ BLOCK {i+1} | {role} | {length} chars ] "
+                header_line = f"{header:-^80}"
+
+                log_output.append(header_line)
+                log_output.append(display_text.strip())
+                log_output.append("")
             
         log_output.append(thin_separator)
         log_output.append(f" TOTAL: {len(messages)} blocks | ~{total_chars} chars")
@@ -260,7 +333,7 @@ class PromptEngine:
         
         logger.info("\n".join(log_output))
 
-    def build_system_prompt_blocks(self, character_name, user_name, user_description, chat_messages, user_message, activated_lorebook=None):
+    def build_system_prompt_blocks(self, character_name, user_name, user_description, chat_messages, user_message, activated_lorebook=None, image_attachments=None, provider_style="openai"):
         """
         Builds a robust system prompt list with structured blocks, memory, and lore integration.
         Returns a list of message dicts.
@@ -513,29 +586,45 @@ class PromptEngine:
             except Exception as e:
                 logger.error(f"[Soul Memory] Semantic Search Error: {e}", exc_info=True)
 
+        if system_blocks:
+            merged_system_content = "\n\n".join(
+                b["content"] for b in system_blocks if b.get("content")
+            )
+            system_blocks = [{"role": "system", "content": merged_system_content}]
+
         user_msg_tokens = self.count_tokens(final_user_message)
+        if image_attachments:
+            user_msg_tokens += len(image_attachments) * self.IMAGE_TOKEN_ESTIMATE
         current_token_count += user_msg_tokens
 
-        if self.max_context_tokens == -1:
+        final_user_content = self._build_final_user_content(final_user_message, image_attachments, provider_style)
+
+        if self.max_context_tokens <= 0:
             logger.info("Unlimited context detected. Bypassing history truncation.")
-            final_history = []
+            raw_history = []
             for msg in chat_messages:
                 msg_content = msg.get("content", "")
                 if msg_content.strip():
-                    final_history.append(msg.copy())
-            
+                    raw_history.append(msg.copy())
+
+            final_history = self._merge_consecutive_roles(raw_history)
+
             if final_history and final_history[0]["role"] == "assistant":
                 final_history.insert(0, {"role": "user", "content": "..."})
             if final_history and final_history[-1]["role"] == "user":
                 final_history.append({"role": "assistant", "content": "..."})
-                
-            return system_blocks + final_history + [{"role": "user", "content": final_user_message}], activated_entries
+
+            final_messages = system_blocks + final_history + [{"role": "user", "content": final_user_content}]
+            self.log_prompt_structure(final_messages)
+            return final_messages, activated_entries
 
         available_tokens = self.max_context_tokens - current_token_count - self.response_reserve
         
         if available_tokens <= 128:
             logger.warning("Context full! Drastic compression triggered: sending only system blocks + last message.")
-            return system_blocks + [{"role": "user", "content": final_user_message}], activated_entries
+            final_messages = system_blocks + [{"role": "user", "content": final_user_content}]
+            self.log_prompt_structure(final_messages)
+            return final_messages, activated_entries
         
         # Short-Term Memory filtering
         reversed_history = []
@@ -554,16 +643,15 @@ class PromptEngine:
             history_tokens_used += msg_tokens
 
         short_term_memory = list(reversed(reversed_history))
-        
-        final_history = []
-        for msg in short_term_memory:
-            if not final_history:
-                final_history.append(msg.copy())
+        final_history = self._merge_consecutive_roles(short_term_memory)
+
+        cleaned_history = []
+        for msg in final_history:
+            if msg.get("role") == "system":
+                cleaned_history.append({"role": "user", "content": f"[SYSTEM DIRECTIVE]: {msg.get('content', '')}"})
             else:
-                if final_history[-1]["role"] == msg["role"]:
-                    final_history[-1]["content"] += "\n\n" + msg["content"]
-                else:
-                    final_history.append(msg.copy())
+                cleaned_history.append(msg)
+        final_history = cleaned_history
 
         if final_history and final_history[0]["role"] == "assistant":
             final_history.insert(0, {"role": "user", "content": "..."})
@@ -571,9 +659,37 @@ class PromptEngine:
         if final_history and final_history[-1]["role"] == "user":
             final_history.append({"role": "assistant", "content": "..."})
 
-        final_messages = system_blocks + final_history + [{"role": "user", "content": final_user_message}]
-        
+        final_messages = system_blocks + final_history + [{"role": "user", "content": final_user_content}]
+        self.log_prompt_structure(final_messages)
+
         return final_messages, activated_entries
+
+    def _build_final_user_content(self, text, image_attachments, provider_style="openai"):
+        if not image_attachments:
+            return text
+
+        if provider_style == "anthropic":
+            blocks = [{"type": "text", "text": text}]
+            for img in image_attachments:
+                blocks.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": img.get("mime", "image/png"),
+                        "data": img.get("b64", ""),
+                    },
+                })
+            return blocks
+
+        blocks = [{"type": "text", "text": text}]
+        for img in image_attachments:
+            mime = img.get("mime", "image/png")
+            b64 = img.get("b64", "")
+            blocks.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime};base64,{b64}"},
+            })
+        return blocks
 
     def build_summary_prompt_blocks(self, current_summary, new_messages, character_name, user_name):
         system_instruction = self.configuration_settings.get_main_setting("prompt_summary")
