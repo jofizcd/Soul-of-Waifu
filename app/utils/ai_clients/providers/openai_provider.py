@@ -1,9 +1,12 @@
+import re
 import logging
 import httpx
 from openai import AsyncOpenAI
 from app.utils.ai_clients.base_provider import BaseAIProvider
 
 logger = logging.getLogger("OpenAI Provider")
+
+_REASONING_MODEL_RE = re.compile(r"^(o\d(-|$)|gpt-5)", re.IGNORECASE)
 
 class OpenAIProvider(BaseAIProvider):
     def __init__(self, api_key: str, model: str, base_url: str = None, extra_headers: dict = None):
@@ -17,16 +20,28 @@ class OpenAIProvider(BaseAIProvider):
             http_client=httpx.AsyncClient(timeout=120)
         )
 
+    def _is_reasoning_model(self) -> bool:
+        return bool(_REASONING_MODEL_RE.match(self.model or ""))
+
+    def _apply_token_and_sampling_params(self, payload: dict, kwargs: dict, default_max_tokens: int):
+        max_tokens = kwargs.get("max_tokens", default_max_tokens)
+        if self._is_reasoning_model():
+            payload["max_completion_tokens"] = max_tokens
+        else:
+            payload["max_tokens"] = max_tokens
+            payload["temperature"] = kwargs.get("temperature", 0.7)
+            payload["top_p"] = kwargs.get("top_p", 0.9)
+            if kwargs.get("stop"):
+                payload["stop"] = kwargs["stop"]
+        return payload
+
     async def generate_stream(self, messages: list[dict], **kwargs):
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": True,
-            "max_tokens": kwargs.get("max_tokens", 1000),
-            "temperature": kwargs.get("temperature", 0.7),
-            "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"])
         }
+        self._apply_token_and_sampling_params(payload, kwargs, 1000)
 
         if self.extra_headers:
             payload["extra_headers"] = self.extra_headers
@@ -45,13 +60,12 @@ class OpenAIProvider(BaseAIProvider):
             "model": self.model,
             "messages": messages,
             "stream": True,
-            "max_tokens": kwargs.get("max_tokens", 1000),
-            "temperature": kwargs.get("temperature", 0.5),
-            "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"])
         }
+        self._apply_token_and_sampling_params(payload, kwargs, 1000)
+        if "temperature" in payload:
+            payload["temperature"] = kwargs.get("temperature", 0.5)
 
-        if "gemini" not in self.model.lower():
+        if "gemini" not in self.model.lower() and not self._is_reasoning_model():
             payload["frequency_penalty"] = kwargs.get("frequency_penalty", 0.5)
             payload["presence_penalty"] = kwargs.get("presence_penalty", 0.0)
 
@@ -72,11 +86,8 @@ class OpenAIProvider(BaseAIProvider):
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "max_tokens": kwargs.get("max_tokens", 1000),
-            "temperature": kwargs.get("temperature", 0.7),
-            "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"])
         }
+        self._apply_token_and_sampling_params(payload, kwargs, 1000)
 
         if tools:
             payload["tools"] = tools
@@ -95,4 +106,3 @@ class OpenAIProvider(BaseAIProvider):
         except Exception as e:
             logger.error(f"OpenAI API Generate Error: {e}")
             return {"content": None, "tool_calls": None}
-
