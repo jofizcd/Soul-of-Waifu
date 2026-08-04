@@ -36,8 +36,9 @@ from app.utils.ai_clients.prompt_engine import PromptEngine
 from app.utils.ai_clients.ai_factory import AIFactory
 from app.utils.soul_companion.soul_companion import SoulCompanion
 from app.utils.translator import Translator
-from app.utils.text_to_speech import TTSWorker
+from app.utils.text_to_speech import TTSWorker, PipelinedTTSWorker
 from app.utils.speech_to_text import AudioInputWorker, STTWorker
+from app.utils.vrm_server import VRMServerThread
 from app.gui.custom_widgets import sow_toast
 
 import sys
@@ -126,6 +127,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         character_data = self.configuration_characters.load_configuration()
         character_info = character_data["character_list"][character_name]
+        self.current_sow_system_mode = character_info.get("current_sow_system_mode", "Nothing")
         self.conversation_method = character_info["conversation_method"]
         self.expression_images_folder = character_info.get("expression_images_folder", None)
         self.live2d_model_folder = character_info.get("live2d_model_folder", None)
@@ -177,9 +179,12 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self.stt_worker.text_ready_signal.connect(self.on_user_speech_recognized)
         self.stt_worker.start()
 
-        self.tts_worker = TTSWorker(self.current_text_to_speech, character_name, self.elevenlabs_voice_id, language="en")
-        self.tts_worker.playback_worker.queue_empty_signal.connect(self.on_audio_finished)
-        self.tts_worker.playback_worker.lipsync_signal.connect(self.update_avatar_lips)
+        self.tts_worker = PipelinedTTSWorker(
+            self.current_text_to_speech, character_name,
+            self.elevenlabs_voice_id, language="en"
+        )
+        self.tts_worker.queue_empty_signal.connect(self.on_audio_finished)
+        self.tts_worker.lipsync_signal.connect(self.update_avatar_lips)
         self.tts_worker.start()
 
         self._state_signaler = StateSignaler()
@@ -227,7 +232,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 self.ui.set_voice_level(0.0)
         
         try:
-            current_mode = self.configuration_characters.load_configuration()["character_list"][self.character_name]["current_sow_system_mode"]
+            current_mode = self._get_current_mode()
             if current_mode == "VRM" and hasattr(self, 'vrm_webview'):
                 self.vrm_webview.page().runJavaScript(f"if (typeof window.setAppState !== 'undefined') window.setAppState('{state}');")
         except Exception as e:
@@ -312,19 +317,34 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             self.tts_worker.clear_queue()
             logger.info("The TTS and player queues are cleared")
 
+        if getattr(self, '_companion_speaking', False):
+            self._companion_speaking = False
+            if hasattr(self, 'soul_companion'):
+                try:
+                    self.soul_companion.on_interrupted_by_user()
+                except Exception:
+                    pass
+
         self._subtitle_clear()
         self.set_state("LISTENING")
     
     def on_audio_finished(self):
-        if self.interaction_state == "SPEAKING" and not self.is_interrupted:
-
-            self._subtitle_on_speech_ended()
-
+        if self.interaction_state != "SPEAKING":
             if getattr(self, '_companion_speaking', False):
                 self._companion_speaking = False
-                self.set_state("STOPPED")
-            else:
-                self.set_state("LISTENING")
+            return
+
+        if self.is_interrupted:
+            self._companion_speaking = False
+            self._subtitle_clear()
+            return
+
+        self._subtitle_on_speech_ended()
+        if getattr(self, '_companion_speaking', False):
+            self._companion_speaking = False
+            self.set_state("STOPPED")
+        else:
+            self.set_state("LISTENING")
     
     def _subtitle_on_speech_ended(self):
         try:
@@ -356,7 +376,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
     
     def update_avatar_lips(self, mouth_value):
         """Update avatar lip sync and voice indicator animation."""
-        current_mode = self.configuration_characters.load_configuration()["character_list"][self.character_name]["current_sow_system_mode"]
+        current_mode = self._get_current_mode()
 
         # 1. LIVE2D
         if current_mode == "Live2D Model":
@@ -403,6 +423,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         conversation_method = character_info["conversation_method"]
         current_sow_system_mode = character_info["current_sow_system_mode"]
+        self.current_sow_system_mode = current_sow_system_mode
         expression_images_folder = character_info.get("expression_images_folder", None)
         live2d_model_folder = character_info.get("live2d_model_folder", None)
         vrm_model_file = character_info.get("vrm_model_file", None)
@@ -632,26 +653,6 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                         level_name = levels.get(level, f"LEVEL{level}")
                         logger.info(f"[JS Console] {level_name} in {source_id} (line {line_number}): {message}")
 
-                class ServerThread(threading.Thread):
-                    def __init__(self, port=8000):
-                        super().__init__()
-                        self.port = port
-                        self.daemon = True
-                        self.server = None
-
-                    def run(self):
-                        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-                        os.chdir(project_root)
-                        
-                        handler = SimpleHTTPRequestHandler
-                        self.server = TCPServer(("", self.port), handler)
-                        self.server.serve_forever()
-                    
-                    def stop(self):
-                        if self.server:
-                            self.server.shutdown()
-                            self.server.server_close()
-
                 self.vrm_webview = QWebEngineView()
                 self.vrm_webview.setStyleSheet("""
                     border-top-right-radius: 10px;
@@ -661,24 +662,18 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 """)
 
                 self.vrm_webview.setPage(CustomWebEnginePage(self.vrm_webview))
-
-                self.vrm_webview.settings().setAttribute(
-                    self.vrm_webview.settings().WebAttribute.WebGLEnabled, True
-                )
-                self.vrm_webview.settings().setAttribute(
-                    self.vrm_webview.settings().WebAttribute.Accelerated2dCanvasEnabled, True
-                )
+                self.vrm_webview.settings().setAttribute(self.vrm_webview.settings().WebAttribute.WebGLEnabled, True)
+                self.vrm_webview.settings().setAttribute(self.vrm_webview.settings().WebAttribute.Accelerated2dCanvasEnabled, True)
 
                 if hasattr(self, 'server_thread') and self.server_thread is not None:
                     if self.server_thread.is_alive():
                         logger.info("Stopping existing VRM server before creating new one...")
                         self.server_thread.stop()
-                        self.server_thread.join(timeout=2)
 
-                self.server_thread = ServerThread(port=8002)
+                self.server_thread = VRMServerThread(preferred_port=8002)
                 self.server_thread.start()
 
-                html_url = f"http://localhost:8002/app/utils/emotions/vrm_module.html"
+                html_url = f"http://127.0.0.1:{self.server_thread.port}/app/utils/emotions/vrm_module.html"
                 
                 if vrm_model_file:
                     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -833,17 +828,22 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             except Exception as e:
                 return
 
-    def on_user_speech_recognized(self, text):
+    def on_user_speech_recognized(self, text: str, is_text_input: bool = False):
         logger.info(f"UI received text: {text}")
-
-        if self.interaction_state != "LISTENING":
-            return
-
-        if hasattr(self, "soul_companion"):
-            self.soul_companion.on_user_spoke(text)
 
         live2d_mode = self.configuration_settings.get_main_setting("live2d_mode")
         is_no_gui = (live2d_mode != 0)
+
+        if not is_text_input and not is_no_gui and self.interaction_state != "LISTENING":
+            logger.debug("Speech ignored: interaction state is not LISTENING")
+            return
+
+        if self.interaction_state == "SPEAKING":
+            self.interrupt_ai()
+
+        if is_no_gui and hasattr(self, "soul_companion"):
+            self.soul_companion.on_user_spoke(text)
+            return
 
         if is_no_gui:
             return
@@ -854,6 +854,28 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         
         self.llm_task = asyncio.create_task(self.process_llm_response(text, add_msg_task))
 
+    def _get_gen_kwargs(self, conversation_method: str) -> dict:
+        raw_stops = self.configuration_settings.get_main_setting("stop_strings")
+        stop_sequences = None
+        if raw_stops and isinstance(raw_stops, str) and raw_stops.strip():
+            stop_list = [s.strip() for s in raw_stops.split(",") if s.strip()]
+            if stop_list:
+                stop_sequences = stop_list[:4]
+
+        gen_kwargs = {
+            "stop": stop_sequences,
+            "temperature": self.configuration_settings.get_main_setting("temperature"),
+            "max_tokens": self.configuration_settings.get_main_setting("max_tokens"),
+            "top_p": self.configuration_settings.get_main_setting("top_p"),
+            "frequency_penalty": self.configuration_settings.get_main_setting("frequency_penalty"),
+            "presence_penalty": self.configuration_settings.get_main_setting("presence_penalty")
+        }
+
+        if conversation_method == "Local LLM":
+            gen_kwargs["reasoning_mode"] = self.configuration_settings.get_main_setting("reasoning_mode")
+
+        return gen_kwargs
+    
     async def process_llm_response(self, user_text, user_message_task):
         self.set_state("PROCESSING")
         self.is_interrupted = False
@@ -899,7 +921,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             if not provider:
                 raise ValueError(f"Unknown method: {conversation_method}")
 
-            stream_generator = provider.generate_stream(messages)
+            gen_kwargs = self._get_gen_kwargs(conversation_method)
+
+            stream_generator = provider.generate_stream(messages, **gen_kwargs)
             
             async for data_chunk in stream_generator:
                 if self.is_interrupted:
@@ -1221,47 +1245,125 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                 QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignVCenter
             )
     
-    def markdown_to_html(self, text):
-        # 1. Text in double quotes ("text")
-        text = re.sub(r'"(.*?)"', r'<span style="color: orange;">"\1"</span>', text)
-        text = re.sub(r'“(.*?)”', r'<span style="color: orange;">"\1"</span>', text)
+    def markdown_to_html(self, text: str) -> str:
+        import html
+        import re
 
-        # 2. Bold text (**text** or __text__)
+        s = {}
+
+        qc = s.get("quote_color", "#F59E0B")
+        ic = s.get("italic_color", "#9CA3AF")
+        cbg = s.get("code_bg_color", "#0D0E15")
+        header_bg = s.get("code_header_bg", "#161822")
+        border_color = s.get("code_border", "rgba(255, 255, 255, 0.1)")
+        text_color = s.get("code_text_color", "#E2E8F0")
+
+        code_blocks = []
+        inline_blocks = []
+        think_blocks = []
+
+        def replace_code_block(match):
+            lang = match.group(1).strip()
+            code_content = match.group(2)
+
+            escaped_code = html.escape(code_content.strip())
+            lang_display = lang.upper() if lang else "CODE"
+
+            block_html = f'''<table width="100%" style="background-color: {cbg}; border: 1px solid {border_color}; border-radius: 8px; margin: 10px 0; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+        <tr>
+            <td style="background-color: {header_bg}; color: #A78BFA; font-size: 10px; font-weight: bold; padding: 6px 12px; font-family: 'Consolas', 'Fira Code', monospace; border-bottom: 1px solid {border_color}; letter-spacing: 0.5px;">
+                ⚡ {lang_display}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 12px; color: {text_color}; font-size: 12px; font-family: 'Consolas', 'Fira Code', monospace; background-color: {cbg}; line-height: 1.45;">
+                <pre style="margin: 0; padding: 0; font-family: 'Consolas', 'Fira Code', monospace; white-space: pre-wrap; background-color: {cbg}; color: {text_color};">{escaped_code}</pre>
+            </td>
+        </tr>
+    </table>'''
+
+            placeholder = f"@@@CODEBLOCK{len(code_blocks)}@@@"
+            code_blocks.append(block_html)
+            return placeholder
+
+        text = re.sub(r'```([a-zA-Z0-9_+-]*)\n?(.*?)```', replace_code_block, text, flags=re.DOTALL)
+
+        def replace_inline_code(match):
+            code_content = html.escape(match.group(1))
+            inline_html = f'<code style="background-color: rgba(139, 92, 246, 0.15); color: #C084FC; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(139, 92, 246, 0.3); font-family: \'Consolas\', \'Fira Code\', monospace; font-size: 0.9em; font-weight: 500;">{code_content}</code>'
+            
+            placeholder = f"@@@INLINECODE{len(inline_blocks)}@@@"
+            inline_blocks.append(inline_html)
+            return placeholder
+
+        text = re.sub(r'`([^`]+)`', replace_inline_code, text)
+
+        def replace_think_block(match):
+            think_content = match.group(2).strip()
+            if not think_content:
+                return ""
+
+            escaped_thought = html.escape(think_content).replace("\n", "<br>")
+
+            think_html = f'''<table width="100%" style="background-color: rgba(18, 18, 26, 0.85); border: 1px solid rgba(139, 92, 246, 0.25); border-left: 4px solid #8B5CF6; border-radius: 8px; margin: 10px 0; border-collapse: separate; border-spacing: 0;">
+        <tr>
+            <td style="padding: 6px 12px; background-color: rgba(139, 92, 246, 0.12); color: #C084FC; font-size: 11px; font-weight: bold; font-family: 'Inter Tight', 'Segoe UI', sans-serif; letter-spacing: 0.8px;">
+                💭 THINKING PROCESS
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px 12px; color: #A1A1AA; font-size: 12px; font-style: italic; line-height: 1.5; font-family: 'Inter Tight', 'Segoe UI', sans-serif;">
+                {escaped_thought}
+            </td>
+        </tr>
+    </table>'''
+
+            placeholder = f"@@@THINKBLOCK{len(think_blocks)}@@@"
+            think_blocks.append(think_html)
+            return placeholder
+
+        text = re.sub(r'<(think|thought|reasoning)>(.*?)</\1>', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'<(think|thought|reasoning)>(.*)$', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
+
+        text = re.sub(r'"(.*?)"', rf'<span style="color: {qc}; font-weight: 500;">"\1"</span>', text)
+        text = re.sub(r'“(.*?)”', rf'<span style="color: {qc}; font-weight: 500;">“\1”</span>', text)
+
         text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
         text = re.sub(r'__(.*?)__', r'<b>\1</b>', text)
 
-        # 3. Italics (*text* or _text_)
-        text = re.sub(r'\*(.*?)\*', r'<i><span style="color: #a3a3a3;">\1</span></i>', text)
-        text = re.sub(r'_(.*?)_', r'<i><span style="color: #a3a3a3;">\1</span></i>', text)
+        text = re.sub(r'\*(.*?)\*', rf'<i><span style="color: {ic};">\1</span></i>', text)
+        text = re.sub(r'_(.*?)_', rf'<i><span style="color: {ic};">\1</span></i>', text)
 
-        # 4. Headers (#, ##, ###)
-        text = re.sub(r'^#\s+(.*)$', r'<h1>\1</h1>', text, flags=re.MULTILINE)
-        text = re.sub(r'^##\s+(.*)$', r'<h2>\1</h2>', text, flags=re.MULTILINE)
-        text = re.sub(r'^###\s+(.*)$', r'<h3>\1</h3>', text, flags=re.MULTILINE)
+        text = re.sub(r'^#\s+(.*)$', r'<h1 style="color: #F3F4F6; font-size: 1.35em; margin: 12px 0 6px 0; font-weight: 700;">\1</h1>', text, flags=re.MULTILINE)
+        text = re.sub(r'^##\s+(.*)$', r'<h2 style="color: #E5E7EB; font-size: 1.18em; margin: 10px 0 5px 0; font-weight: 600;">\1</h2>', text, flags=re.MULTILINE)
+        text = re.sub(r'^###\s+(.*)$', r'<h3 style="color: #D1D5DB; font-size: 1.05em; margin: 8px 0 4px 0; font-weight: 600;">\1</h3>', text, flags=re.MULTILINE)
 
-        # 5. Numbered lists (1. element)
-        text = re.sub(r'^(\d+\.)\s+(.*)$', r'<ol><li>\2</li></ol>', text, flags=re.MULTILINE)
+        def process_ol(match):
+            block = match.group(0)
+            items = re.findall(r'^\d+\.\s+(.*)$', block, flags=re.MULTILINE)
+            lis = ''.join([f'<li style="margin-bottom: 3px;">{item}</li>' for item in items])
+            return f'<ol style="margin: 6px 0 8px 0; padding-left: 22px; color: #D1D5DB;">{lis}</ol>'
 
-        # 6. Lists (* element or - element)
-        text = re.sub(r'^[\*\-]\s+(.*)$', r'<ul><li>\1</li></ul>', text, flags=re.MULTILINE)
+        text = re.sub(r'(?:^\d+\.\s+.*(?:\n|$))+', process_ol, text, flags=re.MULTILINE)
 
-        # 7. Code blocks (```code```)
-        text = re.sub(
-            r'```(.*?)```',
-            r'<pre style="background-color: #1a1a1a; color: #c7c7c7; border-radius: 6px; font-family: Inter Tight Light;">\1</pre>',
-            text,
-            flags=re.DOTALL
-        )
+        def process_ul(match):
+            block = match.group(0)
+            items = re.findall(r'^[\*\-]\s+(.*)$', block, flags=re.MULTILINE)
+            lis = ''.join([f'<li style="margin-bottom: 3px;">{item}</li>' for item in items])
+            return f'<ul style="margin: 6px 0 8px 0; padding-left: 22px; color: #D1D5DB;">{lis}</ul>'
 
-        # 8. Inline code (`code`)
-        text = re.sub(
-            r'`([^`]+)`',
-            r'<code style="background-color: #1a1a1a; color: #c7c7c7; border-radius: 6px; font-family: Inter Tight Light;">\1</code>',
-            text
-        )
+        text = re.sub(r'(?:^[\*\-]\s+.*(?:\n|$))+', process_ul, text, flags=re.MULTILINE)
 
-        # 9. Line break (\n)
         text = text.replace('\n', '<br>')
+
+        for i, block in enumerate(inline_blocks):
+            text = text.replace(f"@@@INLINECODE{i}@@@", block)
+
+        for i, block in enumerate(code_blocks):
+            text = text.replace(f"@@@CODEBLOCK{i}@@@", block)
+
+        for i, block in enumerate(think_blocks):
+            text = text.replace(f"@@@THINKBLOCK{i}@@@", block)
 
         return text
     
@@ -1764,6 +1866,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._breath_amp_z  = 0.4
         self._breath_timer.start(33)
 
+        self._breath_sway_x = 0.0
+        self._breath_sway_z = 0.0
+
         self._check_time_context()
         self.soul_companion = SoulCompanion(system_ref=self)
         logger.info("Desktop Companion variables initialized (Soul Companion ready)")
@@ -1781,12 +1886,16 @@ class Soul_Of_Waifu_System(QtCore.QObject):
     def _sc_speak_slot(self, text: str):
         if not (hasattr(self, "tts_worker") and self.tts_worker):
             return
- 
+        if not text or not text.strip():
+            return
+
+        is_subtitle_continuation = getattr(self, "_companion_speaking", False)
         self._companion_speaking = True
+        self.is_interrupted = False
         self.tts_worker.add_text(text)
         self.set_state("SPEAKING")
 
-        tts_duration_ms = max(3500, int(len(text) * 130 + 2000))
+        tts_duration_ms = max(8000, int(len(text) * 250 + 5000))
 
         current_mode = self._get_current_mode()
 
@@ -1794,13 +1903,19 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             widget = self._get_model_widget_instance()
             if widget and hasattr(widget, "subtitle_overlay"):
                 if getattr(widget, "_subtitles_enabled", True):
-                    widget.subtitle_overlay.show_text(text, tts_duration_ms)
+                    if is_subtitle_continuation:
+                        widget.subtitle_overlay.append_text(text, tts_duration_ms)
+                    else:
+                        widget.subtitle_overlay.show_text(text, tts_duration_ms)
 
         elif current_mode == "VRM":
             if hasattr(self, "vrm_no_gui") and self.vrm_no_gui:
                 if hasattr(self.vrm_no_gui, "subtitle_overlay"):
                     if getattr(self.vrm_no_gui, "_subtitles_enabled", True):
-                        self.vrm_no_gui.subtitle_overlay.show_text(text, tts_duration_ms)
+                        if is_subtitle_continuation:
+                            self.vrm_no_gui.subtitle_overlay.append_text(text, tts_duration_ms)
+                        else:
+                            self.vrm_no_gui.subtitle_overlay.show_text(text, tts_duration_ms)
 
         if current_mode == "Live2D Model":
             widget = self._get_model_widget_instance()
@@ -1828,6 +1943,22 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             self.soul_companion.stop()
         logger.info("Companion systems stopped (Soul Companion)")
 
+    def get_companion_state_snapshot(self) -> dict:
+        if not hasattr(self, 'soul_companion'):
+            return {}
+        sc = self.soul_companion
+        return {
+            "hormones": sc.hormones.to_dict(),
+            "emotion": sc.emotion.current,
+            "scratchpad": sc.scratchpad.to_string(limit=3),
+            "is_sleeping": sc.hormones.is_sleeping,
+            "is_lonely": sc.hormones.is_lonely,
+            "last_spoke_sec_ago": int((datetime.now() - sc._last_spoke).total_seconds()),
+            "last_user_input_sec_ago": int((datetime.now() - sc._last_user_input).total_seconds()),
+            "is_afk": sc._is_afk,
+            "enabled": sc._enabled,
+        }
+
     def _get_model(self):
         """Return the active Live2D LAppModel, or None."""
         m = getattr(getattr(self, 'live2d_no_gui', None), 'live2d_model', None)
@@ -1844,6 +1975,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
     def _get_current_mode(self) -> str:
         """Return current_sow_system_mode string."""
+        if hasattr(self, "current_sow_system_mode"):
+            return self.current_sow_system_mode
+        
         try:
             return self.configuration_characters.load_configuration()[
                 "character_list"][self.character_name]["current_sow_system_mode"]
@@ -1944,6 +2078,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         try:
             model = self._get_model()
             if model:
+                sway_x = getattr(self, "_breath_sway_x", 0.0)
+                sway_z = getattr(self, "_breath_sway_z", 0.0)
+
                 if self._drag_is_active:
                     model.SetParameterValue("ParamBodyAngleX", self._body_tilt_current)
                     model.SetParameterValue("ParamAngleZ",     tilt_z)
@@ -1957,7 +2094,8 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                     model.SetParameterValue("ParamEyeBallY",   self._current_eye_y)
                     model.SetParameterValue("ParamAngleX",     self._current_head_x)
                     model.SetParameterValue("ParamAngleY",     self._current_head_y)
-                    model.SetParameterValue("ParamBodyAngleX", self._current_body_x)
+                    model.SetParameterValue("ParamBodyAngleX", self._current_body_x + sway_x)
+                    model.SetParameterValue("ParamAngleZ",     sway_z)
         except Exception as e:
             logger.debug(f"Tracking frame step error: {e}")
 
@@ -1985,8 +2123,8 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self._spring_return_timer.start(16)
 
     def _spring_return_tick(self):
-        k = 0.18
-        d = 0.55
+        k = 0.15
+        d = 0.68
 
         for attr_x, attr_v in [("_spring_body_x",  "_spring_body_vel"),
                                 ("_spring_angle_z", "_spring_angle_vel")]:
@@ -2014,25 +2152,14 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         self._body_tilt_current = self._spring_body_x
 
-        if abs(self._spring_body_x) < 0.05 and abs(self._spring_angle_z) < 0.05:
+        if abs(self._spring_body_x) < 0.08 and abs(self._spring_body_vel) < 0.05:
             self._spring_return_timer.stop()
             self._spring_body_x    = 0.0
             self._spring_angle_z   = 0.0
+            self._spring_body_vel  = 0.0
+            self._spring_angle_vel = 0.0
             self._body_tilt_current = 0.0
             self._body_tilt_target  = 0.0
-            try:
-                mode = self._get_current_mode()
-                if mode == "Live2D Model":
-                    model = self._get_model()
-                    if model:
-                        model.SetParameterValue("ParamBodyAngleX", 0.0)
-                        model.SetParameterValue("ParamAngleZ",     0.0)
-                elif mode == "VRM":
-                    wv = self._get_webview()
-                    if wv:
-                        wv.page().runJavaScript("setBodyAngle(0, 0);")
-            except Exception:
-                pass
 
     # === SMOOTH IDLE ANIMATION ===
     def _idle_anim_tick(self):
@@ -2065,25 +2192,14 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
     # === BREATHING SWAY ===
     def _breath_sway_tick(self):
-        if self._is_sleeping or self._spring_return_timer.isActive():
-            return
-        if self.interaction_state != "STOPPED":
+        if self._is_sleeping or self.interaction_state != "STOPPED":
             return
 
         import math
         self._breath_phase += self._breath_speed
-        sway_x = math.sin(self._breath_phase)         * self._breath_amp_x
-        sway_z = math.sin(self._breath_phase * 0.7)   * self._breath_amp_z
 
-        try:
-            mode = self._get_current_mode()
-            if mode == "Live2D Model":
-                model = self._get_model()
-                if model and not self._spring_return_timer.isActive():
-                    model.SetParameterValue("ParamBodyAngleX", sway_x)
-                    model.SetParameterValue("ParamAngleZ",     sway_z)
-        except Exception as e:
-            logger.debug(f"Breath sway error: {e}")
+        self._breath_sway_x = math.sin(self._breath_phase) * self._breath_amp_x
+        self._breath_sway_z = math.sin(self._breath_phase * 0.7) * self._breath_amp_z
     
     # === IDLE SCHEDULER ===
     def _check_idle_action(self):
@@ -2714,10 +2830,12 @@ class Live2DWidget(QOpenGLWidget):
         if not self.live2d_model:
             return False
         try:
+            if self.sow_system_ref and hasattr(self.sow_system_ref, "_spring_return_timer"):
+                self.sow_system_ref._spring_return_timer.stop()
+
             p = getattr(live2d, "MotionPriority", None)
             priority_val = getattr(p, "FORCE", 3) if priority == 3 else priority
             self.live2d_model.StartMotion(group_name, no, priority_val)
-            logger.info(f"[Live2D] Playing motion: {group_name}_{no} (priority={priority_val})")
             return True
         except Exception as e:
             logger.debug(f"[Live2D] Failed to play motion {group_name}_{no}: {e}")
@@ -2910,6 +3028,10 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         self._always_on_top = True
         self._subtitles_enabled = True
 
+        self._text_chat_enabled = False
+        self.text_input_overlay = CompanionTextInputOverlay(self)
+        self.text_input_overlay.text_submitted_signal.connect(self._on_text_chat_submitted)
+
         self.dragging_window = False
         self.drag_offset = QtCore.QPoint()
 
@@ -2990,10 +3112,12 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         if not self.live2d_model:
             return False
         try:
+            if self.sow_system_ref and hasattr(self.sow_system_ref, "_spring_return_timer"):
+                self.sow_system_ref._spring_return_timer.stop()
+
             p = getattr(live2d, "MotionPriority", None)
             priority_val = getattr(p, "FORCE", 3) if priority == 3 else priority
             self.live2d_model.StartMotion(group_name, no, priority_val)
-            logger.info(f"[Live2D] Playing motion: {group_name}_{no} (priority={priority_val})")
             return True
         except Exception as e:
             logger.debug(f"[Live2D] Failed to play motion {group_name}_{no}: {e}")
@@ -3051,7 +3175,27 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
             return
         h_dict = self.sow_system_ref.soul_companion.hormones.to_dict()
         hud = HormonesHUDOverlay(self, h_dict)
-        hud.move(10, 20)
+        
+        global_pos = self.mapToGlobal(QtCore.QPoint(0, 0))
+        target_x = global_pos.x() - hud.width() - 15
+        if target_x < 10:
+            target_x = global_pos.x() + self.width() + 15
+            
+        hud.move(target_x, global_pos.y() + 40)
+        hud.show()
+
+    def show_scratchpad_hud(self):
+        if not self.sow_system_ref or not hasattr(self.sow_system_ref, "soul_companion"):
+            return
+        scratch_str = self.sow_system_ref.soul_companion.scratchpad.to_string(limit=6)
+        hud = ScratchpadHUDOverlay(self, scratch_str)
+        
+        global_pos = self.mapToGlobal(QtCore.QPoint(0, 0))
+        target_x = global_pos.x() - hud.width() - 15
+        if target_x < 10:
+            target_x = global_pos.x() + self.width() + 15
+            
+        hud.move(target_x, global_pos.y() + 40)
         hud.show()
 
     def mousePressEvent(self, event: QtGui.QMouseEvent):
@@ -3242,6 +3386,8 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         action_size_large  = size_menu.addAction(t("sc_menu_size_large", "Large  (600 × 900)"))
 
         action_hud = settings_menu.addAction(t("sc_menu_hud", "📊  Show Hormones HUD"))
+        action_scratch = qa_menu.addAction(t("sc_menu_scratchpad", "🧠  ScratchPad Thoughts"))
+        action_text_mode = settings_menu.addAction(t("sc_menu_text_bar_hover", "💬  Text Chat Bar (Hover)"))
 
         menu.addSeparator()
         action_center = menu.addAction(t("sc_menu_center", "📍  Center on Screen"))
@@ -3256,6 +3402,11 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
             ref.soul_companion.event_bus.emit_threadsafe("manual_clipboard", {})
         elif action == action_mind and ref and hasattr(ref, "soul_companion"):
             ref.soul_companion.event_bus.emit_threadsafe("manual_scratchpad", {})
+
+        elif action == action_scratch:
+            self.show_scratchpad_hud()
+        elif action == action_text_mode:
+            self._text_chat_enabled = not getattr(self, "_text_chat_enabled", True)
 
         elif action == action_voice and self.toggle_voice_cb:
             self.toggle_voice_cb()
@@ -3333,11 +3484,30 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         if hasattr(self, "subtitle_overlay"):
             self.subtitle_overlay._reposition()
 
+        if hasattr(self, "text_input_overlay"):
+            w = max(200, self.width() - 40)
+            self.text_input_overlay.setGeometry(20, self.height() - 75, w, 36)
+
     def wheelEvent(self, event: QtGui.QWheelEvent):
         delta = event.angleDelta().y()
         step = 20 if delta > 0 else -20
         new_w, new_h = max(200, self.width() + step), max(300, self.height() + int(step * 1.5))
         self.resize(new_w, new_h)
+
+    def enterEvent(self, event):
+        if getattr(self, "_text_chat_enabled", False):
+            self.text_input_overlay.show()
+            self.text_input_overlay.raise_()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if not self.text_input_overlay.hasFocus():
+            self.text_input_overlay.hide()
+        super().leaveEvent(event)
+
+    def _on_text_chat_submitted(self, text: str):
+        if self.sow_system_ref:
+            self.sow_system_ref.on_user_speech_recognized(text, is_text_input=True)
 
     def closeEvent(self, event):
         logger.info("Live2D Desktop Companion closing...")
@@ -3434,7 +3604,7 @@ class VRMWidget_NoGUI(QWidget):
         self.toggle_voice_cb = toggle_voice_cb
         self.sow_system_ref = sow_system_ref
  
-        self.server_thread = ServerThread(port=8002)
+        self.server_thread = VRMServerThread(preferred_port=8002)
         self.server_thread.start()
  
         self.vrm_webview = QWebEngineView(self)
@@ -3461,6 +3631,10 @@ class VRMWidget_NoGUI(QWidget):
         self._always_on_top = True
         self._subtitles_enabled = True
 
+        self._text_chat_enabled = False
+        self.text_input_overlay = CompanionTextInputOverlay(self)
+        self.text_input_overlay.text_submitted_signal.connect(self._on_text_chat_submitted)
+
         self.subtitle_overlay = CompanionSubtitleOverlay(self)
         self.subtitle_overlay.raise_()
 
@@ -3473,9 +3647,28 @@ class VRMWidget_NoGUI(QWidget):
 
         if hasattr(self, "subtitle_overlay"):
             self.subtitle_overlay._reposition()
+
+        if hasattr(self, "text_input_overlay"):
+            w = max(200, self.width() - 40)
+            self.text_input_overlay.setGeometry(20, self.height() - 75, w, 36)
+
+    def enterEvent(self, event):
+        if getattr(self, "_text_chat_enabled", False):
+            self.text_input_overlay.show()
+            self.text_input_overlay.raise_()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if not self.text_input_overlay.hasFocus():
+            self.text_input_overlay.hide()
+        super().leaveEvent(event)
+
+    def _on_text_chat_submitted(self, text: str):
+        if self.sow_system_ref:
+            self.sow_system_ref.on_user_speech_recognized(text, is_text_input=True)
  
     def load_vrm_model(self):
-        html_url = f"http://localhost:{self.server_thread.port}/app/utils/emotions/vrm_module_companion.html"
+        html_url = f"http://127.0.0.1:{self.server_thread.port}/app/utils/emotions/vrm_module_companion.html"
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         model_rel_path = os.path.relpath(self.vrm_model_path, project_root).replace("\\", "/")
         html_url += f"?model=/{model_rel_path}&transparent=1"
@@ -3549,7 +3742,27 @@ class VRMWidget_NoGUI(QWidget):
             return
         h_dict = self.sow_system_ref.soul_companion.hormones.to_dict()
         hud = HormonesHUDOverlay(self, h_dict)
-        hud.move(10, 20)
+        
+        global_pos = self.mapToGlobal(QtCore.QPoint(0, 0))
+        target_x = global_pos.x() - hud.width() - 15
+        if target_x < 10:
+            target_x = global_pos.x() + self.width() + 15
+            
+        hud.move(target_x, global_pos.y() + 40)
+        hud.show()
+
+    def show_scratchpad_hud(self):
+        if not self.sow_system_ref or not hasattr(self.sow_system_ref, "soul_companion"):
+            return
+        scratch_str = self.sow_system_ref.soul_companion.scratchpad.to_string(limit=6)
+        hud = ScratchpadHUDOverlay(self, scratch_str)
+        
+        global_pos = self.mapToGlobal(QtCore.QPoint(0, 0))
+        target_x = global_pos.x() - hud.width() - 15
+        if target_x < 10:
+            target_x = global_pos.x() + self.width() + 15
+            
+        hud.move(target_x, global_pos.y() + 40)
         hud.show()
 
     def mousePressEvent(self, event):
@@ -3700,22 +3913,25 @@ class VRMWidget_NoGUI(QWidget):
 
         speed_menu         = settings_menu.addMenu(t("sc_menu_speed", "👁  Tracking Speed"))
         speed_menu.setStyleSheet(menu.styleSheet())
-        action_speed_slow  = speed_menu.addAction("Slow")
-        action_speed_norm  = speed_menu.addAction("Normal")
-        action_speed_fast  = speed_menu.addAction("Fast")
+        action_speed_slow  = speed_menu.addAction(t("sc_menu_speed_slow", "Slow"))
+        action_speed_norm  = speed_menu.addAction(t("sc_menu_speed_normal", "Normal"))
+        action_speed_fast  = speed_menu.addAction(t("sc_menu_speed_fast", "Fast"))
 
-        size_menu          = settings_menu.addMenu("📐  Model Size")
+        size_menu          = settings_menu.addMenu(t("sc_menu_size", "📐  Model Size"))
         size_menu.setStyleSheet(menu.styleSheet())
-        action_size_small  = size_menu.addAction("Small  (200 × 300)")
-        action_size_medium = size_menu.addAction("Medium (400 × 600)")
-        action_size_large  = size_menu.addAction("Large  (600 × 900)")
+        action_size_small  = size_menu.addAction(t("sc_menu_size_small", "Small  (200 × 300)"))
+        action_size_medium = size_menu.addAction(t("sc_menu_size_medium", "Medium (400 × 600)"))
+        action_size_large  = size_menu.addAction(t("sc_menu_size_large", "Large  (600 × 900)"))
 
-        action_hud = settings_menu.addAction("📊  Show Hormones HUD")
+        action_hud = settings_menu.addAction(t("sc_menu_hud", "📊  Show Hormones HUD"))
+        action_scratch = settings_menu.addAction(t("sc_menu_scratchpad", "🧠  ScratchPad Thoughts"))
+        text_status = t("sc_menu_text_bar_on", "💬  Text Chat Bar (ON)") if getattr(self, "_text_chat_enabled", False) else t("sc_menu_text_bar_off", "💬  Text Chat Bar (OFF)")
+        action_text_mode = settings_menu.addAction(text_status)
 
         menu.addSeparator()
-        action_center = menu.addAction("📍  Center on Screen")
-        action_reset  = menu.addAction("🔄  Reset Size")
-        action_close  = menu.addAction("❌  Hide Companion")
+        action_center = menu.addAction(t("sc_menu_center", "📍  Center on Screen"))
+        action_reset  = menu.addAction(t("sc_menu_reset", "🔄  Reset Size"))
+        action_close  = menu.addAction(t("sc_menu_hide", "❌  Hide Companion"))
 
         action = menu.exec(event.globalPos())
 
@@ -3725,6 +3941,16 @@ class VRMWidget_NoGUI(QWidget):
             ref.soul_companion.event_bus.emit_threadsafe("manual_clipboard", {})
         elif action == action_mind and ref and hasattr(ref, "soul_companion"):
             ref.soul_companion.event_bus.emit_threadsafe("manual_scratchpad", {})
+
+        elif action == action_scratch:
+            self.show_scratchpad_hud()
+        elif action == action_text_mode:
+            self._text_chat_enabled = not getattr(self, "_text_chat_enabled", False)
+            if self._text_chat_enabled:
+                self.text_input_overlay.show()
+                self.text_input_overlay.raise_()
+            else:
+                self.text_input_overlay.hide()
 
         elif action == action_voice and self.toggle_voice_cb:
             self.toggle_voice_cb()
@@ -3844,7 +4070,7 @@ class CompanionSubtitleOverlay(QWidget):
     FONT_MIN_PX    = 18
     PADDING_X      = 22
     PADDING_Y      = 10
-    BOTTOM_MARGIN  = 70
+    BOTTOM_MARGIN  = 130
     MAX_LINES      = 3
     FADE_IN_MS     = 85
     FADE_OUT_MS    = 380
@@ -3935,8 +4161,38 @@ class CompanionSubtitleOverlay(QWidget):
         first_interval = self._calculate_word_delay(self._words[0])
         self._reveal_timer.start(first_interval)
 
-        self._hide_timer.start(tts_duration_ms + 1500)
+        self._hide_timer.start(tts_duration_ms + 3000)
  
+    def append_text(self, text: str, tts_duration_ms: int = 5000):
+        text = text.strip()
+        if not text:
+            return
+
+        if not self._full_text:
+            self.show_text(text, tts_duration_ms)
+            return
+
+        self._hide_timer.stop()
+
+        self._full_text = f"{self._full_text} {text}".strip()
+        new_words = text.split()
+        self._words.extend(new_words)
+
+        self._font_px = self._calc_font_px(self._full_text)
+        self._font.setPixelSize(self._font_px)
+        self._reposition()
+
+        if not self.isVisible():
+            self.show()
+            self.raise_()
+
+        if not self._reveal_timer.isActive():
+            if self._revealed_idx < len(self._words):
+                next_interval = self._calculate_word_delay(self._words[self._revealed_idx])
+                self._reveal_timer.start(next_interval)
+
+        self._hide_timer.start(tts_duration_ms + 3000)
+
     def on_speech_ended(self):
         if not self._full_text:
             return
@@ -4114,22 +4370,29 @@ class CompanionSubtitleOverlay(QWidget):
         painter.drawText(rect, flags, text)
 
 class HormonesHUDOverlay(QtWidgets.QFrame):
-    """
-    Transient HUD overlay to display current hormones.
-    """
     def __init__(self, parent, hormones_dict):
-        super().__init__(parent)
-        self.setWindowFlags(QtCore.Qt.WindowType.SubWindow | QtCore.Qt.WindowType.FramelessWindowHint)
+        super().__init__(None)
+
+        ref = getattr(parent, "sow_system_ref", None)
+        def t(k, default):
+            return ref.translations.get(k, default) if ref and hasattr(ref, "translations") else default
+        
+        self.setWindowFlags(
+            QtCore.Qt.WindowType.Tool | 
+            QtCore.Qt.WindowType.FramelessWindowHint | 
+            QtCore.Qt.WindowType.WindowStaysOnTopHint
+        )
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
         
         self.setStyleSheet("""
-            QFrame {
-                background-color: rgba(20, 20, 25, 0.45);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 12px;
+            QFrame#HormonesFrame {
+                background-color: #12121A;
+                border: 2px solid #8B5CF6;
+                border-radius: 14px;
             }
             QLabel {
-                color: #E5E5EA;
+                color: #F3F4F6;
                 font-family: 'Comfortaa', 'Segoe UI', sans-serif;
                 font-weight: bold;
                 font-size: 11px;
@@ -4137,31 +4400,38 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
                 background: transparent;
             }
             QProgressBar {
-                border: 1px solid rgba(255, 255, 255, 15);
-                border-radius: 5px;
-                background-color: rgba(255, 255, 255, 10);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+                background-color: #09090D;
                 text-align: right;
                 color: transparent;
-                height: 10px;
+                height: 8px;
             }
             QProgressBar::chunk {
-                border-radius: 4px;
+                border-radius: 3px;
             }
         """)
+        self.setObjectName("HormonesFrame")
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(25)
+        shadow.setColor(QColor(0, 0, 0, 220))
+        shadow.setOffset(0, 6)
+        self.setGraphicsEffect(shadow)
         
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
         
-        title_lbl = QtWidgets.QLabel("🧪 Endocrine Balance")
-        title_lbl.setStyleSheet("font-size: 13px; color: #FFFFFF; font-weight: bold; margin-bottom: 4px;")
+        title_lbl = QtWidgets.QLabel(t("sc_hud_hormones_title", "Endocrine & Hormone Balance"))
+        title_lbl.setStyleSheet("font-size: 12px; color: #A78BFA; font-weight: bold;")
         layout.addWidget(title_lbl)
         
         bars_info = [
-            ("🧪 Oxytocin (Love)", "oxytocin", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #ff758c, stop:1 #ff7eb3)"),
-            ("⚡ Dopamine (Interest)", "dopamine", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #4facfe, stop:1 #00f2fe)"),
-            ("🔥 Cortisol (Stress)", "cortisol", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #ff0844, stop:1 #ffb199)"),
-            ("🔋 Energy (Vigor)", "energy", "qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 #43e97b, stop:1 #38f9d7)"),
+            (t("sc_hud_oxytocin", "🧪 Oxytocin (Love)"), "oxytocin", "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff758c, stop:1 #ff7eb3)"),
+            (t("sc_hud_dopamine", "⚡ Dopamine (Focus)"), "dopamine", "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4facfe, stop:1 #00f2fe)"),
+            (t("sc_hud_cortisol", "🔥 Cortisol (Stress)"), "cortisol", "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff0844, stop:1 #ffb199)"),
+            (t("sc_hud_energy", "🔋 Energy (Vigor)"), "energy", "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #43e97b, stop:1 #38f9d7)"),
         ]
         
         for label_text, key, chunk_style in bars_info:
@@ -4181,19 +4451,19 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
         
         self._opacity = 0.0
         self._opacity_anim = QtCore.QPropertyAnimation(self, b"windowOpacity", self)
-        self._opacity_anim.setDuration(300)
+        self._opacity_anim.setDuration(250)
         self._opacity_anim.setStartValue(0.0)
-        self._opacity_anim.setEndValue(0.96)
+        self._opacity_anim.setEndValue(1.0)
         self._opacity_anim.start()
         
         self._timer = QtCore.QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._start_fade_out)
-        self._timer.start(5000)
+        self._timer.start(7000)
 
     def _start_fade_out(self):
         self._opacity_anim.stop()
-        self._opacity_anim.setDuration(400)
+        self._opacity_anim.setDuration(350)
         self._opacity_anim.setStartValue(self._opacity)
         self._opacity_anim.setEndValue(0.0)
         self._opacity_anim.finished.connect(self.deleteLater)
@@ -4207,3 +4477,120 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
     def windowOpacity(self, value):
         self._opacity = value
         self.setWindowOpacity(value)
+
+class ScratchpadHUDOverlay(QtWidgets.QFrame):
+    def __init__(self, parent, scratchpad_str: str):
+        super().__init__(None)
+
+        ref = getattr(parent, "sow_system_ref", None)
+        def t(k, default):
+            return ref.translations.get(k, default) if ref and hasattr(ref, "translations") else default
+        
+        self.setWindowFlags(
+            QtCore.Qt.WindowType.Tool | 
+            QtCore.Qt.WindowType.FramelessWindowHint | 
+            QtCore.Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
+        
+        self.setStyleSheet("""
+            QFrame#ScratchFrame {
+                background-color: #12121A;
+                border: 2px solid #C084FC;
+                border-radius: 14px;
+            }
+            QLabel {
+                color: #E5E7EB;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                border: none;
+                background: transparent;
+            }
+        """)
+        self.setObjectName("ScratchFrame")
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(25)
+        shadow.setColor(QColor(0, 0, 0, 220))
+        shadow.setOffset(0, 6)
+        self.setGraphicsEffect(shadow)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        
+        title_lbl = QtWidgets.QLabel(t("sc_hud_scratchpad_title", "🧠 Companion's Internal Thoughts (ScratchPad)"))
+        title_lbl.setStyleSheet("font-size: 12px; color: #C084FC; font-weight: bold; margin-bottom: 6px;")
+        layout.addWidget(title_lbl)
+
+        body_lbl = QtWidgets.QLabel(scratchpad_str)
+        body_lbl.setWordWrap(True)
+        body_lbl.setStyleSheet("font-size: 11px; color: #D1D5DB; line-height: 1.4;")
+        layout.addWidget(body_lbl)
+        
+        self.adjustSize()
+        self.resize(min(320, self.width()), self.height())
+
+        self._opacity_anim = QtCore.QPropertyAnimation(self, b"windowOpacity", self)
+        self._opacity_anim.setDuration(250)
+        self._opacity_anim.setStartValue(0.0)
+        self._opacity_anim.setEndValue(1.0)
+        self._opacity_anim.start()
+        
+        self._timer = QtCore.QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._start_fade_out)
+        self._timer.start(8000)
+
+    def _start_fade_out(self):
+        self._opacity_anim.stop()
+        self._opacity_anim.setDuration(350)
+        self._opacity_anim.setStartValue(self.windowOpacity())
+        self._opacity_anim.setEndValue(0.0)
+        self._opacity_anim.finished.connect(self.deleteLater)
+        self._opacity_anim.start()
+
+class CompanionTextInputOverlay(QtWidgets.QLineEdit):
+    """
+    A semi-transparent, compact text input field for communicating with companion without a microphone.
+    """
+    text_submitted_signal = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        ref = getattr(parent, "sow_system_ref", None) if parent else None
+        def t(k, default):
+            return ref.translations.get(k, default) if ref and hasattr(ref, "translations") else default
+
+        self.setPlaceholderText(t("sc_input_placeholder", "Write your text..."))
+        self.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(24, 24, 32, 0.85);
+                color: #FFFFFF;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+                padding: 6px 12px;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #A78BFA;
+                background-color: rgba(24, 24, 32, 0.95);
+            }
+        """)
+        
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setOffset(0, 3)
+        self.setGraphicsEffect(shadow)
+
+        self.returnPressed.connect(self._on_submit)
+        self.hide()
+
+    def _on_submit(self):
+        text = self.text().strip()
+        if text:
+            self.text_submitted_signal.emit(text)
+            self.clear()
+            self.hide()
