@@ -1,7 +1,13 @@
 import os
+import io
 import re
+import time
+import sys
 import ssl
+import socket
+import secrets
 import shutil
+import subprocess
 import uuid
 import json
 import base64
@@ -38,25 +44,31 @@ from PyQt6.QtWidgets import (
     QScrollArea, QSizePolicy, QGridLayout
 )
 
+from app.gui.character_ai_assistant import CharacterAIAssistantDialog
 from app.utils.ai_clients.local_server_manager import LocalServerManager
 from app.utils.ai_clients.prompt_engine import PromptEngine
 from app.utils.ai_clients.ai_factory import AIFactory
+from app.utils.ai_clients.tools import ToolRegistry, normalize_tool_call
 from app.utils.ai_clients.soul_stage_engine import (
         SoulStageOrchestrator,
         SoulStageSession,
+        NPCMemoryRegistry,
+        SoulStageContextWindow,
+        SoulStageMessageManager
     )
+from app.utils.vrm_server import VRMServerThread
 
 from app.gui.custom_widgets import PersonasEditorDialog, SystemPromptEditorDialog, DiscordGatewayDialog, LorebookEditorDialog, AuthorNotesEditorDialog, SummaryEditorDialog, ImageGenSettingsDialog
 from app.gui.custom_widgets import (
     Live2DWidget, AnimatedHoverButton, TextEditUserMessage, SmoothMessageFrame, TypingIndicatorWidget, TypewriterEffect,
     CharacterCardCharactersGateway, SceneGatewayCard, LorebookGatewayCard, CharacterCardList, CharacterFolderCard, MethodCard, ModelListItemWidget, 
     EditorCharacterItemWidget, BackgroundChangerWindow, SoulMemoryViewer, AboutDialog,
-    ResponsiveEmotionLabel, MultiSelectDialog, UpdaterDialog, sow_toast, SowConfirmDialog, Live2DMotionLinkerDialog
+    ResponsiveEmotionLabel, MultiSelectDialog, UpdaterDialog, sow_toast, SowConfirmDialog, Live2DMotionLinkerDialog, SowInputDialog, SowSelectDialog
 )
 
 from app.utils.translator import Translator
 from app.utils.character_cards import CharactersCard, SoulGateway
-from app.utils.text_to_speech import ElevenLabs, XTTSv2_SOW_System, EdgeTTS, KokoroTTS_SOW_System, SileroTTS_SOW_System, Qwen3TTS_SOW_System, AudioPlaybackWorker
+from app.utils.text_to_speech import AudioPlaybackWorker
 from app.utils.ambient_client import AmbientPlayer
 from app.utils.models_hub import ModelSearch, ModelRecommendations, ModelPopular, ModelInformation, ModelRepoFiles, FileSelectorDialog, FileDownloader, ModelItemWidget, RecommendedModelItemWidget
 from app.gui.sow_system_signals import Soul_Of_Waifu_System
@@ -156,6 +168,25 @@ class InterfaceSignals():
 
         self.messages = {}
 
+        self.pending_attachments = []
+        self._attachment_preview_widgets = {}
+        self.MAX_ATTACHMENTS_PER_MESSAGE = 5
+        self.MAX_ATTACHMENT_SIZE_MB = 15
+        self.MAX_IMAGE_DIMENSION = 1536
+        
+        self.OPENAI_STYLE_VISION_PROVIDERS = {
+            "Open AI", "OpenRouter", "Local LLM", "Mistral AI",
+            "DeepSeek", "Grok", "Qwen", "Z.AI", "Google Gemini",
+        }
+        self.ANTHROPIC_STYLE_VISION_PROVIDERS = {"Anthropic"}
+        
+        self.TEXT_ATTACHMENT_EXTENSIONS = {
+            ".txt", ".md", ".markdown", ".json", ".csv", ".log", ".yaml", ".yml",
+            ".xml", ".py", ".js", ".ts", ".html", ".css", ".ini", ".cfg",
+        }
+
+        self._pending_tts_segments = {}
+
         # --- Emotion Resources ---
         emotions_path = "app/utils/emotions/live2d/expressions"
         self.emotion_resources = {
@@ -202,18 +233,41 @@ class InterfaceSignals():
         self.local_server_manager = LocalServerManager(self.ui)
 
         # --- Soul Stage ---
+        _ss_npc_registry = None
+        _ss_context_window = None
+        try:
+            _ss_npc_registry = NPCMemoryRegistry(embedder=None)
+        except Exception as e:
+            logger.warning(f"[SoulStage] NPCMemoryRegistry unavailable, using plain NPCRegistry: {e}")
+        try:
+            _ss_context_window = SoulStageContextWindow(
+                model_name="default",
+                max_context=8000,
+            )
+        except Exception as e:
+            logger.warning(f"[SoulStage] SoulStageContextWindow unavailable, using hard slices: {e}")
+
         self.soul_stage_orchestrator = SoulStageOrchestrator(
             prompt_engine=self.prompt_engine,
-            local_server_manager=self.local_server_manager
+            local_server_manager=self.local_server_manager,
+            npc_memory_registry=_ss_npc_registry,
+            context_window=_ss_context_window,
         )
         self.soul_stage_session = None
         self._soul_stage_scene_id: str = None
         self.soul_stage_party_bar = None
 
+        self.ss_msg_mgr = None
+
         # --- Utility Modules ---
         self.translator = Translator()
         self.character_card_client = CharactersCard()
         self.soul_gateway_client = SoulGateway()
+
+        # --- Chat tools (calculator, date/time, web search, ...) ---
+        self.tool_registry = ToolRegistry()
+        self.tools_enabled = bool(self.configuration_settings.get_main_setting("chat_tools_enabled"))
+        self.MAX_TOOL_LOOP_ITERATIONS = 4
 
         # --- AUDIO PLAYER & LIPSYNC SETUP ---
         output_device = self.configuration_settings.get_main_setting("output_device_real_index")
@@ -253,6 +307,13 @@ class InterfaceSignals():
         
         self._selected_lorebooks_building = []
         self._replace_lorebook_building_with_button()
+
+        if hasattr(self.ui, "pushButton_attach_file"):
+            self.ui.pushButton_attach_file.clicked.connect(self.open_attach_file_dialog)
+
+        if hasattr(self.ui, "pushButton_toggle_tools"):
+            self.ui.pushButton_toggle_tools.setChecked(self.tools_enabled)
+            self.ui.pushButton_toggle_tools.clicked.connect(self.toggle_chat_tools)
 
     def _replace_lorebook_building_with_button(self):
         self.ui.comboBox_lorebook_building.hide()
@@ -953,6 +1014,487 @@ class InterfaceSignals():
 
         self._resize_animation_group.start()
 
+    def toggle_chat_tools(self):
+        self.tools_enabled = not self.tools_enabled
+        self.configuration_settings.update_main_setting("chat_tools_enabled", self.tools_enabled)
+
+        if hasattr(self.ui, "pushButton_toggle_tools"):
+            self.ui.pushButton_toggle_tools.setChecked(self.tools_enabled)
+
+        if self.tools_enabled:
+            tool_list = ", ".join(self.tool_registry.tool_names())
+            sow_toast(
+                parent=self.main_window,
+                title=self.translations.get("toast_tools_title", "Tools"),
+                text=self.translations.get(
+                    "toast_tools_enabled",
+                    f"The character can now use tools while replying: {tool_list}"
+                ),
+                msg_type="success"
+            )
+        else:
+            sow_toast(
+                parent=self.main_window,
+                title=self.translations.get("toast_tools_title", "Tools"),
+                text=self.translations.get("toast_tools_disabled", "Tools are now disabled."),
+                msg_type="success"
+            )
+
+    def _show_tool_usage_indicator(self, character_name, tool_label):
+        widget = QFrame()
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                margin-top: 6px;
+                margin-bottom: 12px;
+                margin-left: 10px;
+                margin-right: 10px;
+            }
+        """)
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(14, 8, 14, 8)
+        label = QLabel(f"\U0001F6E0 {character_name} — {tool_label}")
+        label.setStyleSheet("color: rgba(255,255,255,0.7); font-size: 12px; background: transparent; border: none;")
+        layout.addWidget(label)
+
+        self.chat_container.addWidget(widget)
+
+        scroll_bar = self.ui.scrollArea_chat.verticalScrollBar()
+        scroll_bar.setValue(scroll_bar.maximum())
+
+        return widget
+
+    def _remove_tool_usage_indicator(self, widget):
+        if widget is None:
+            return
+        try:
+            self.chat_container.removeWidget(widget)
+            widget.deleteLater()
+        except RuntimeError:
+            pass
+
+    async def run_tool_loop(self, provider, messages, character_name, user_name):
+        if not self.tool_registry.has_tools():
+            return messages
+
+        tool_context = {"character_name": character_name, "user_name": user_name, "system_ref": self}
+        schemas = self.tool_registry.get_schemas()
+        working_messages = [msg.copy() for msg in messages]
+
+        tool_directive = (
+            "[CRITICAL SYSTEM DIRECTIVE — TOOL USAGE]\n"
+            "You have access to real-time interactive tools (web search, calculator, date/time, system info, clipboard, URL opener). "
+            "Examine the user's query carefully. If it asks about real-world facts, current events, recent news, "
+            "specific dates, time, math calculations, URLs, or information you aren't 100% sure about, "
+            "YOU MUST ALWAYS CALL THE APPROPRIATE TOOL FIRST using function calling before answering."
+        )
+
+        if working_messages and working_messages[0]["role"] == "system":
+            working_messages[0]["content"] += f"\n\n{tool_directive}"
+        else:
+            working_messages.insert(0, {"role": "system", "content": tool_directive})
+
+        for _ in range(self.MAX_TOOL_LOOP_ITERATIONS):
+            try:
+                result = await provider.generate(working_messages, tools=schemas, temperature=0.1, max_tokens=600)
+            except Exception as e:
+                logger.error(f"Tool loop: generate() call failed, skipping tools: {e}")
+                return messages
+
+            raw_tool_calls = result.get("tool_calls") if result else None
+            if not raw_tool_calls:
+                break
+
+            normalized_calls = [normalize_tool_call(tc) for tc in raw_tool_calls]
+            normalized_calls = [c for c in normalized_calls if c.get("name")]
+            if not normalized_calls:
+                break
+
+            assistant_tool_calls = []
+            for i, c in enumerate(normalized_calls):
+                raw_tc = raw_tool_calls[i] if i < len(raw_tool_calls) else {}
+                
+                sig = None
+                if isinstance(raw_tc, dict):
+                    sig = raw_tc.get("thought_signature") or raw_tc.get("extra_content", {}).get("google", {}).get("thought_signature")
+                else:
+                    sig = getattr(raw_tc, "thought_signature", None)
+                    if not sig and hasattr(raw_tc, "extra_content"):
+                        sig = getattr(raw_tc, "extra_content", {}).get("google", {}).get("thought_signature", None)
+                
+                if not sig:
+                    sig = "skip_thought_signature_validator"
+
+                assistant_tool_calls.append({
+                    "id": c["id"] or f"call_{i}",
+                    "type": "function",
+                    "function": {"name": c["name"], "arguments": json.dumps(c["arguments"])},
+                    "thought_signature": sig,
+                    "extra_content": {"google": {"thought_signature": sig}}
+                })
+
+            working_messages.append({
+                "role": "assistant",
+                "content": result.get("content"),
+                "tool_calls": assistant_tool_calls,
+            })
+
+            for call, wire_call in zip(normalized_calls, assistant_tool_calls):
+                indicator = self._show_tool_usage_indicator(
+                    character_name,
+                    self.translations.get("tool_using_label", "using {tool}...").format(tool=call["name"])
+                )
+                try:
+                    QApplication.processEvents()
+                    start_time = time.time()
+                    
+                    tool_result = await self.tool_registry.execute(call["name"], call["arguments"], tool_context)
+                    
+                    elapsed = time.time() - start_time
+                    if elapsed < 0.35:
+                        await asyncio.sleep(0.35 - elapsed)
+                finally:
+                    self._remove_tool_usage_indicator(indicator)
+
+                result_text = tool_result.get("result", "") if tool_result else ""
+                working_messages.append({
+                    "role": "tool",
+                    "tool_call_id": wire_call["id"],
+                    "name": call["name"],
+                    "content": result_text,
+                })
+
+        return working_messages
+    
+    def open_attach_file_dialog(self):
+        if len(self.pending_attachments) >= self.MAX_ATTACHMENTS_PER_MESSAGE:
+            sow_toast(
+                parent=self.main_window,
+                title=self.translations.get("toast_attach_title", "Attachments"),
+                text=self.translations.get(
+                    "toast_attach_limit",
+                    f"You can attach up to {self.MAX_ATTACHMENTS_PER_MESSAGE} files per message."
+                ),
+                msg_type="error"
+            )
+            return
+
+        file_filter = (
+            "Supported files (*.png *.jpg *.jpeg *.webp *.bmp *.gif "
+            "*.txt *.md *.markdown *.json *.csv *.log *.yaml *.yml *.xml "
+            "*.py *.js *.ts *.html *.css *.pdf *.docx);;"
+            "Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;"
+            "All Files (*)"
+        )
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self.main_window,
+            self.translations.get("attach_file_dialog_title", "Attach files to your message"),
+            "",
+            file_filter
+        )
+        if not file_paths:
+            return
+
+        for file_path in file_paths:
+            if len(self.pending_attachments) >= self.MAX_ATTACHMENTS_PER_MESSAGE:
+                break
+            self._add_pending_attachment(file_path)
+
+        self._refresh_attachment_preview_bar()
+
+    def _add_pending_attachment(self, file_path):
+        try:
+            if not os.path.isfile(file_path):
+                return
+
+            size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            if size_mb > self.MAX_ATTACHMENT_SIZE_MB:
+                sow_toast(
+                    parent=self.main_window,
+                    title=self.translations.get("toast_attach_title", "Attachments"),
+                    text=self.translations.get(
+                        "toast_attach_too_large",
+                        f"'{os.path.basename(file_path)}' is larger than {self.MAX_ATTACHMENT_SIZE_MB} MB and was skipped."
+                    ),
+                    msg_type="error"
+                )
+                return
+
+            ext = os.path.splitext(file_path)[1].lower()
+            is_image = ext in (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif")
+
+            attachment = {
+                "id": str(uuid.uuid4()),
+                "path": file_path,
+                "name": os.path.basename(file_path),
+                "kind": "image" if is_image else "file",
+                "ext": ext,
+            }
+            self.pending_attachments.append(attachment)
+        except Exception as e:
+            logger.error(f"Failed to add attachment '{file_path}': {e}")
+
+    def remove_pending_attachment(self, attachment_id):
+        self.pending_attachments = [a for a in self.pending_attachments if a["id"] != attachment_id]
+        self._refresh_attachment_preview_bar()
+
+    def clear_pending_attachments(self):
+        self.pending_attachments = []
+        self._refresh_attachment_preview_bar()
+
+    def _refresh_attachment_preview_bar(self):
+        if not hasattr(self.ui, "attachment_preview_layout"):
+            return
+
+        layout = self.ui.attachment_preview_layout
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        for attachment in self.pending_attachments:
+            layout.addWidget(self._build_attachment_chip(attachment))
+
+        layout.addStretch()
+
+        has_attachments = bool(self.pending_attachments)
+        bar = self.ui.attachment_preview_bar
+        bar.setVisible(has_attachments)
+        bar.setMinimumHeight(56 if has_attachments else 0)
+        bar.setMaximumHeight(56 if has_attachments else 0)
+
+    def _build_attachment_chip(self, attachment):
+        chip = QFrame()
+        chip.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.06);
+                border-radius: 8px;
+            }
+        """)
+        chip_layout = QHBoxLayout(chip)
+        chip_layout.setContentsMargins(6, 4, 6, 4)
+        chip_layout.setSpacing(6)
+
+        if attachment["kind"] == "image":
+            thumb = QLabel()
+            pixmap = QPixmap(attachment["path"])
+            if not pixmap.isNull():
+                thumb.setPixmap(pixmap.scaled(
+                    32, 32, QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+                    QtCore.Qt.TransformationMode.SmoothTransformation
+                ))
+            thumb.setFixedSize(32, 32)
+            thumb.setStyleSheet("border-radius: 4px;")
+            chip_layout.addWidget(thumb)
+        else:
+            icon_label = QLabel("\U0001F4C4")
+            icon_label.setFixedSize(24, 24)
+            icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            chip_layout.addWidget(icon_label)
+
+        name = attachment["name"]
+        display_name = name if len(name) <= 22 else name[:19] + "..."
+        name_label = QLabel(display_name)
+        name_label.setToolTip(name)
+        name_label.setStyleSheet("color: rgba(255,255,255,0.85); font-size: 11px; background: transparent; border: none;")
+        chip_layout.addWidget(name_label)
+
+        remove_btn = QPushButton("\u2715")
+        remove_btn.setFixedSize(18, 18)
+        remove_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        remove_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        remove_btn.setStyleSheet("""
+            QPushButton { background-color: transparent; border: none; color: rgba(255,255,255,0.5); font-size: 10px; }
+            QPushButton:hover { color: #ff5c5c; }
+        """)
+        remove_btn.clicked.connect(lambda _, aid=attachment["id"]: self.remove_pending_attachment(aid))
+        chip_layout.addWidget(remove_btn)
+
+        return chip
+
+    def _encode_image_attachment(self, file_path):
+        try:
+            from PIL import Image
+            with Image.open(file_path) as img:
+                img = img.convert("RGB") if img.mode not in ("RGB", "RGBA") else img
+                width, height = img.size
+                longest_side = max(width, height)
+                if longest_side > self.MAX_IMAGE_DIMENSION:
+                    scale = self.MAX_IMAGE_DIMENSION / float(longest_side)
+                    resample_filter = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+                    img = img.resize((max(1, int(width * scale)), max(1, int(height * scale))), resample_filter)
+
+                buffer = io.BytesIO()
+                img.save(buffer, format="PNG")
+                b64_data = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                return {"mime": "image/png", "b64": b64_data}
+        except Exception as e:
+            logger.error(f"Failed to encode image attachment '{file_path}': {e}")
+            return None
+
+    def _extract_text_attachment(self, file_path):
+        ext = os.path.splitext(file_path)[1].lower()
+        max_chars = 8000
+
+        try:
+            if ext in self.TEXT_ATTACHMENT_EXTENSIONS:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                if len(content) > max_chars:
+                    content = content[:max_chars] + "\n... [truncated]"
+                return content
+
+            if ext == ".pdf":
+                try:
+                    from pypdf import PdfReader
+                except ImportError:
+                    try:
+                        from PyPDF2 import PdfReader
+                    except ImportError:
+                        return "[Unable to extract text: install 'pypdf' to read PDF attachments.]"
+                reader = PdfReader(file_path)
+                pages_text = []
+                for page in reader.pages:
+                    pages_text.append(page.extract_text() or "")
+                content = "\n".join(pages_text).strip()
+                if not content:
+                    return "[This PDF appears to contain no extractable text (it may be scanned/image-based).]"
+                if len(content) > max_chars:
+                    content = content[:max_chars] + "\n... [truncated]"
+                return content
+
+            if ext == ".docx":
+                try:
+                    import docx
+                except ImportError:
+                    return "[Unable to extract text: install 'python-docx' to read Word attachments.]"
+                document = docx.Document(file_path)
+                content = "\n".join(p.text for p in document.paragraphs).strip()
+                if len(content) > max_chars:
+                    content = content[:max_chars] + "\n... [truncated]"
+                return content
+
+            return f"[Attached file '{os.path.basename(file_path)}': unsupported format for text extraction.]"
+        except Exception as e:
+            logger.error(f"Failed to extract text from '{file_path}': {e}")
+            return f"[Could not read attached file '{os.path.basename(file_path)}': {e}]"
+
+    def _persist_attachment_original(self, character_name, message_id, attachment):
+        try:
+            dest_dir = os.path.join(
+                os.getcwd(), "app", "data", ".soul", character_name, "attachments", message_id
+            )
+            os.makedirs(dest_dir, exist_ok=True)
+
+            base, ext = os.path.splitext(attachment["name"])
+            destination = os.path.join(dest_dir, attachment["name"])
+            counter = 1
+            while os.path.exists(destination):
+                destination = os.path.join(dest_dir, f"{base}_{counter}{ext}")
+                counter += 1
+
+            shutil.copyfile(attachment["path"], destination)
+            return f"attachments/{message_id}/{os.path.basename(destination)}"
+        except Exception as e:
+            logger.error(f"Failed to persist attachment original '{attachment.get('name')}': {e}")
+            return None
+
+    def _persist_message_attachments(self, character_name, message_id, attachments_meta):
+        if not attachments_meta:
+            return
+
+        try:
+            config_data = self.configuration_characters.load_configuration()
+            char_info = config_data["character_list"][character_name]
+            current_chat = char_info.get("current_chat", "default")
+            chat_content_ref = char_info["chats"][current_chat]["chat_content"]
+
+            entry = chat_content_ref.get(message_id, {})
+            entry["attachments"] = attachments_meta
+            chat_content_ref[message_id] = entry
+
+            self.configuration_characters.save_configuration_edit(config_data)
+        except Exception as e:
+            logger.error(f"Failed to persist attachments for message {message_id}: {e}")
+
+    def _persist_tts_segments_for_message(self, character_name, message_id, segments):
+        if not segments:
+            return
+
+        try:
+            config_data = self.configuration_characters.load_configuration()
+            char_info = config_data["character_list"][character_name]
+            current_chat = char_info.get("current_chat", "default")
+            chat_content_ref = char_info["chats"][current_chat]["chat_content"]
+
+            entry = chat_content_ref.get(message_id, {})
+            entry["tts_audio"] = segments
+            chat_content_ref[message_id] = entry
+
+            self.configuration_characters.save_configuration_edit(config_data)
+        except Exception as e:
+            logger.error(f"Failed to persist TTS audio for message {message_id}: {e}")
+
+    def on_tts_segment_saved(self, message_id, relative_path):
+        self._pending_tts_segments.setdefault(message_id, []).append(relative_path)
+
+    def replay_message_audio(self, character_name, message_id):
+        try:
+            configuration_data = self.configuration_characters.load_configuration()
+            char_info = configuration_data["character_list"].get(character_name, {})
+            current_chat = char_info.get("current_chat", "default")
+            chat_content = char_info.get("chats", {}).get(current_chat, {}).get("chat_content", {})
+            msg_data = chat_content.get(message_id, {})
+            segments = msg_data.get("tts_audio") or []
+
+            if not segments:
+                sow_toast(
+                    parent=self.main_window,
+                    title=self.translations.get("toast_tts_replay_title", "Voice message"),
+                    text=self.translations.get("toast_tts_replay_missing", "No saved voice audio for this message."),
+                    msg_type="error"
+                )
+                return
+
+            base_dir = os.path.join(os.getcwd(), "app", "data", ".soul", character_name)
+            missing_any = False
+            for relative_path in segments:
+                full_path = os.path.join(base_dir, relative_path)
+                if os.path.exists(full_path):
+                    self.playback_worker.add_audio_file(full_path, persist=True)
+                else:
+                    missing_any = True
+
+            if missing_any:
+                logger.warning(f"Some TTS replay segments for message {message_id} are missing on disk.")
+        except Exception as e:
+            logger.error(f"Failed to replay message audio: {e}")
+
+    def _get_gen_kwargs(self, conversation_method: str) -> dict:
+        raw_stops = self.configuration_settings.get_main_setting("stop_strings")
+        stop_sequences = None
+        if raw_stops and isinstance(raw_stops, str) and raw_stops.strip():
+            stop_list = [s.strip() for s in raw_stops.split(",") if s.strip()]
+            if stop_list:
+                stop_sequences = stop_list[:4]
+
+        gen_kwargs = {
+            "stop": stop_sequences,
+            "temperature": self.configuration_settings.get_main_setting("temperature"),
+            "max_tokens": self.configuration_settings.get_main_setting("max_tokens"),
+            "top_p": self.configuration_settings.get_main_setting("top_p"),
+            "frequency_penalty": self.configuration_settings.get_main_setting("frequency_penalty"),
+            "presence_penalty": self.configuration_settings.get_main_setting("presence_penalty")
+        }
+
+        if conversation_method == "Local LLM":
+            gen_kwargs["reasoning_mode"] = self.configuration_settings.get_main_setting("reasoning_mode")
+
+        return gen_kwargs
+
     def load_translation(self, language):
         """
         Loads translation data from a YAML file based on the program language.
@@ -984,26 +1526,103 @@ class InterfaceSignals():
     def on_pushButton_launch_server_clicked(self):
         asyncio.create_task(self.local_server_manager.ensure_server_running())
 
+    def get_local_ip(self):
+        try:
+            hostname = socket.gethostname()
+            _, _, ip_list = socket.gethostbyname_ex(hostname)
+            
+            for ip in ip_list:
+                if ip.startswith("192.168."):
+                    return ip
+                    
+            for ip in ip_list:
+                if ip.startswith("10."):
+                    return ip
+                    
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            
+            if not ip.startswith("127."):
+                return ip
+                
+        except Exception:
+            pass
+            
+        return "127.0.0.1"
+
+    def on_copy_mobile_link(self):
+        token = self.get_or_create_web_token()
+        local_ip = self.get_local_ip()
+        mobile_url = f"http://{local_ip}:8000/?token={token}"
+        
+        QtWidgets.QApplication.clipboard().setText(mobile_url)
+        
+        original_text = self.translations.get("web_browser_copy_mobile_btn", "Copy Mobile Link")
+        copied_text = self.translations.get("web_browser_copied_btn", "Copied! 📋")
+        
+        self.ui.pushButton_copy_mobile_link.setText(copied_text)
+        self.ui.pushButton_copy_mobile_link.setStyleSheet("""
+            QPushButton {
+                background: rgba(74, 222, 128, 0.15);
+                border: 1px solid rgba(74, 222, 128, 0.4);
+                color: #4ade80;
+                border-radius: 8px;
+                padding: 0px 20px;
+                font-weight: 600;
+            }
+        """)
+        
+        def reset_btn_state():
+            self.ui.pushButton_copy_mobile_link.setText(original_text)
+            self.ui.pushButton_copy_mobile_link.setStyleSheet("""
+                QPushButton {
+                    background: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    color: #e0e0e0;
+                    border-radius: 8px;
+                    padding: 0px 20px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background: rgba(255, 255, 255, 0.08);
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                }
+            """)
+            
+        QtCore.QTimer.singleShot(2000, reset_btn_state)
+
+    def get_or_create_web_token(self) -> str:
+        token = self.configuration_settings.get_main_setting("web_auth_token")
+        if not token:
+            token = secrets.token_urlsafe(16)
+            self.configuration_settings.update_main_setting("web_auth_token", token)
+        return token
+
     def on_toggle_web_server(self):
         if not self.web_server_running:
             self.web_server_running = True
-            self.ui.label_web_server_status.setText(self.translations.get("web_server_starting_lbl", "Status: Starting..."))
+            self.ui.label_web_server_status.setText(
+                self.translations.get("web_server_starting_lbl", "Status: Starting...")
+            )
             self.ui.label_web_server_status.setStyleSheet("color: #ff9d00; padding-left: 5px;")
-            self.ui.pushButton_toggle_web_server.setText("Starting...")
+            self.ui.pushButton_toggle_web_server.setText(
+                self.translations.get("web_server_starting_btn", "Starting...")
+            )
             
             self.web_server_task = asyncio.create_task(self.start_server_async())
-            
-            self.ui.label_web_server_status.setText(self.translations.get("web_server_starting_lbl_2", "Status: Running on http://127.0.0.1:8000"))
-            self.ui.label_web_server_status.setStyleSheet("color: #4ade80; padding-left: 5px;")
-            self.ui.pushButton_toggle_web_server.setText(self.translations.get("web_server_stop_btn", "Stop Server"))
-            self.ui.pushButton_open_web_browser.setEnabled(True)
         else:
             asyncio.create_task(self.stop_server_async())
             
             self.web_server_running = False
-            self.ui.label_web_server_status.setText(self.translations.get("web_server_status_stopped", "Status: Stopped"))
+            self.ui.label_web_server_status.setText(
+                self.translations.get("web_server_status_stopped", "Status: Stopped")
+            )
             self.ui.label_web_server_status.setStyleSheet("color: #909090; padding-left: 5px;")
-            self.ui.pushButton_toggle_web_server.setText(self.translations.get("web_server_start_btn", "Start Server"))
+            self.ui.pushButton_toggle_web_server.setText(
+                self.translations.get("web_server_start_btn", "Start Server")
+            )
             self.ui.pushButton_open_web_browser.setEnabled(False)
 
     async def start_server_async(self):
@@ -1011,7 +1630,9 @@ class InterfaceSignals():
             from app.utils.web_server import WebBridge
             import uvicorn
             
-            self.web_bridge = WebBridge(self)
+            token = self.get_or_create_web_token()
+            
+            self.web_bridge = WebBridge(self, auth_token=token)
             
             config = uvicorn.Config(
                 app=self.web_bridge.app,
@@ -1022,6 +1643,20 @@ class InterfaceSignals():
             )
             
             self.web_server_instance = uvicorn.Server(config)
+            
+            status_text = self.translations.get(
+                "web_server_running_status", 
+                "Status: Running on http://127.0.0.1:8000"
+            )
+            
+            self.ui.label_web_server_status.setText(status_text)
+            self.ui.label_web_server_status.setStyleSheet("color: #4ade80; padding-left: 5px;")
+            self.ui.pushButton_toggle_web_server.setText(
+                self.translations.get("web_server_stop_btn", "Stop Server")
+            )
+            self.ui.pushButton_open_web_browser.setEnabled(True)
+            self.ui.pushButton_copy_mobile_link.setEnabled(True)
+
             await self.web_server_instance.serve()
             
         except asyncio.CancelledError:
@@ -1030,10 +1665,15 @@ class InterfaceSignals():
             logging.error(f"Failed to start local Web Server: {e}")
             
             self.web_server_running = False
-            self.ui.label_web_server_status.setText(self.translations.get("web_server_error", "Status: Port 8000 busy or Error"))
+            self.ui.label_web_server_status.setText(
+                self.translations.get("web_server_error", "Status: Port 8000 busy or Error")
+            )
             self.ui.label_web_server_status.setStyleSheet("color: #f87171; padding-left: 5px;")
-            self.ui.pushButton_toggle_web_server.setText(self.translations.get("web_server_start_btn", "Start Server"))
+            self.ui.pushButton_toggle_web_server.setText(
+                self.translations.get("web_server_start_btn", "Start Server")
+            )
             self.ui.pushButton_open_web_browser.setEnabled(False)
+            self.ui.pushButton_copy_mobile_link.setEnabled(False)
             self.web_server_instance = None
             self.web_server_task = None
 
@@ -1049,11 +1689,14 @@ class InterfaceSignals():
             except asyncio.CancelledError:
                 pass
             self.web_server_task = None
-            
+        
+        self.ui.pushButton_copy_mobile_link.setEnabled(False)
+
         self.web_server_instance = None
 
     def on_open_web_browser(self):
-        webbrowser.open("http://127.0.0.1:8000")
+        token = self.get_or_create_web_token()
+        webbrowser.open(f"http://127.0.0.1:8000/?token={token}")
 
     def on_youtube(self):
         QDesktopServices.openUrl(QUrl("https://www.youtube.com/@jofizcd"))
@@ -1126,7 +1769,13 @@ class InterfaceSignals():
         """
         character_configuration = self.configuration_characters.load_configuration()
         character_list = character_configuration["character_list"]
+
         conversation_method = self.configuration_settings.get_main_setting("conversation_method")
+        if hasattr(self.ui, 'provider_group') and self.ui.provider_group:
+            checked_btn = self.ui.provider_group.checkedButton()
+            if checked_btn is not None:
+                conversation_method = checked_btn.property("provider_value")
+                self.configuration_settings.update_main_setting("conversation_method", conversation_method)
         
         def handle_generic_ai(method_name):
             """
@@ -1177,6 +1826,30 @@ class InterfaceSignals():
 
                     char_data = character_list.get(old_name, {})
 
+                    character_information_parts = []
+
+                    if character_description.strip():
+                        character_information_parts.append(character_description.strip())
+
+                    if character_personality.strip():
+                        character_information_parts.append(f"{character_personality.strip()}.")
+
+                    if scenario.strip():
+                        character_information_parts.append(f"Here is the dialogue script: {scenario.strip()}.\n\n")
+
+                    if example_messages.strip():
+                        character_information_parts.append(
+                            f"[Example Chat]:\n{example_messages.strip()}\n\n"
+                            "Your response should follow the same pattern and style as above."
+                        )
+
+                    if character_information_parts:
+                        character_information_parts.append(
+                            "Respond as the character, do not break role or add extra explanations."
+                        )
+
+                    character_information = " ".join(character_information_parts)
+
                     char_data.update({
                         "character_avatar": character_avatar_directory,
                         "character_description": character_description,
@@ -1192,7 +1865,9 @@ class InterfaceSignals():
                         "selected_lorebook": selected_lorebook,
                         "selected_lorebooks": selected_lorebooks,
                         "conversation_method": method_name,
-                        "sow_variables": sow_variables
+                        "sow_variables": sow_variables,
+                        "character_information": character_information,
+                        "system_prompt": character_information
                     })
 
                     current_chat_id = char_data.get("current_chat", "default")
@@ -1297,7 +1972,7 @@ class InterfaceSignals():
             self.configuration_settings.update_user_data("current_character_image", None)
 
         match conversation_method:
-            case "Mistral AI" | "Open AI" | "OpenRouter" | "Local LLM" | "Anthropic" | "Google Gemini" | "DeepSeek" | "Grok" | "Qwen" | "Z.AI":
+            case "Mistral AI" | "Open AI" | "OpenRouter" | "Local LLM" | "Anthropic" | "Google Gemini" | "DeepSeek" | "Grok" | "Qwen" | "Z.AI" | "Player2":
                 return handle_generic_ai(conversation_method)
             case _:
                 logger.error(f"Unsupported conversation method: {conversation_method}")
@@ -1438,6 +2113,17 @@ class InterfaceSignals():
         gm_tone           = scene_data.get("gm_tone", "epic_fantasy")
         narrator_style    = scene_data.get("narrator_style", "Standard evocative present-tense prose")
 
+        self.soul_stage_orchestrator.world_state.dice_rolls_enabled = bool(
+            scene_data.get("dice_rolls_enabled", False)
+        )
+
+        self.soul_stage_orchestrator.world_state.lock_bg = bool(
+            scene_data.get("lock_bg", False)
+        )
+        self.soul_stage_orchestrator.world_state.disable_ambient = bool(
+            scene_data.get("disable_ambient", False)
+        )
+
         if not party_names:
             logger.error("[SoulStage] No party members in scene!")
             sow_toast(
@@ -1488,12 +2174,86 @@ class InterfaceSignals():
             self.soul_stage_orchestrator.world_state.narrator_style = narrator_style
             self.soul_stage_orchestrator.world_state.update_from_plan(initial_plan)
 
+            if self.soul_stage_orchestrator.world_state.disable_ambient:
+                self.soul_stage_orchestrator.world_state.ambient_audio = "None"
+
+        self.ui.soul_stage_page.chat_view.set_actor_options(
+            party_names,
+            [npc.name for npc in self.soul_stage_orchestrator.npc_registry.list_active()],
+        )
+        
         self._ss_apply_environment(
             self.soul_stage_orchestrator.world_state.bg_image,
             self.soul_stage_orchestrator.world_state.ambient_audio
         )
 
         self.soul_stage_session = SoulStageSession(self.soul_stage_orchestrator, party_names, conv_method)
+
+        try:
+            def _ss_get_chat_log() -> list:
+                from app.gui.soul_stage_page import _load_scenes
+                d = _load_scenes()
+                return d["scenes"].get(self._soul_stage_scene_id, {}).get("chat_log", [])
+
+            def _ss_get_scene_data() -> dict:
+                from app.gui.soul_stage_page import _load_scenes
+                return _load_scenes()["scenes"].get(self._soul_stage_scene_id, {})
+
+            def _ss_save_scene(scene_data_dict: dict) -> None:
+                from app.gui.soul_stage_page import _load_scenes, _save_scenes
+                d = _load_scenes()
+                if self._soul_stage_scene_id in d["scenes"]:
+                    if "chat_log" in scene_data_dict:
+                        d["scenes"][self._soul_stage_scene_id]["chat_log"] = scene_data_dict["chat_log"]
+                    if "world_state" in scene_data_dict:
+                        d["scenes"][self._soul_stage_scene_id]["world_state"] = scene_data_dict["world_state"]
+                _save_scenes(d)
+
+            async def _ss_translate_fn(text: str, target_lang: str) -> str:
+                try:
+                    provider = AIFactory.get_provider(self.soul_stage_session.conversation_method)
+                    if not provider:
+                        return text
+                    messages = [
+                        {"role": "system", "content": f"Translate the following text to {target_lang}. Output ONLY the translation, nothing else."},
+                        {"role": "user", "content": text},
+                    ]
+                    result = ""
+                    async for chunk in provider.generate_stream(messages, temperature=0.2, max_tokens=600):
+                        result += chunk
+                    return result.strip() or text
+                except Exception as e:
+                    logger.warning(f"[SoulStage] _ss_translate_fn failed: {e}")
+                    return text
+
+            async def _ss_rerun_turn_fn(player_message: str) -> None:
+                chat_view = self.ui.soul_stage_page.chat_view
+                chat_view.text_input.setPlainText(player_message)
+                await self._ss_send_message()
+
+            def _ss_rebuild_ui_fn(chat_log: list) -> None:
+                chat_view = self.ui.soul_stage_page.chat_view
+                chat_view.clear_chat()
+                self._ss_restore_chat(chat_log)
+                chat_view.set_actor_options(
+                    self.soul_stage_session.party_names if self.soul_stage_session else [],
+                    [npc.name for npc in self.soul_stage_orchestrator.npc_registry.list_active()],
+                )
+
+            self.ss_msg_mgr = SoulStageMessageManager(
+                orchestrator=self.soul_stage_orchestrator,
+                get_chat_log=_ss_get_chat_log,
+                get_chat_view=lambda: self.ui.soul_stage_page.chat_view,
+                get_scene_data=_ss_get_scene_data,
+                save_scene=_ss_save_scene,
+                translate_fn=_ss_translate_fn,
+                rerun_turn_fn=_ss_rerun_turn_fn,
+                rebuild_ui_fn=_ss_rebuild_ui_fn,
+                translations=self.translations,
+            )
+        except Exception as e:
+            logger.warning(f"[SoulStage] SoulStageMessageManager init failed: {e}", exc_info=True)
+            self.ss_msg_mgr = None
 
         chat_view = self.ui.soul_stage_page.chat_view
         try:
@@ -1502,6 +2262,7 @@ class InterfaceSignals():
             chat_view.world_info_clicked.disconnect()
             chat_view.continue_plot.disconnect()
             chat_view.choice_made.disconnect()
+            chat_view.export_clicked.disconnect()
             self.ui.soul_stage_page.open_memory_requested.disconnect()
         except Exception:
             pass
@@ -1525,6 +2286,7 @@ class InterfaceSignals():
         chat_view.btn_stop.clicked.connect(self._soul_stage_interrupt)
         chat_view.world_info_clicked.connect(self._ss_open_world_info)
         chat_view.continue_plot.connect(lambda: asyncio.create_task(self._ss_continue_plot()))
+        chat_view.export_clicked.connect(self._ss_export_markdown)
         chat_view.choice_made.connect(lambda: asyncio.create_task(self._ss_send_message()))
         self.ui.soul_stage_page.open_memory_requested.connect(self._ss_open_memory)
 
@@ -1541,7 +2303,73 @@ class InterfaceSignals():
                 self.soul_stage_orchestrator.world_state.player_inventory
             )
         ))
-        
+
+    def _ss_export_markdown(self):
+        """Export the current scene to a .md file the user picks via a save dialog."""
+        if not self.ss_msg_mgr or not self._soul_stage_scene_id:
+            sow_toast(
+                parent=self.main_window,
+                title=self.translations.get("soul_stage_title", "Soul Stage"),
+                text=self.translations.get("export_md_no_scene", "No active scene to export."),
+                msg_type="error",
+                duration=4000,
+            )
+            return
+
+        try:
+            md_text = self.ss_msg_mgr.export_markdown()
+        except Exception as e:
+            logger.error(f"[SoulStage] Markdown export generation failed: {e}", exc_info=True)
+            sow_toast(
+                parent=self.main_window,
+                title=self.translations.get("soul_stage_title", "Soul Stage"),
+                text=self.translations.get("export_md_failed", "Failed to generate the export."),
+                msg_type="error",
+                duration=4000,
+            )
+            return
+
+        import re as _re
+        from app.gui.soul_stage_page import _load_scenes
+
+        scene_data = _load_scenes()["scenes"].get(self._soul_stage_scene_id, {})
+        safe_title = _re.sub(r"[^\w\-]+", "_", (scene_data.get("title") or "soul_stage_session")).strip("_")
+        safe_title = safe_title or "soul_stage_session"
+        default_name = f"{safe_title}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md"
+
+        path, _ = QFileDialog.getSaveFileName(
+            self.main_window,
+            self.translations.get("export_md_dialog_title", "Export Scene as Markdown"),
+            default_name,
+            "Markdown Files (*.md)",
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".md"):
+            path += ".md"
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(md_text)
+        except Exception as e:
+            logger.error(f"[SoulStage] Failed to write markdown export to {path}: {e}", exc_info=True)
+            sow_toast(
+                parent=self.main_window,
+                title=self.translations.get("soul_stage_title", "Soul Stage"),
+                text=self.translations.get("export_md_write_failed", "Could not write the file — check the path and permissions."),
+                msg_type="error",
+                duration=5000,
+            )
+            return
+
+        sow_toast(
+            parent=self.main_window,
+            title=self.translations.get("soul_stage_title", "Soul Stage"),
+            text=self.translations.get("export_md_success", "Scene exported to Markdown."),
+            msg_type="success",
+            duration=4000,
+        )
+
     def _ss_stop_ambient(self):
         if hasattr(self, 'ambient_thread'):
             try:
@@ -1678,16 +2506,30 @@ class InterfaceSignals():
             chat_view.chat_page.setStyleSheet("QWidget#chat_content_area { background: transparent; }")
             chat_view.scroll_area.setStyleSheet(ss_scroll_style)
 
-        if ambient_file and ambient_file != "None":
+        ws = self.soul_stage_orchestrator.world_state if self.soul_stage_orchestrator else None
+        ambient_disabled = bool(ws.disable_ambient) if ws else False
+        if ambient_disabled:
+            ambient_file = "None"
+
+        if hasattr(self, "ambient_thread"):
+            try:
+                if hasattr(self.ambient_thread, "isRunning") and self.ambient_thread.isRunning():
+                    self.ambient_thread.stop()
+                    self.ambient_thread.wait()
+            except Exception:
+                pass
+
+        if ambient_file and ambient_file != "None" and not ambient_disabled:
             amb_path = f"assets/ambient/{ambient_file}".replace("\\", "/")
             if os.path.exists(amb_path):
                 output_device = self.configuration_settings.get_main_setting("output_device_real_index")
-                if hasattr(self, "ambient_thread") and self.ambient_thread.isRunning():
-                    self.ambient_thread.stop()
-                    self.ambient_thread.wait()
                 self.ambient_thread = AmbientPlayer(amb_path, device_index=output_device)
                 self.ambient_thread.start()
                 logger.info(f"[SoulStage] Ambient sound started: {ambient_file}")
+            else:
+                logger.warning(f"[SoulStage] Ambient file not found: {amb_path}")
+        elif ambient_disabled:
+            logger.info("[SoulStage] Ambient audio is disabled for this scene — playing in silence.")
 
     def get_current_memory_dir(self, character_name: str) -> Path:
         from app.utils.soul_memory import SoulMemoryAgent
@@ -1762,18 +2604,7 @@ class InterfaceSignals():
             from app.gui.soul_stage_page import _load_scenes, _save_scenes
             d = _load_scenes()
             if self._soul_stage_scene_id in d["scenes"]:
-                ws = orch.world_state
-                d["scenes"][self._soul_stage_scene_id]["world_state"] = {
-                    "location":         ws.location,
-                    "time_of_day":      ws.time_of_day,
-                    "atmosphere":       ws.atmosphere,
-                    "bg_image":         ws.bg_image,
-                    "ambient_audio":    ws.ambient_audio,
-                    "key_facts":        ws.key_facts,
-                    "player_inventory": ws.player_inventory,
-                    "player_status":    ws.player_status,
-                    "narrator_style":   ws.narrator_style,
-                }
+                d["scenes"][self._soul_stage_scene_id]["world_state"] = orch.serialize_scene_state()
                 _save_scenes(d)
 
         chat_view = self.ui.soul_stage_page.chat_view
@@ -1954,10 +2785,10 @@ class InterfaceSignals():
         chat_view = self.ui.soul_stage_page.chat_view
 
         from app.gui.soul_stage_page import (
-            SoulStageEventCard, SoulStageNPCBubble, _load_scenes, _save_scenes
+            SoulStageEventCard, SoulStageNPCBubble, SoulStageDiceCard, _load_scenes, _save_scenes
         )
         scene_data = _load_scenes()["scenes"].get(self._soul_stage_scene_id, {})
-        persona_key = scene_data.get("persona_key", "")
+        persona_key = scene_data.get("persona", "None")
         personas = self.configuration_settings.get_user_data("personas") or {}
         user_name = "Player"
         user_desc = ""
@@ -1982,6 +2813,25 @@ class InterfaceSignals():
         chat_view.text_input.setEnabled(False)
 
         turn_log = []
+        pending_dice: list = [None]
+
+        async def on_dice_roll(dice_result):
+            pending_dice[0] = dice_result
+            card = SoulStageDiceCard()
+            wrap = QWidget()
+            wrap.setStyleSheet("background: transparent;")
+            lyt = QVBoxLayout(wrap)
+            lyt.setContentsMargins(0, 2, 0, 2)
+            lyt.addWidget(card)
+            chat_view.chat_container.addWidget(wrap)
+            try:
+                sides = int(dice_result.notation.lower().split("d")[1])
+            except Exception:
+                sides = 20
+            card.animate_to(dice_result.describe(), dice_result.success, sides=sides)
+            chat_view.scroll_to_bottom()
+            await asyncio.sleep(0)
+
         _plot_event_type: list = ["none"]
         narrator_bubble = narrator_wrap = char_label = npc_bubble = None
         char_full_text = npc_full_text = ""
@@ -1989,13 +2839,19 @@ class InterfaceSignals():
         async def on_narrator_chunk(chunk: str):
             nonlocal narrator_bubble, narrator_wrap
             if narrator_bubble is None:
-                narrator_bubble = SoulStageEventCard(event_type=_plot_event_type[0])
+                narrator_bubble = SoulStageEventCard(event_type="none")
                 narrator_wrap = QWidget()
                 narrator_wrap.setStyleSheet("background: transparent;")
                 lyt = QVBoxLayout(narrator_wrap)
                 lyt.setContentsMargins(0, 4, 0, 4)
                 lyt.addWidget(narrator_bubble)
                 chat_view.chat_container.addWidget(narrator_wrap)
+
+                if self.ss_msg_mgr:
+                    _narr_idx = len(chat_log) + len(turn_log)
+                    def _get_idx(_i=_narr_idx):
+                        return _i
+                    self.ss_msg_mgr.attach_context_menu(narrator_wrap, narrator_bubble.text_label, _get_idx, is_player=False)
             narrator_bubble.append_text(chunk)
             chat_view.scroll_to_bottom()
             await asyncio.sleep(0)
@@ -2003,17 +2859,21 @@ class InterfaceSignals():
         async def on_narrator_done():
             nonlocal narrator_bubble, narrator_wrap
             if narrator_bubble:
-                turn_log.append({
+                entry = {
                     "role": "narrator",
                     "content": narrator_bubble.text_label.text(),
                     "actor_name": "NARRATOR"
-                })
+                }
+                if pending_dice[0] is not None:
+                    entry["dice_check"] = pending_dice[0].to_dict()
+                turn_log.append(entry)
             narrator_bubble = narrator_wrap = None
 
         async def on_char_start(name: str, _avatar):
             nonlocal char_label, char_full_text
             char_full_text = ""
-            char_label, _ = self._ss_add_custom_message(name, "", is_user=False)
+            _char_idx = len(chat_log) + len(turn_log)
+            char_label, _ = self._ss_add_custom_message(name, "", is_user=False, msg_idx=_char_idx)
             await asyncio.sleep(0)
 
         async def on_char_chunk(name: str, chunk: str):
@@ -2037,6 +2897,12 @@ class InterfaceSignals():
             lyt.setContentsMargins(0, 4, 0, 4)
             lyt.addWidget(npc_bubble)
             chat_view.chat_container.addWidget(wrap)
+
+            if self.ss_msg_mgr:
+                _npc_idx = len(chat_log) + len(turn_log)
+                def _get_idx(_i=_npc_idx):
+                    return _i
+                self.ss_msg_mgr.attach_context_menu(wrap, npc_bubble.text_label, _get_idx, is_player=False)
             await asyncio.sleep(0)
 
         async def on_npc_chunk(name: str, chunk: str):
@@ -2057,6 +2923,10 @@ class InterfaceSignals():
             chat_view.btn_send.show()
             chat_view.btn_continue_plot.setEnabled(True)
             chat_view.text_input.setEnabled(True)
+            chat_view.set_actor_options(
+                session.party_names,
+                [npc.name for npc in session.orchestrator.npc_registry.list_active()],
+            )
             self._ss_apply_environment(
                 session.orchestrator.world_state.bg_image,
                 session.orchestrator.world_state.ambient_audio
@@ -2105,8 +2975,9 @@ class InterfaceSignals():
                 finally:
                     self.prompt_engine.configuration_characters.load_configuration = original_load
 
-                self.log_prompt_structure(messages)
-                async for chunk in provider.generate_stream(messages):
+                gen_kwargs = self._get_gen_kwargs(c_method)
+
+                async for chunk in provider.generate_stream(messages, **gen_kwargs):
                     yield chunk
 
             return stream_wrapper()
@@ -2123,71 +2994,79 @@ class InterfaceSignals():
             on_char_start=on_char_start, on_char_chunk=on_char_chunk, on_char_done=on_char_done,
             on_npc_start=on_npc_start, on_npc_chunk=on_npc_chunk, on_npc_done=on_npc_done,
             on_turn_complete=on_turn_complete, on_error=on_error, on_choices=on_choices,
+            on_dice_roll=on_dice_roll
         )
 
+        full_chat_log = []
         if self._soul_stage_scene_id:
             d = _load_scenes()
             if self._soul_stage_scene_id in d["scenes"]:
-                d["scenes"][self._soul_stage_scene_id].setdefault("chat_log", []).extend(turn_log)
+                d["scenes"][self._soul_stage_scene_id].setdefault("chat_log",[]).extend(turn_log)
                 d["scenes"][self._soul_stage_scene_id]["chat_log"] = \
                     d["scenes"][self._soul_stage_scene_id]["chat_log"][-200:]
-                ws = session.orchestrator.world_state
-                d["scenes"][self._soul_stage_scene_id]["world_state"] = {
-                    "location":         ws.location,
-                    "time_of_day":      ws.time_of_day,
-                    "atmosphere":       ws.atmosphere,
-                    "bg_image":         ws.bg_image,
-                    "ambient_audio":    ws.ambient_audio,
-                    "key_facts":        ws.key_facts,
-                    "player_inventory": ws.player_inventory,
-                    "player_status":    ws.player_status,
-                    "narrator_style":   ws.narrator_style,
-                }
-                active_npcs = []
-                for npc in session.orchestrator.npc_registry.list_active():
-                    active_npcs.append({
-                        "name": npc.name, "archetype": npc.archetype,
-                        "personality": npc.personality, "avatar_key": npc.avatar_key,
-                        "turn_count": npc.turn_count
-                    })
-                d["scenes"][self._soul_stage_scene_id]["active_npcs"] = active_npcs
+                d["scenes"][self._soul_stage_scene_id]["world_state"] = session.orchestrator.serialize_scene_state()
                 _save_scenes(d)
+                full_chat_log = d["scenes"][self._soul_stage_scene_id].get("chat_log", [])
 
         asyncio.create_task(
             session.orchestrator.sync_party_memory(
-                session.conversation_method, session.party_names, turn_log, user_name
+                session.conversation_method, session.party_names, full_chat_log, user_name
             )
         )
 
     def _ss_restore_chat(self, chat_log: list):
-        from app.gui.soul_stage_page import SoulStageEventCard, SoulStageNPCBubble
+        from app.gui.soul_stage_page import SoulStageEventCard, SoulStageNPCBubble, SoulStageDiceCard, format_dice_dict
         chat_view = self.ui.soul_stage_page.chat_view
         
-        for entry in chat_log:
+        for idx, entry in enumerate(chat_log):
             role = entry.get("role", "")
             actor = entry.get("actor_name", "")
             content = entry.get("content", "")
             archetype = entry.get("archetype", "citizen")
 
+            def _make_get_idx(i=idx):
+                return i
+
             if role == "narrator":
+                dice = entry.get("dice_check")
+                if isinstance(dice, dict) and dice.get("notation"):
+                    dice_card = SoulStageDiceCard()
+                    dice_wrap = QWidget()
+                    dice_wrap.setStyleSheet("background:transparent;")
+                    QVBoxLayout(dice_wrap).addWidget(dice_card)
+                    chat_view.chat_container.addWidget(dice_wrap)
+                    dice_card.set_final(format_dice_dict(dice), dice.get("success"))
+
                 b = SoulStageEventCard(event_type="none"); b.set_text(self.markdown_to_html(content))
                 w = QWidget(); w.setStyleSheet("background:transparent;"); QVBoxLayout(w).addWidget(b)
                 chat_view.chat_container.addWidget(w)
+                if self.ss_msg_mgr:
+                    self.ss_msg_mgr.attach_context_menu(w, b.text_label, _make_get_idx, is_player=False)
+
             elif role == "npc":
-                b = SoulStageNPCBubble(actor, archetype); b.append_text(self.markdown_to_html(content))
+                avatar_path = self.soul_stage_orchestrator.npc_registry.get_avatar_path_for_name(actor, archetype)
+                b = SoulStageNPCBubble(actor, archetype, avatar_path); b.append_text(self.markdown_to_html(content))
                 w = QWidget(); w.setStyleSheet("background:transparent;"); QVBoxLayout(w).addWidget(b)
                 chat_view.chat_container.addWidget(w)
+                if self.ss_msg_mgr:
+                    self.ss_msg_mgr.attach_context_menu(w, b.text_label, _make_get_idx, is_player=False)
+
             elif role == "player":
-                self._ss_add_custom_message(actor, content, is_user=True)
+                self._ss_add_custom_message(actor, content, is_user=True, msg_idx=idx)
+
             elif role == "char":
-                lbl, _ = self._ss_add_custom_message(actor, content, is_user=False)
+                self._ss_add_custom_message(actor, content, is_user=False, msg_idx=idx)
 
         chat_view.scroll_to_bottom()
 
     async def _ss_show_opening(self, opening_narration: str, first_message: str, party_names: list):
-        from app.gui.soul_stage_page import SoulStageEventCard, append_to_scene_log
+        from app.gui.soul_stage_page import SoulStageEventCard, append_to_scene_log, _load_scenes
         chat_view = self.ui.soul_stage_page.chat_view
         log_entries =[]
+
+        base_idx = 0
+        if self._soul_stage_scene_id:
+            base_idx = len(_load_scenes()["scenes"].get(self._soul_stage_scene_id, {}).get("chat_log", []))
 
         if opening_narration:
             bubble = SoulStageEventCard(event_type="none")
@@ -2196,11 +3075,19 @@ class InterfaceSignals():
             lyt.addWidget(bubble); chat_view.chat_container.addWidget(wrap)
             chat_view.scroll_to_bottom()
             await asyncio.sleep(0.05)
+            if self.ss_msg_mgr is not None:
+                try:
+                    _narr_idx = base_idx + len(log_entries)
+                    def _get_idx(_i=_narr_idx):
+                        return _i
+                    self.ss_msg_mgr.attach_context_menu(wrap, bubble.text_label, _get_idx, is_player=False)
+                except Exception as e:
+                    logger.warning(f"[SoulStage] attach_context_menu failed: {e}")
             log_entries.append({"role": "narrator", "actor_name": "NARRATOR", "content": opening_narration, "timestamp": datetime.datetime.now().isoformat()})
 
         if first_message and party_names:
             char_name = party_names[0]
-            lbl, _ = self._ss_add_custom_message(char_name, "", is_user=False)
+            lbl, _ = self._ss_add_custom_message(char_name, "", is_user=False, msg_idx=base_idx + len(log_entries))
             lbl.setText(self.markdown_to_html(first_message))
             chat_view.scroll_to_bottom()
             log_entries.append({"role": "char", "actor_name": char_name, "content": first_message, "timestamp": datetime.datetime.now().isoformat()})
@@ -2208,7 +3095,7 @@ class InterfaceSignals():
         if log_entries and self._soul_stage_scene_id:
             append_to_scene_log(self._soul_stage_scene_id, log_entries)
 
-    def _ss_add_custom_message(self, name: str, text: str, is_user: bool):
+    def _ss_add_custom_message(self, name: str, text: str, is_user: bool, msg_idx=None):
         from app.gui.soul_stage_page import _get_char_avatar_pixmap, _load_scenes
 
         html_text = self.markdown_to_html(text)
@@ -2355,6 +3242,21 @@ class InterfaceSignals():
         """)
 
         self.ui.soul_stage_page.chat_view.chat_container.addWidget(frame)
+
+        if self.ss_msg_mgr is not None:
+            try:
+                if msg_idx is None:
+                    from app.gui.soul_stage_page import _load_scenes
+                    _log = _load_scenes()["scenes"].get(self._soul_stage_scene_id, {}).get("chat_log", [])
+                    msg_idx = max(0, len(_log) - 1)
+
+                def _get_idx(_i=msg_idx):
+                    return _i
+
+                self.ss_msg_mgr.attach_context_menu(frame, lbl, _get_idx, is_player=is_user)
+            except Exception as e:
+                logger.warning(f"[SoulStage] attach_context_menu failed: {e}")
+
         return lbl, frame
 
     async def _ss_send_message(self):
@@ -2362,14 +3264,19 @@ class InterfaceSignals():
 
         from app.gui.soul_stage_page import (
             SoulStageEventCard,
-            SoulStageNPCBubble, 
+            SoulStageNPCBubble,
+            SoulStageDiceCard,
             _save_scenes, 
             _load_scenes
         )
 
         session = self.soul_stage_session
         chat_view = self.ui.soul_stage_page.chat_view
-        user_text = chat_view.text_input.toPlainText().strip()
+        raw_text = chat_view.text_input.toPlainText().strip()
+        composed = chat_view.compose_message(raw_text)
+        user_text = composed["text"]
+        manual_next_actor = composed["manual_next_actor"]
+        private_recipient = composed["private_recipient"]
         chat_view.text_input.clear()
         chat_view.clear_choices()
 
@@ -2394,14 +3301,33 @@ class InterfaceSignals():
             elif r == "char": context_messages.append({"role": "assistant", "content": f"[{actor}]: {c}"})
             elif r == "npc": context_messages.append({"role": "assistant", "content": f"[NPC {actor}]: {c}"})
 
-        self._ss_add_custom_message(user_name, user_text or " ", is_user=True)
+        _player_msg_idx = len(chat_log)
+        self._ss_add_custom_message(user_name, user_text or " ", is_user=True, msg_idx=_player_msg_idx)
         chat_view.scroll_to_bottom()
 
         chat_view.btn_send.hide()
         chat_view.btn_stop.show()
         chat_view.text_input.setEnabled(False)
 
-        turn_log =[{"role": "player", "content": user_text or " ", "actor_name": user_name}]
+        turn_log = [{"role": "player", "content": user_text or " ", "actor_name": user_name}]
+        pending_dice: list = [None]
+
+        async def on_dice_roll(dice_result):
+            pending_dice[0] = dice_result
+            card = SoulStageDiceCard()
+            wrap = QWidget()
+            wrap.setStyleSheet("background: transparent;")
+            lyt = QVBoxLayout(wrap)
+            lyt.setContentsMargins(0, 2, 0, 2)
+            lyt.addWidget(card)
+            chat_view.chat_container.addWidget(wrap)
+            try:
+                sides = int(dice_result.notation.lower().split("d")[1])
+            except Exception:
+                sides = 20
+            card.animate_to(dice_result.describe(), dice_result.success, sides=sides)
+            chat_view.scroll_to_bottom()
+            await asyncio.sleep(0)
         
         narrator_bubble = narrator_wrap = char_label = npc_bubble = None
         char_full_text = npc_full_text = ""
@@ -2415,8 +3341,16 @@ class InterfaceSignals():
                 narrator_bubble = SoulStageEventCard(event_type="none")
                 narrator_wrap = QWidget()
                 narrator_wrap.setStyleSheet("background: transparent;")
-                lyt = QVBoxLayout(narrator_wrap); lyt.setContentsMargins(0, 4, 0, 4)
-                lyt.addWidget(narrator_bubble); chat_view.chat_container.addWidget(narrator_wrap)
+                lyt = QVBoxLayout(narrator_wrap)
+                lyt.setContentsMargins(0, 4, 0, 4)
+                lyt.addWidget(narrator_bubble)
+                chat_view.chat_container.addWidget(narrator_wrap)
+
+                if self.ss_msg_mgr:
+                    _narr_idx = len(chat_log) + len(turn_log)
+                    def _get_idx(_i=_narr_idx):
+                        return _i
+                    self.ss_msg_mgr.attach_context_menu(narrator_wrap, narrator_bubble.text_label, _get_idx, is_player=False)
             narrator_bubble.append_text(chunk)
             chat_view.scroll_to_bottom()
             await asyncio.sleep(0)
@@ -2424,13 +3358,17 @@ class InterfaceSignals():
         async def on_narrator_done():
             nonlocal narrator_bubble, narrator_wrap
             if narrator_bubble:
-                turn_log.append({"role": "narrator", "content": narrator_bubble.text_label.text(), "actor_name": "NARRATOR"})
+                entry = {"role": "narrator", "content": narrator_bubble.text_label.text(), "actor_name": "NARRATOR"}
+                if pending_dice[0] is not None:
+                    entry["dice_check"] = pending_dice[0].to_dict()
+                turn_log.append(entry)
             narrator_bubble = narrator_wrap = None
 
         async def on_char_start(name: str, _avatar):
             nonlocal char_label, char_name_saved, char_full_text
             char_full_text = ""; char_name_saved = name
-            char_label, _ = self._ss_add_custom_message(name, "", is_user=False)
+            _char_idx = len(chat_log) + len(turn_log)
+            char_label, _ = self._ss_add_custom_message(name, "", is_user=False, msg_idx=_char_idx)
             await asyncio.sleep(0)
 
         async def on_char_chunk(name: str, chunk: str):
@@ -2454,6 +3392,12 @@ class InterfaceSignals():
             lyt.setContentsMargins(0, 4, 0, 4)
             lyt.addWidget(npc_bubble)
             chat_view.chat_container.addWidget(wrap)
+
+            if self.ss_msg_mgr:
+                _npc_idx = len(chat_log) + len(turn_log)
+                def _get_idx(_i=_npc_idx):
+                    return _i
+                self.ss_msg_mgr.attach_context_menu(wrap, npc_bubble.text_label, _get_idx, is_player=False)
             await asyncio.sleep(0)
 
         async def on_npc_chunk(name: str, chunk: str):
@@ -2471,6 +3415,10 @@ class InterfaceSignals():
             chat_view.btn_stop.hide()
             chat_view.btn_send.show()
             chat_view.text_input.setEnabled(True)
+            chat_view.set_actor_options(
+                session.party_names,
+                [npc.name for npc in session.orchestrator.npc_registry.list_active()],
+            )
             self._ss_apply_environment(
                 session.orchestrator.world_state.bg_image,
                 session.orchestrator.world_state.ambient_audio
@@ -2513,8 +3461,9 @@ class InterfaceSignals():
                 finally:
                     self.prompt_engine.configuration_characters.load_configuration = original_load
 
-                self.log_prompt_structure(messages)
-                async for chunk in provider.generate_stream(messages):
+                gen_kwargs = self._get_gen_kwargs(c_method)
+
+                async for chunk in provider.generate_stream(messages, **gen_kwargs):
                     yield chunk
 
             return stream_wrapper()
@@ -2523,39 +3472,41 @@ class InterfaceSignals():
             if choices:
                 chat_view.show_choices(choices, event_type)
 
+        if self.ss_msg_mgr is not None:
+            try:
+                from app.gui.soul_stage_page import _load_scenes as _ss_ls_snap
+                _snap_log = _ss_ls_snap()["scenes"].get(self._soul_stage_scene_id, {}).get("chat_log", [])
+                self.ss_msg_mgr.take_snapshot(turn_idx=len(_snap_log))
+            except Exception as e:
+                logger.warning(f"[SoulStage] take_snapshot failed: {e}")
+
         await session.orchestrator.run_turn(
-            player_message=user_text, party_names=session.party_names, conversation_method=session.conversation_method,
+            player_message=user_text, party_names=session.party_names,
+            conversation_method=session.conversation_method,
             context_messages=context_messages, user_name=user_name, user_description=user_desc,
             character_stream_fn=character_stream_fn,
             on_narrator_chunk=on_narrator_chunk, on_narrator_done=on_narrator_done,
             on_char_start=on_char_start, on_char_chunk=on_char_chunk, on_char_done=on_char_done,
             on_npc_start=on_npc_start, on_npc_chunk=on_npc_chunk, on_npc_done=on_npc_done,
-            on_turn_complete=on_turn_complete, on_error=on_error, on_choices=on_choices
+            on_turn_complete=on_turn_complete, on_error=on_error, on_choices=on_choices, on_dice_roll=on_dice_roll,
+            manual_next_actor=manual_next_actor,
+            private_recipient=private_recipient,
         )
 
+        full_chat_log = []
         if self._soul_stage_scene_id:
             d = _load_scenes()
             if self._soul_stage_scene_id in d["scenes"]:
                 d["scenes"][self._soul_stage_scene_id].setdefault("chat_log",[]).extend(turn_log)
                 d["scenes"][self._soul_stage_scene_id]["chat_log"] = d["scenes"][self._soul_stage_scene_id]["chat_log"][-200:]
-                d["scenes"][self._soul_stage_scene_id]["world_state"] = {
-                    "location":         session.orchestrator.world_state.location,
-                    "time_of_day":      session.orchestrator.world_state.time_of_day,
-                    "atmosphere":       session.orchestrator.world_state.atmosphere,
-                    "bg_image":         session.orchestrator.world_state.bg_image,
-                    "ambient_audio":    session.orchestrator.world_state.ambient_audio,
-                    "key_facts":        session.orchestrator.world_state.key_facts,
-                    "player_inventory": session.orchestrator.world_state.player_inventory,
-                    "player_status":    session.orchestrator.world_state.player_status,
-                    "narrator_style":   session.orchestrator.world_state.narrator_style,
-                }
-                active_npcs =[]
-                for npc in session.orchestrator.npc_registry.list_active():
-                    active_npcs.append({"name": npc.name, "archetype": npc.archetype, "personality": npc.personality, "avatar_key": npc.avatar_key, "turn_count": npc.turn_count})
-                d["scenes"][self._soul_stage_scene_id]["active_npcs"] = active_npcs
+                _ss_ws = session.orchestrator.world_state
+                d["scenes"][self._soul_stage_scene_id]["world_state"] = session.orchestrator.serialize_scene_state()
                 _save_scenes(d)
+                full_chat_log = d["scenes"][self._soul_stage_scene_id].get("chat_log", [])
 
-        asyncio.create_task(session.orchestrator.sync_party_memory(session.conversation_method, session.party_names, turn_log, user_name))
+        asyncio.create_task(session.orchestrator.sync_party_memory(
+            session.conversation_method, session.party_names, full_chat_log, user_name
+        ))
 
     def _soul_stage_interrupt(self):
         if self.soul_stage_session and self.soul_stage_session.orchestrator.is_running:
@@ -2661,7 +3612,10 @@ class InterfaceSignals():
                 QtCore.Qt.TransformationMode.SmoothTransformation
             )
 
-            painter.drawPixmap(4, 4, scaled_pixmap)
+            x_offset = 4 + (avatar_size - scaled_pixmap.width()) // 2
+            y_offset = 4 + (avatar_size - scaled_pixmap.height()) // 2
+
+            painter.drawPixmap(x_offset, y_offset, scaled_pixmap)
             painter.end()
 
             self.ui.user_avatar_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -2728,6 +3682,8 @@ class InterfaceSignals():
                         conversation_method_image = "app/gui/icons/qwen.png"
                     case "Z.AI":
                         conversation_method_image = "app/gui/icons/zai.png"
+                    case "Player2":
+                        conversation_method_image = "app/gui/icons/player2.png"
                     case _:
                         conversation_method_image = "app/gui/icons/local_llm.png"
 
@@ -3135,7 +4091,7 @@ class InterfaceSignals():
         scenario = character_information.get("scenario", "")
         example_messages = character_information.get("example_messages", "")
         alternate_greetings = character_information.get("alternate_greetings", "")
-        creator_notes = character_information.get("creator_notes", "")
+        creator_notes = character_information.get("character_title", "")
 
         config_user = self.configuration_settings.load_configuration()
         user_data = config_user.get("user_data", {})
@@ -3422,6 +4378,19 @@ class InterfaceSignals():
             f"}}"
         )
 
+        save_button.clicked.connect(lambda: self.save_changes_main_menu(
+            conversation_method,
+            character_name,
+            name_edit,
+            description_edit,
+            personality_edit,
+            scenario_edit,
+            first_message_edit,
+            example_messages_edit,
+            alternate_greetings_edit,
+            creator_notes_edit
+        ))
+
         ok_button = QPushButton(self.translations.get("personas_editor_close", "CLOSE"), dialog)
         ok_button.setFont(f_btn)
         ok_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -3595,7 +4564,7 @@ class InterfaceSignals():
         create_combo_section(
             layout0, 
             self.translations.get("character_edit_conv_method", "Conversation Method"), 
-            ["Mistral AI", "OpenRouter", "Open AI", "Local LLM", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI"], conversation_method,
+            ["Mistral AI", "OpenRouter", "Open AI", "Local LLM", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI", "Player2"], conversation_method,
             lambda txt: update_character_conversation_method(character_name, txt)
         )
         
@@ -4012,23 +4981,30 @@ class InterfaceSignals():
             if index < 0: return
             old_name = chat_combobox.currentText()
             
-            qdialog_font = QtGui.QFont()
-            qdialog_font.setFamily("Inter Tight SemiBold")
-            qdialog_font.setPointSize(10)
-            qdialog_font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+            dialog = SowInputDialog(
+                parent=self.main_window,
+                title=self.translations.get("rename_chat_title", "Rename Chat"),
+                label=self.translations.get("rename_chat_prompt", "Enter new chat name:"),
+                text=old_name
+            )
             
-            dialog = QInputDialog()
-            dialog.setFont(qdialog_font)
-            new_name, ok = dialog.getText(None, "Rename Chat", "Enter new chat name:", text=old_name)
-            
-            if ok and new_name.strip():
-                config = self.configuration_characters.load_configuration()
-                char_chats = config["character_list"][character_name]["chats"]
-                found_id = next((cid for cid, cinfo in char_chats.items() if cinfo.get("name") == old_name), None)
-                if found_id:
-                    char_chats[found_id]["name"] = new_name
-                    self.configuration_characters.save_configuration_edit(config)
-                    chat_combobox.setItemText(index, new_name)
+            if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+                new_name = dialog.get_text()
+                if new_name and new_name != old_name:
+                    config = self.configuration_characters.load_configuration()
+                    char_chats = config["character_list"][character_name]["chats"]
+                    found_id = next((cid for cid, cinfo in char_chats.items() if cinfo.get("name") == old_name), None)
+                    if found_id:
+                        char_chats[found_id]["name"] = new_name
+                        self.configuration_characters.save_configuration_edit(config)
+                        chat_combobox.setItemText(index, new_name)
+                        
+                        sow_toast(
+                            parent=self.main_window,
+                            title=self.translations.get("chat_manager_label", "Chat Manager"),
+                            text=self.translations.get("chat_renamed_success", f"Chat renamed to '{new_name}'."),
+                            msg_type="success"
+                        )
 
         def delete_chat():
             index = chat_combobox.currentIndex()
@@ -4139,25 +5115,59 @@ class InterfaceSignals():
         character_list = configuration_data["character_list"]
 
         if character_name in character_list:
-            character_list[character_name]["character_title"] = creator_notes_edit.toPlainText()
-            character_list[character_name]["character_description"] = description_edit.toPlainText()
-            character_list[character_name]["character_personality"] = personality_edit.toPlainText()
-            character_list[character_name]["scenario"] = scenario_edit.toPlainText()
-            character_list[character_name]["first_message"] = first_message_edit.toPlainText()
-            character_list[character_name]["example_messages"] = example_messages_edit.toPlainText()
+            new_description = description_edit.toPlainText()
+            new_personality = personality_edit.toPlainText()
+            new_scenario = scenario_edit.toPlainText()
+            new_first_message = first_message_edit.toPlainText()
+            new_example_messages = example_messages_edit.toPlainText()
+            new_creator_notes = creator_notes_edit.toPlainText()
+
             raw_text = alternate_greetings_edit.toPlainText().strip()
             if raw_text:
                 greetings_list = [g.strip() for g in raw_text.split("<GREETING>") if g.strip()]
             else:
                 greetings_list = []
-            character_list[character_name]["alternate_greetings"] = greetings_list 
-            
-            new_name = name_edit.text()
-            if new_name == character_name:
-                pass
-            else:
+
+            character_list[character_name]["character_title"] = new_creator_notes
+            character_list[character_name]["character_description"] = new_description
+            character_list[character_name]["character_personality"] = new_personality
+            character_list[character_name]["scenario"] = new_scenario
+            character_list[character_name]["first_message"] = new_first_message
+            character_list[character_name]["example_messages"] = new_example_messages
+            character_list[character_name]["alternate_greetings"] = greetings_list
+
+            character_information_parts = []
+
+            if new_description.strip():
+                character_information_parts.append(new_description.strip())
+
+            if new_personality.strip():
+                character_information_parts.append(f"{new_personality.strip()}.")
+
+            if new_scenario.strip():
+                character_information_parts.append(f"Here is the dialogue script: {new_scenario.strip()}.\n\n")
+
+            if new_example_messages.strip():
+                character_information_parts.append(
+                    f"[Example Chat]:\n{new_example_messages.strip()}\n\n"
+                    "Your response should follow the same pattern and style as above."
+                )
+
+            if character_information_parts:
+                character_information_parts.append(
+                    "Respond as the character, do not break role or add extra explanations."
+                )
+
+            character_information = " ".join(character_information_parts)
+
+            character_list[character_name]["character_information"] = character_information
+            character_list[character_name]["system_prompt"] = character_information
+
+            new_name = name_edit.text().strip()
+            if new_name and new_name != character_name:
                 character_data = character_list.pop(character_name)
                 character_list[new_name] = character_data
+                character_name = new_name
 
             configuration_data["character_list"] = character_list
             self.configuration_characters.save_configuration_edit(configuration_data)
@@ -4186,23 +5196,28 @@ class InterfaceSignals():
         title = self.translations.get("character_edit_start_new_dialogue", "Start new dialogue")
         message = self.translations.get("character_edit_start_new_dialogue_sure", "Are you sure you want to start a new dialogue?")
 
-        dialog = SowConfirmDialog(
+        confirm_dialog = SowConfirmDialog(
             parent=self.main_window,
             title=title,
             text=message,
             confirm_text="Confirm",
             danger=False
         )
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+        if confirm_dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
 
-        chat_name, ok = QInputDialog.getText(
-            dialog,
-            self.translations.get("new_chat_title", "New Chat"),
-            self.translations.get("new_chat_prompt", "Enter chat name:")
+        input_dialog = SowInputDialog(
+            parent=self.main_window,
+            title=self.translations.get("new_chat_title", "New Chat"),
+            label=self.translations.get("new_chat_prompt", "Enter chat name:"),
+            placeholder=self.translations.get("default_chat_name", "Default Chat")
         )
+        
+        chat_name = ""
+        if input_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            chat_name = input_dialog.get_text()
 
-        if not ok or not chat_name.strip():
+        if not chat_name:
             chat_name = self.translations.get("default_chat_name", "Default Chat")
 
         new_name = name_edit.text()
@@ -4704,16 +5719,19 @@ class InterfaceSignals():
                 )
                 return
             
-            char_name, ok = QInputDialog.getItem(
-                dialog,
-                self.translations.get("folder_add_char_title", "Add Character"),
-                self.translations.get("folder_add_char_prompt", "Select character:"),
-                available, 0, False
+            select_dialog = SowSelectDialog(
+                parent=dialog,
+                title=self.translations.get("folder_add_char_title", "Add Character"),
+                label=self.translations.get("folder_add_char_prompt", "Select character:"),
+                items=available
             )
-            if ok and char_name:
-                current_members.append(char_name)
-                groups[group_name] = current_members
-                _refresh_members()
+            
+            if select_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+                char_name = select_dialog.get_selected_item()
+                if char_name:
+                    current_members.append(char_name)
+                    groups[group_name] = current_members
+                    _refresh_members()
 
         def _remove_char():
             item = members_list.currentItem()
@@ -4769,25 +5787,23 @@ class InterfaceSignals():
             asyncio.create_task(self.set_main_tab())
 
         def _delete_folder():
-            from app.gui.soul_stage_page import RPGConfirmDialog
-            
             title = self.translations.get("folder_delete_confirm_title", "Delete Folder")
             message = self.translations.get("folder_delete_confirm_msg", "Delete this folder?")
             
             detail_base = self.translations.get("folder_delete_detail", "Characters will return to the main list.")
-            detail = f"'{group_name}' · {detail_base}"
+            full_text = f"{message}<br><span style='color: rgba(255,255,255,0.4); font-size: 9pt;'>'{group_name}' · {detail_base}</span>"
             
             confirm_btn = self.translations.get("delete", "Delete")
 
-            confirmed = RPGConfirmDialog.ask(
+            confirm_dlg = SowConfirmDialog(
+                parent=dialog,
                 title=title,
-                message=message,
+                text=full_text,
                 confirm_text=confirm_btn,
-                detail=detail,
-                parent=dialog 
+                danger=True
             )
 
-            if confirmed:
+            if confirm_dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
                 groups.pop(group_name, None)
                 self._save_groups(groups)
                 dialog.accept()
@@ -5178,6 +6194,15 @@ class InterfaceSignals():
         self.models = []
         self.filtered_models = []
 
+        try:
+            self.ui.lineEdit_search_openrouter_models.textChanged.disconnect()
+        except TypeError:
+            pass
+        try:
+            self.ui.comboBox_openrouter_models.currentIndexChanged.disconnect()
+        except TypeError:
+            pass
+
         self.ui.lineEdit_search_openrouter_models.textChanged.connect(self.filter_models)
         self.ui.comboBox_openrouter_models.currentIndexChanged.connect(self.on_comboBox_openrouter_models_changed)
 
@@ -5207,8 +6232,11 @@ class InterfaceSignals():
 
     def filter_models(self, text):
         text = text.lower()
-        self.filtered_models = [model for model in self.models if text in model["name"].lower()]
+        self.filtered_models = [model for model in self.models if text in str(model["name"]).lower()]
+        
+        self.ui.comboBox_openrouter_models.blockSignals(True)
         self.load_openrouter_models()
+        self.ui.comboBox_openrouter_models.blockSignals(False)
 
     def load_openrouter_models(self):
         openrouter_model_id = self.configuration_settings.get_main_setting("openrouter_model")
@@ -5217,7 +6245,7 @@ class InterfaceSignals():
 
         for model in self.filtered_models:
             self.ui.comboBox_openrouter_models.addItem(model["name"], userData=model["id"])
-            index = self.ui.comboBox_openrouter_models.findText(model["name"])
+            index = self.ui.comboBox_openrouter_models.count() - 1
             self.ui.comboBox_openrouter_models.setItemData(index, model["description"], Qt.ItemDataRole.ToolTipRole)
 
         self.set_combobox_to_model(self.ui.comboBox_openrouter_models, openrouter_model_id)
@@ -5434,6 +6462,13 @@ class InterfaceSignals():
                     force=True
                 )
             )
+
+            sow_toast(
+                parent=self.main_window,
+                title="Soul Memory",
+                text=self.translations.get("soul_memory_manual_completed", "Manual memory update completed..."),
+                msg_type="success"
+            )
         except Exception as e:
             logger.error(f"Manual memory trigger error: {e}", exc_info=True)
 
@@ -5529,17 +6564,24 @@ class InterfaceSignals():
         else:
             self.configuration_settings.update_main_setting("enable_mcp", False)
     
+    def on_checkBox_enable_no_mmap_stateChanged(self):
+        if self.ui.checkBox_enable_no_mmap.isChecked():
+            self.configuration_settings.update_main_setting("no_mmap_status", True)
+        else:
+            self.configuration_settings.update_main_setting("no_mmap_status", False)
+
     def on_checkBox_enable_flash_attention_stateChanged(self):
         if self.ui.checkBox_enable_flash_attention.isChecked():
             self.configuration_settings.update_main_setting("flash_attention_status", True)
         else:
             self.configuration_settings.update_main_setting("flash_attention_status", False)
 
-    def on_checkBox_enable_nsfw_stateChanged(self):
-        if self.ui.checkBox_enable_nsfw.isChecked():
-            self.configuration_settings.update_main_setting("nsfw_query", True)
-        else:
-            self.configuration_settings.update_main_setting("nsfw_query", False)
+    def on_checkBox_enable_nsfw_stateChanged(self, checked: bool):
+        self.configuration_settings.update_main_setting("nsfw_query", checked)
+        
+        if self.ui.stackedWidget.currentWidget() == self.ui.charactersgateway_page:
+            if self.ui.gateway_nav_rail.currentRow() == 1:
+                self.handle_tab_change(1)
 
     def on_checkBox_enable_ambient_stateChanged(self):
         if self.ui.checkBox_enable_ambient.isChecked():
@@ -5746,6 +6788,12 @@ class InterfaceSignals():
             self.ui.checkBox_enable_mlock.setChecked(False)
         else:
             self.ui.checkBox_enable_mlock.setChecked(True)
+
+        no_mmap_state = self.configuration_settings.get_main_setting("no_mmap_status")
+        if no_mmap_state == False:
+            self.ui.checkBox_enable_no_mmap.setChecked(False)
+        else:
+            self.ui.checkBox_enable_no_mmap.setChecked(True)
         
         flash_attention_state = self.configuration_settings.get_main_setting("flash_attention_status")
         if flash_attention_state == False:
@@ -5766,10 +6814,14 @@ class InterfaceSignals():
             self.ui.checkBox_enable_mcp.setChecked(True)
 
         nsfw_query = self.configuration_settings.get_main_setting("nsfw_query")
-        if nsfw_query == False:
-            self.ui.checkBox_enable_nsfw.setChecked(False)
-        else:
-            self.ui.checkBox_enable_nsfw.setChecked(True)
+        self.ui.checkBox_enable_nsfw.blockSignals(True)
+        self.ui.checkBox_enable_nsfw.setChecked(bool(nsfw_query))
+        self.ui.checkBox_enable_nsfw.blockSignals(False)
+
+        try:
+            self.ui.checkBox_enable_nsfw.toggled.disconnect(self.on_checkBox_enable_nsfw_stateChanged)
+        except (TypeError, RuntimeError):
+            pass
 
         self.ui.comboBox_user_persona_building.clear()
         self.ui.comboBox_system_prompt_building.clear()
@@ -5835,6 +6887,8 @@ class InterfaceSignals():
         elif selected_conversation_method == "Z.AI":
             api_token = self.configuration_api.get_token("ZAI_API_TOKEN")
             self.ui.lineEdit_api_token_options.setText(api_token)
+        elif selected_conversation_method == "Player2":
+            self.ui.lineEdit_api_token_options.setText("Not needed")
 
         self.ui.lineEdit_openai_model.setText(self.configuration_settings.get_main_setting("openai_model") or "")
         self.ui.lineEdit_mistral_model.setText(self.configuration_settings.get_main_setting("mistral_model_endpoint") or "")
@@ -5889,6 +6943,8 @@ class InterfaceSignals():
             self.ui.label_openai_model.show()
             self.ui.lineEdit_openai_model.show()
             api_token = self.configuration_api.get_token("OPEN_AI_API_TOKEN")
+            base_url = self.configuration_api.get_token("CUSTOM_ENDPOINT_URL")
+            self.ui.lineEdit_base_url_options.setText(base_url)
             
         elif selected_conversation_method == "OpenRouter":
             self.ui.openrouter_models_options_label.show()
@@ -6599,17 +7655,29 @@ class InterfaceSignals():
                 self._set_editor_avatar(cached_image_path)
                 self.character_data = self.read_character_card(file_path)
 
-            if self.character_data and "data" in self.character_data:
-                data = self.character_data["data"]
+            if self.character_data:
+                data = self.character_data.get("data", self.character_data)
 
-                self.ui.lineEdit_character_name_building.setText(str(data.get("name", "")))
-                self.ui.textEdit_character_description_building.setPlainText(str(data.get("description", "")))
-                self.ui.textEdit_character_personality_building.setPlainText(str(data.get("personality", "")))
-                self.ui.textEdit_first_message_building.setPlainText(str(data.get("first_mes", "")))
-                self.ui.textEdit_example_messages.setPlainText(str(data.get("mes_example", "")))
-                self.ui.textEdit_creator_notes.setPlainText(str(data.get("creator_notes", "")))
-                self.ui.textEdit_character_version.setPlainText(str(data.get("character_version", "")))
-                self.ui.textEdit_scenario.setPlainText(str(data.get("scenario", "")))
+                name = data.get("name", "")
+                description = data.get("description", "")
+                personality = data.get("personality", "")
+                
+                first_message = data.get("first_mes") or data.get("first_message", "")
+                
+                example_messages = data.get("mes_example") or data.get("example_messages", "")
+                
+                creator_notes = data.get("creator_notes", "") or data.get("comment", "")
+                character_version = data.get("character_version", "1.0.0")
+                scenario = data.get("scenario", "")
+
+                self.ui.lineEdit_character_name_building.setText(str(name))
+                self.ui.textEdit_character_description_building.setPlainText(str(description))
+                self.ui.textEdit_character_personality_building.setPlainText(str(personality))
+                self.ui.textEdit_first_message_building.setPlainText(str(first_message))
+                self.ui.textEdit_example_messages.setPlainText(str(example_messages))
+                self.ui.textEdit_creator_notes.setPlainText(str(creator_notes))
+                self.ui.textEdit_character_version.setPlainText(str(character_version))
+                self.ui.textEdit_scenario.setPlainText(str(scenario))
 
                 alternate_greetings = data.get("alternate_greetings", [])
                 self.ui.textEdit_alternate_greetings.setPlainText(self.format_alternate_greetings(alternate_greetings))
@@ -6993,6 +8061,13 @@ class InterfaceSignals():
         
         avatar_path = char_data.get("character_avatar")
         self._set_editor_avatar(avatar_path)
+
+        conv_method = char_data.get("conversation_method", "Local LLM")
+        if hasattr(self.ui, 'provider_group') and self.ui.provider_group:
+            for btn in self.ui.provider_group.buttons():
+                if btn.property("provider_value") == conv_method:
+                    btn.setChecked(True)
+                    break
             
         self.ui.pushButton_create_character_3.setText(self.translations.get("character_edit_save_button", "Save Character"))
         self.update_token_count()
@@ -7002,6 +8077,73 @@ class InterfaceSignals():
         self.clean_character_card()
         self.ui.editor_character_list.clearSelection()
         self.ui.pushButton_create_character_3.setText(self.translations.get("create_character_button_3", "Create Character"))
+
+    def open_ai_character_assistant(self):
+        current_provider = "Local LLM"
+        if hasattr(self.ui, 'provider_group') and self.ui.provider_group:
+            checked_btn = self.ui.provider_group.checkedButton()
+            if checked_btn is not None:
+                current_provider = checked_btn.property("provider_value")
+
+        self.assistant_dialog = CharacterAIAssistantDialog(
+            translations=self.translations,
+            configuration_settings=self.configuration_settings,
+            configuration_api=self.configuration_api,
+            ai_factory=AIFactory,
+            default_provider=current_provider,
+            gen_kwargs_func=self._get_gen_kwargs,
+            parent=self.main_window
+        )
+        
+        self.assistant_dialog.character_generated.connect(self._apply_ai_generated_character)
+        self.assistant_dialog.exec()
+
+    def _apply_ai_generated_character(self, data: dict, mode: str):
+        field_map = {
+            "name": self.ui.lineEdit_character_name_building,
+            "description": self.ui.textEdit_character_description_building,
+            "personality": self.ui.textEdit_character_personality_building,
+            "scenario": self.ui.textEdit_scenario,
+            "first_message": self.ui.textEdit_first_message_building,
+            "alternate_greetings": self.ui.textEdit_alternate_greetings,
+            "example_messages": self.ui.textEdit_example_messages,
+            "creator_notes": self.ui.textEdit_creator_notes
+        }
+
+        applied_count = 0
+        
+        for key, text_value in data.items():
+            if key in field_map:
+                widget = field_map[key]
+                
+                if mode == "empty_only":
+                    if isinstance(widget, QLineEdit):
+                        current_text = widget.text().strip()
+                    else:
+                        current_text = widget.toPlainText().strip()
+                    
+                    if current_text:
+                        continue
+                
+                if isinstance(widget, QLineEdit):
+                    widget.setText(text_value)
+                else:
+                    widget.setPlainText(text_value)
+                
+                applied_count += 1
+
+        self.update_token_count()
+        
+        if applied_count > 0:
+            sow_toast(
+                parent=self.main_window,
+                title=self.translations.get("toast_ai_assistant_title", "AI Assistant"),
+                text=self.translations.get(
+                    "toast_ai_assistant_applied", 
+                    f"Успешно применено {applied_count} полей!"
+                ),
+                msg_type="success"
+            )
 
     ### SETUP CHARACTER INFORMATION ====================================================================
 
@@ -7035,7 +8177,7 @@ class InterfaceSignals():
         dialog = QDialog()
         dialog.setWindowTitle(self.translations.get("tts_selector_title", 'Text-To-Speech Selector'))
         dialog.setWindowIcon(QtGui.QIcon("app/gui/icons/logotype.ico"))
-        dialog.setFixedSize(820, 600)
+        dialog.setFixedSize(820, 650)
 
         dialog.setStyleSheet(f"""
             QDialog {{
@@ -7236,24 +8378,52 @@ class InterfaceSignals():
         return container
 
     def create_voice_nothing_widgets(self, character_name):
+        _SURF2    = "rgba(22, 22, 26, 0.5)"
+        _BORDER   = "rgba(255, 255, 255, 0.08)"
+        _TEXT_S   = "#6F6B63"
         _BLUE     = "#4BB8FF"  
         _BLUE_MUT = "rgba(75, 184, 255, 0.12)"
         _BLUE_GLO = "rgba(75, 184, 255, 0.25)"
         _BLUE_BRT = "#82CDFF"
 
-        f_title = QtGui.QFont("Inter Tight", 14, QtGui.QFont.Weight.Bold)
-        f_title.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
-        
-        f_label = QtGui.QFont("Inter Tight Medium", 8, QtGui.QFont.Weight.Bold)
+        f_label = QtGui.QFont("Inter Tight Medium", 10)
         f_label.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         
-        f_input = QtGui.QFont("Inter Tight Medium", 10)
-        f_input.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
-
         f_btn = QtGui.QFont("Inter Tight Medium", 10, QtGui.QFont.Weight.Bold)
         f_btn.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(15)
+
+        info_card = QFrame()
+        info_card.setObjectName("TTSNoticeCard")
+        info_card.setStyleSheet(f"QFrame#TTSNoticeCard {{ background-color: rgba(255, 255, 255, 0.02); border: 1px solid {_BORDER}; border-radius: 12px; }}")
+        info_layout = QVBoxLayout(info_card)
+        info_layout.setContentsMargins(18, 18, 18, 18)
+        info_layout.setSpacing(10)
+
+        info_title = QLabel(self.translations.get("tts_notice_title", "💡 First Run Notice for TTS Engines"))
+        info_title.setStyleSheet("color: #82CDFF; font-weight: bold; font-size: 13px; background: transparent; border: none;")
+        
+        info_text = QLabel(
+            self.translations.get(
+                "tts_notice_first_run_text",
+                "Please note: prior to the first launch of "
+                "<b>XTTSv2</b>, <b>Kokoro</b>, <b>Silero</b>, or <b>Qwen 3 TTS</b>, the program will automatically download "
+                "required weights and model components. You can view the upload process in the console.<br><br>"
+                "Once the initial download completes, voice generation will work seamlessly and instantly offline."
+            )
+        )
+        info_text.setFont(f_label)
+        info_text.setWordWrap(True)
+        info_text.setStyleSheet("color: rgba(255, 255, 255, 0.75); background: transparent; border: none; line-height: 1.4;")
+
+        info_layout.addWidget(info_title)
+        info_layout.addWidget(info_text)
+
+        layout.addWidget(info_card)
+        layout.addStretch(1)
 
         save_button = QPushButton(self.translations.get("tts_selector_save_button", 'Save Selection'))
         save_button.setFont(f_btn)
@@ -7275,7 +8445,7 @@ class InterfaceSignals():
                 color: {_BLUE_BRT};
             }}
         """)
-        layout.addWidget(save_button, alignment=QtCore.Qt.AlignmentFlag.AlignBottom)
+        layout.addWidget(save_button)
 
         def save_voice_mode_settings():
             configuration_data = self.configuration_characters.load_configuration()
@@ -7293,7 +8463,6 @@ class InterfaceSignals():
 
         widget = QWidget()
         widget.setLayout(layout)
-        
         return widget
 
     def create_elevenlabs_widgets(self, character_name):
@@ -8328,7 +9497,6 @@ class InterfaceSignals():
     def create_qwen3_widgets(self, character_name, voice_name, rvc_enabled, file_name):
         RVC_DIR = os.path.join(os.getcwd(), "assets\\rvc_models")
 
-        # ==============================================================================
         _SURF1    = "rgba(0, 0, 0, 0.3)"
         _SURF2    = "rgba(22, 22, 26, 0.5)"
         _SURF3    = "rgba(30, 30, 35, 0.5)"
@@ -8385,7 +9553,6 @@ class InterfaceSignals():
             }}
             QComboBox QAbstractItemView::item {{ padding: 6px; border-radius: 4px; }}
         """
-        # ==============================================================================
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -8424,7 +9591,7 @@ class InterfaceSignals():
         language_combo = QtWidgets.QComboBox()
         language_combo.setFont(f_input)
         language_combo.setStyleSheet(combo_style)
-        language_combo.addItems(["English", "Russian", "Chinese", "Japanese", "Korean", "French", "German", "Spanish"])
+        language_combo.addItems(["English", "Russian", "Chinese", "Japanese", "Korean", "French", "German", "Spanish", "Portuguese", "Italian"])
         lang_layout.addWidget(lang_label)
         lang_layout.addWidget(language_combo)
 
@@ -8481,10 +9648,10 @@ class InterfaceSignals():
         qwen_preset_combo = QtWidgets.QComboBox()
         qwen_preset_combo.setFont(f_input)
         qwen_preset_combo.setStyleSheet(combo_style)
-        qwen_preset_combo.addItems(["Serena", "Vivian", "Aiden", "Dylan", "Eric", "Ryan", "Sophia", "Emma", "Michael"])
+        qwen_preset_combo.addItems(["Serena", "Vivian", "Aiden", "Dylan", "Eric", "Ryan", "Uncle_Fu", "Ono_Anna", "Sohee"])
         layout_presets.addWidget(lbl_preset)
         layout_presets.addWidget(qwen_preset_combo)
-        style_label = QLabel("Style Instruction (optional)")
+        style_label = QLabel(self.translations.get("tts_selector_qwen3_lbl_7", "Style Instruction (optional)"))
         style_label.setFont(f_label)
         style_label.setStyleSheet(lbl_style)
         qwen_style_input = QLineEdit()
@@ -8541,6 +9708,19 @@ class InterfaceSignals():
         clone_file_row.addWidget(btn_browse_ref)
         layout_cloning.addWidget(lbl_cloning)
         layout_cloning.addLayout(clone_file_row)
+
+        lbl_ref_text = QLabel(self.translations.get(
+            "tts_selector_qwen3_lbl_ref_text", "REFERENCE AUDIO TRANSCRIPT (RECOMMENDED)"))
+        lbl_ref_text.setFont(f_label)
+        lbl_ref_text.setStyleSheet(lbl_style)
+        qwen_ref_text_input = QtWidgets.QLineEdit()
+        qwen_ref_text_input.setFont(f_input)
+        qwen_ref_text_input.setPlaceholderText(self.translations.get(
+            "tts_selector_qwen3_lbl_ref_placeholder_text", "Exact words spoken in the reference audio (improves cloning quality)..."))
+        qwen_ref_text_input.setStyleSheet(input_style)
+        layout_cloning.addWidget(lbl_ref_text)
+        layout_cloning.addWidget(qwen_ref_text_input)
+
         qwen_stack.addWidget(page_cloning)
 
         qwen_mode_combo.currentIndexChanged.connect(qwen_stack.setCurrentIndex)
@@ -8607,6 +9787,7 @@ class InterfaceSignals():
         saved_prompt = char_config.get("qwen_prompt", "")
         saved_instruct = char_config.get("qwen_style_instruct", "")
         saved_ref = char_config.get("qwen_cloning_ref_path", "")
+        saved_ref_text = char_config.get("qwen_cloning_ref_text", "")
         saved_language = char_config.get("qwen_language", "English")
         saved_device = char_config.get("qwen_device", "cuda")
 
@@ -8625,6 +9806,7 @@ class InterfaceSignals():
         elif saved_mode == "cloning":
             qwen_mode_combo.setCurrentIndex(2)
             qwen_ref_path_input.setText(saved_ref)
+            qwen_ref_text_input.setText(saved_ref_text)
 
         layout.addSpacing(5)
         select_voice_button = QPushButton(self.translations.get("tts_selector_select_button", 'Save Qwen 3 Settings'))
@@ -8661,6 +9843,7 @@ class InterfaceSignals():
             voice_type = qwen_preset_combo.currentText() if active_mode == "presets" else ""
             prompt_text = qwen_prompt_input.text().strip() if active_mode == "prompt" else ""
             ref_path = qwen_ref_path_input.text().strip() if active_mode == "cloning" else ""
+            ref_text = qwen_ref_text_input.text().strip() if active_mode == "cloning" else ""
 
             if active_mode == "prompt" and not prompt_text:
                 sow_toast(parent=self.main_window, title="Qwen 3 TTS", text="Voice design prompt cannot be empty!", msg_type="error")
@@ -8691,6 +9874,7 @@ class InterfaceSignals():
             char_cfg["voice_type"] = voice_type
             char_cfg["qwen_prompt"] = prompt_text
             char_cfg["qwen_cloning_ref_path"] = ref_path
+            char_cfg["qwen_cloning_ref_text"] = ref_text
             char_cfg["qwen_style_instruct"] = qwen_style_input.text().strip() if active_mode == "presets" else ""
             
             char_cfg["rvc_enabled"] = rvc_enabled
@@ -9528,7 +10712,8 @@ class InterfaceSignals():
 
     @asyncSlot()
     async def handle_tab_change(self, current_tab_index):
-        self.abort_loading = False
+        self._gateway_load_id = getattr(self, '_gateway_load_id', 0) + 1
+        my_load_id = self._gateway_load_id
 
         self.ui.gateway_stacked_widget.setCurrentIndex(current_tab_index)
     
@@ -9574,7 +10759,7 @@ class InterfaceSignals():
                     characters = registry.get("characters", [])
 
                     for i, char_info in enumerate(characters):
-                        if self.abort_loading: break
+                        if self._gateway_load_id != my_load_id: break
 
                         char_url = char_info['download_url']
                         char_name = char_info['name']
@@ -9614,12 +10799,14 @@ class InterfaceSignals():
                             example_dialogs, character_scenario, alternate_greetings, character_book
                         )
 
+                        if self._gateway_load_id != my_load_id: break
                         self.soul_cards.append(character_widget)
                         if i % 2 == 0:
                             QtCore.QTimer.singleShot(0, lambda: self.update_gate_layout("soul_gateway"))
                             await asyncio.sleep(0.02)
 
-                    self.update_gate_layout("soul_gateway")
+                    if self._gateway_load_id == my_load_id:
+                        self.update_gate_layout("soul_gateway")
                 except Exception as e:
                     logger.error(f"Error loading Soul Gateway: {e}")
 
@@ -9641,7 +10828,7 @@ class InterfaceSignals():
                 nodes = trending_characters.get("data", {}).get("nodes", [])
 
                 async def process_node(node):
-                    if self.abort_loading: return
+                    if self._gateway_load_id != my_load_id: return
                     full_path = node.get('fullPath')
                     if full_path is None: return
 
@@ -9650,7 +10837,9 @@ class InterfaceSignals():
                         likes, total_tokens, character_personality, first_message,
                         character_tavern_personality, example_dialogs, character_scenario, alternate_greetings
                     ) = await self.character_card_client.get_character_information(full_path)
-                        
+                    
+                    if self._gateway_load_id != my_load_id: return
+
                     avatar_path = None
                     if character_avatar_url:
                         try:
@@ -9674,17 +10863,20 @@ class InterfaceSignals():
                         example_dialogs, character_scenario, alternate_greetings
                     )
 
+                    if self._gateway_load_id != my_load_id: return
                     self.gate_cards.append(character_widget)
                     QtCore.QTimer.singleShot(0, lambda: self.update_gate_layout("chub_ai"))
 
                 for i, node in enumerate(nodes[:50]):
-                    if self.abort_loading: break
+                    if self._gateway_load_id != my_load_id: break
                     await process_node(node)
                     if i % 4 == 0:
-                        self.update_gate_layout("chub_ai")
+                        if self._gateway_load_id == my_load_id:
+                            self.update_gate_layout("chub_ai")
                         await asyncio.sleep(0.05)
 
-                self.update_gate_layout("chub_ai")
+                if self._gateway_load_id == my_load_id:
+                    self.update_gate_layout("chub_ai")
 
             case 2:  # World Lorebooks
                 self.ui.label_nsfw.hide()
@@ -9696,7 +10888,8 @@ class InterfaceSignals():
                 self.ui.checkBox_enable_nsfw.hide()
                 await self.load_shared_scenes()
         
-        self.is_loading = False
+        if self._gateway_load_id == my_load_id:
+            self.is_loading = False
 
     def update_gate_layout(self, tab):
         match tab:
@@ -9999,14 +11192,12 @@ class InterfaceSignals():
                 self.translations.get("provider_name_openrouter", "OpenRouter"),
                 self.translations.get("provider_desc_openrouter", "Access to hundreds of top models in one place — the ultimate aggregator"),
                 "app/gui/icons/openrouter.png"
+            ),
+            (
+                self.translations.get("provider_name_player2", "Player2"),
+                self.translations.get("provider_desc_player2", "Free AI powered by the Player2 app. No API key required — just keep the Player2 application running"),
+                "app/gui/icons/player2.png"
             )
-        ]
-
-        positions = [
-            (0, 0), (0, 1), (0, 2),
-            (1, 0), (1, 1), (1, 2),
-            (2, 0), (2, 1), (2, 2),
-            (3, 0)
         ]
 
         for i, (name, desc, icon_path) in enumerate(methods):
@@ -10034,7 +11225,10 @@ class InterfaceSignals():
                 )
             
             card.clicked.connect(make_select_callback())
-            row, col = positions[i]
+            
+            row = i // 3
+            col = i % 3
+            
             grid.addWidget(card, row, col)
 
         layout.addLayout(grid)
@@ -10310,7 +11504,8 @@ class InterfaceSignals():
 
         target_method = conversation_method if conversation_method in [
             "Mistral AI", "Open AI", "OpenRouter", "Local LLM", 
-            "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI"
+            "Anthropic", "Google Gemini", "DeepSeek", "Grok", 
+            "Qwen", "Z.AI", "Player2"
         ] else "Local LLM"
 
         try:
@@ -11032,6 +12227,34 @@ class InterfaceSignals():
             self.model_information_widget = None
         self.ui.listWidget_models_hub.clear()
         self.ui.listWidget_models_hub.setSpacing(8)
+
+        rec_header_widget = QWidget()
+        rec_header_widget.setFixedHeight(45)
+        rec_header_widget.setStyleSheet(
+            "background: rgba(75, 184, 255, 0.05); "
+            "border: 1px solid rgba(75, 184, 255, 0.18); "
+            "border-radius: 10px; margin: 2px 5px;"
+        )
+        rec_h_layout = QHBoxLayout(rec_header_widget)
+        rec_h_layout.setContentsMargins(15, 0, 15, 0)
+        
+        rec_info_label = QLabel(
+            self.translations.get(
+                "models_hub_recommendations_banner",
+                "⭐ Curated list of local language models selected and verified by the application developer."
+            )
+        )
+        rec_info_label.setStyleSheet("color: #82CDFF; font-family: 'Inter Tight Medium'; font-size: 12px; background: transparent; border: none;")
+        font = QtGui.QFont()
+        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        rec_info_label.setFont(font)
+        rec_h_layout.addWidget(rec_info_label)
+
+        header_item = QtWidgets.QListWidgetItem()
+        header_item.setSizeHint(QtCore.QSize(0, 48))
+        header_item.setFlags(Qt.ItemFlag.NoItemFlags)
+        self.ui.listWidget_models_hub.addItem(header_item)
+        self.ui.listWidget_models_hub.setItemWidget(header_item, rec_header_widget)
         
         available_ram = self.configuration_settings.get_main_setting("available_memory")
         
@@ -11079,6 +12302,34 @@ class InterfaceSignals():
             self.model_information_widget = None
         self.ui.listWidget_models_hub.clear()
         self.ui.listWidget_models_hub.setSpacing(8)
+
+        pop_header_widget = QWidget()
+        pop_header_widget.setFixedHeight(45)
+        pop_header_widget.setStyleSheet(
+            "background: rgba(255, 157, 0, 0.05); "
+            "border: 1px solid rgba(255, 157, 0, 0.18); "
+            "border-radius: 10px; margin: 2px 5px;"
+        )
+        pop_h_layout = QHBoxLayout(pop_header_widget)
+        pop_h_layout.setContentsMargins(15, 0, 15, 0)
+        
+        pop_info_label = QLabel(
+            self.translations.get(
+                "models_hub_popular_banner",
+                "🔥 Currently popular GGUF models directly fetched from HuggingFace Hub."
+            )
+        )
+        pop_info_label.setStyleSheet("color: #FFB74D; font-family: 'Inter Tight Medium'; font-size: 12px; background: transparent; border: none;")
+        font = QtGui.QFont()
+        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        pop_info_label.setFont(font)
+        pop_h_layout.addWidget(pop_info_label)
+
+        header_item = QtWidgets.QListWidgetItem()
+        header_item.setSizeHint(QtCore.QSize(0, 48))
+        header_item.setFlags(Qt.ItemFlag.NoItemFlags)
+        self.ui.listWidget_models_hub.addItem(header_item)
+        self.ui.listWidget_models_hub.setItemWidget(header_item, pop_header_widget)
 
         self.popular_worker= ModelPopular()
         try:
@@ -11914,6 +13165,7 @@ class InterfaceSignals():
                 current_text_to_speech, character_name, elevenlabs_voice_id, language=lang
             )
             self.chat_tts_worker.playback_worker.lipsync_signal.connect(self.update_lip_sync)
+            self.chat_tts_worker.segment_saved_signal.connect(self.on_tts_segment_saved)
             self.chat_tts_worker.start()
             logger.info(f"Chat TTS Worker started: {current_text_to_speech}")
         else:
@@ -12104,26 +13356,6 @@ class InterfaceSignals():
                         level_name = levels.get(level, f"LEVEL{level}")
                         logger.info(f"[JS Console] {level_name} in {source_id} (line {line_number}): {message}")
 
-                class ServerThread(threading.Thread):
-                    def __init__(self, port=8000):
-                        super().__init__()
-                        self.port = port
-                        self.daemon = True
-                        self.server = None
-
-                    def run(self):
-                        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-                        os.chdir(project_root)
-                        
-                        handler = SimpleHTTPRequestHandler
-                        self.server = TCPServer(("", self.port), handler)
-                        self.server.serve_forever()
-                    
-                    def stop(self):
-                        if self.server:
-                            self.server.shutdown()
-                            self.server.server_close()
-
                 self.vrm_page = QtWidgets.QWidget()
                 self.vrm_webview = QWebEngineView()
                 self.vrm_webview.setPage(CustomWebEnginePage(self.vrm_webview))
@@ -12131,11 +13363,11 @@ class InterfaceSignals():
                 self.vrm_webview.settings().setAttribute(self.vrm_webview.settings().WebAttribute.WebGLEnabled, True)
                 self.vrm_webview.settings().setAttribute(self.vrm_webview.settings().WebAttribute.Accelerated2dCanvasEnabled, True)
 
-                if not hasattr(self, 'server_thread') or not self.server_thread.is_alive():
-                    self.server_thread = ServerThread(port=8001)
+                if not hasattr(self, 'server_thread') or self.server_thread is None or not self.server_thread.is_alive():
+                    self.server_thread = VRMServerThread(preferred_port=8001)
                     self.server_thread.start()
 
-                html_url = f"http://localhost:8001/app/utils/emotions/vrm_module.html"
+                html_url = f"http://127.0.0.1:{self.server_thread.port}/app/utils/emotions/vrm_module.html"
                 
                 if vrm_model_file:
                     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -12837,7 +14069,7 @@ class InterfaceSignals():
         scenario = character_information.get("scenario", "")
         example_messages = character_information.get("example_messages", "")
         alternate_greetings = character_information.get("alternate_greetings", "")
-        creator_notes = character_information.get("creator_notes", "")
+        creator_notes = character_information.get("character_title", "")
 
         main_layout = QHBoxLayout(dialog)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -13246,33 +14478,6 @@ class InterfaceSignals():
                     .replace("{{персонаж}}", character_name)
                     .replace("{{Персонаж}}", character_name))
 
-    def log_prompt_structure(self, messages):
-        separator = "=" * 80
-        thin_separator = "-" * 80
-        
-        log_output = [f"\n{separator}", "FINAL SYSTEM PROMPT STRUCTURE", f"{separator}"]
-        
-        total_chars = 0
-        
-        for i, msg in enumerate(messages):
-            role = msg.get('role', 'unknown').upper()
-            content = msg.get('content', '')
-            length = len(content)
-            total_chars += length
-
-            header = f" [ BLOCK {i+1} | {role} | {length} chars ] "
-            header_line = f"{header:-^80}"
-            
-            log_output.append(header_line)
-            log_output.append(content.strip())
-            log_output.append("")
-            
-        log_output.append(thin_separator)
-        log_output.append(f" TOTAL: {len(messages)} blocks | ~{total_chars} chars")
-        log_output.append(f"{separator}\n")
-        
-        logger.info("\n".join(log_output))
-
     def stop_generation(self):
         self.abort_generation = True
         self.ui.pushButton_stop_generation.hide()
@@ -13315,13 +14520,71 @@ class InterfaceSignals():
             user_text = user_text_original
             user_text_markdown = self.markdown_to_html(user_text_original)
 
-            user_message_container = await self.add_message(character_name, "", is_user=True, message_id=None)
+            current_attachments = list(self.pending_attachments) if not external_text else []
+            image_attachments_b64 = []
+            attachment_text_blocks = []
+
+            provider_style = "openai"
+            if conversation_method in self.ANTHROPIC_STYLE_VISION_PROVIDERS:
+                provider_style = "anthropic"
+            vision_capable = (
+                conversation_method in self.OPENAI_STYLE_VISION_PROVIDERS
+                or conversation_method in self.ANTHROPIC_STYLE_VISION_PROVIDERS
+            )
+
+            for attachment in current_attachments:
+                try:
+                    if attachment["kind"] == "image":
+                        if vision_capable:
+                            encoded = self._encode_image_attachment(attachment["path"])
+                            if encoded:
+                                image_attachments_b64.append(encoded)
+                            else:
+                                attachment_text_blocks.append(
+                                    f"[Attached image '{attachment['name']}' could not be read.]"
+                                )
+                        else:
+                            attachment_text_blocks.append(
+                                f"[Attached image '{attachment['name']}': the current provider "
+                                f"('{conversation_method}') does not support image understanding, "
+                                f"so the picture itself was not sent, only this note.]"
+                            )
+                    else:
+                        extracted = self._extract_text_attachment(attachment["path"])
+                        attachment_text_blocks.append(
+                            f"[Attached file: {attachment['name']}]\n---\n{extracted}\n---"
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to process attachment '{attachment.get('name')}': {e}")
+
+            llm_user_text = user_text
+            if attachment_text_blocks:
+                llm_user_text = (user_text + "\n\n" if user_text else "") + "\n\n".join(attachment_text_blocks)
+
+            user_message_message_id = str(uuid.uuid4()) if current_attachments else None
+            attachments_meta = []
+            for attachment in current_attachments:
+                relative_path = self._persist_attachment_original(
+                    character_name, user_message_message_id, attachment
+                )
+                attachments_meta.append({
+                    "name": attachment["name"],
+                    "kind": attachment["kind"],
+                    "path": relative_path,
+                })
+
+            user_message_container = await self.add_message(
+                character_name, "", is_user=True, message_id=user_message_message_id, attachments=current_attachments
+            )
             user_message_label = user_message_container["label"]
             user_message_label.setText(user_text_markdown or " ")
 
             await asyncio.sleep(0.05)
             if not external_text:
                 self.textEdit_write_user_message.clear()
+
+            if current_attachments:
+                self.clear_pending_attachments()
             
             if sow_system_status and current_sow_system_mode != "Nothing":
                 indicator_margins = (10, 5, 10, 5)
@@ -13346,27 +14609,40 @@ class InterfaceSignals():
 
             current_chat = character_info.get("current_chat", "default")
             chats = character_info.get("chats", {})
-            chat_history = chats.get(current_chat, {}).get("chat_history", [])
+            chat_content = chats.get(current_chat, {}).get("chat_content", {})
             
             context_messages = []
-            for message in chat_history:
-                u_msg = message.get("user", "")
-                c_msg = message.get("character", "")
-                if u_msg:
-                    context_messages.append({"role": "user", "content": f"{u_msg.strip()}"})
-                if c_msg:
-                    context_messages.append({"role": "assistant", "content": f"{c_msg.strip()}"})
+            sorted_msg_ids = sorted(chat_content.keys(), key=lambda k: chat_content[k].get("sequence_number", 0))
+
+            for msg_id in sorted_msg_ids:
+                msg_entry = chat_content[msg_id]
+                is_user_msg = msg_entry.get("is_user", False)
+
+                if is_user_msg:
+                    full_user_text = self._build_rich_user_text_for_context(character_name, msg_entry)
+                    if full_user_text.strip():
+                        context_messages.append({"role": "user", "content": full_user_text.strip()})
+                else:
+                    variants = msg_entry.get("variants", [])
+                    cur_v_id = msg_entry.get("current_variant_id", "default")
+                    c_text = next((v["text"] for v in variants if v.get("variant_id") == cur_v_id), msg_entry.get("text", ""))
+                    if c_text.strip():
+                        context_messages.append({"role": "assistant", "content": c_text.strip()})
 
             messages, activated_lorebook_entries = self.prompt_engine.build_system_prompt_blocks(
-                character_name, user_name, user_description, context_messages, user_text
+                character_name, user_name, user_description, context_messages, llm_user_text,
+                image_attachments=image_attachments_b64 or None, provider_style=provider_style
             )
 
             provider = AIFactory.get_provider(conversation_method)
             if not provider:
                 raise ValueError(f"Unknown conversation method: {conversation_method}")
 
-            self.log_prompt_structure(messages)
-            generator = provider.generate_stream(messages)
+            if self.tools_enabled and self.tool_registry.has_tools():
+                messages = await self.run_tool_loop(provider, messages, character_name, user_name)
+
+            gen_kwargs = self._get_gen_kwargs(conversation_method)
+            generator = provider.generate_stream(messages, **gen_kwargs)
 
             try:
                 sentence_buffer_chat = ""
@@ -13425,7 +14701,10 @@ class InterfaceSignals():
                                 
                                 if len(clean_sentence) > 3:
                                     if hasattr(self, 'chat_tts_worker') and self.chat_tts_worker:
-                                        self.chat_tts_worker.add_text(clean_sentence)
+                                        self.chat_tts_worker.add_text(
+                                            clean_sentence,
+                                            message_id=character_answer_container["message_id"] if character_answer_container else None
+                                        )
                                         
                                 sentence_buffer_chat = sentence_buffer_chat[split_idx:]
 
@@ -13434,7 +14713,10 @@ class InterfaceSignals():
                 if _tts_active and sentence_buffer_chat.strip():
                     clean_tail = re.sub(r'[*_~`]', '', sentence_buffer_chat.strip())
                     if len(clean_tail) > 3 and hasattr(self, 'chat_tts_worker') and self.chat_tts_worker:
-                        self.chat_tts_worker.add_text(clean_tail)
+                        self.chat_tts_worker.add_text(
+                            clean_tail,
+                            message_id=character_answer_container["message_id"] if character_answer_container else None
+                        )
 
                 if full_text and first_chunk_received:
                     new_msgs_for_mem = context_messages + [
@@ -13446,6 +14728,7 @@ class InterfaceSignals():
                             provider, new_msgs_for_mem, character_name, user_name, activated_lorebook_entries
                         )
                     )
+                    await asyncio.sleep(0)
 
             except Exception as e:
                 if not first_chunk_received and 'typing_widget' in locals() and typing_widget:
@@ -13480,12 +14763,28 @@ class InterfaceSignals():
                 user_message_message_id = user_message_container["message_id"]
                 character_answer_message_id = character_answer_container["message_id"]
                 
-                self.configuration_characters.add_message_to_config(
+                await asyncio.to_thread(
+                    self.configuration_characters.add_message_to_config,
                     character_name, "User", True, user_text or " ", user_message_message_id
                 )
-                self.configuration_characters.add_message_to_config(
+                
+                if attachments_meta:
+                    await asyncio.to_thread(
+                        self._persist_message_attachments, 
+                        character_name, user_message_message_id, attachments_meta
+                    )
+
+                await asyncio.to_thread(
+                    self.configuration_characters.add_message_to_config,
                     character_name, character_name, False, clean_full_text, character_answer_message_id
                 )
+
+                saved_tts_segments = self._pending_tts_segments.pop(character_answer_message_id, [])
+                if saved_tts_segments:
+                    await asyncio.to_thread(
+                        self._persist_tts_segments_for_message, 
+                        character_name, character_answer_message_id, saved_tts_segments
+                    )
 
             self.ui.pushButton_stop_generation.hide()
             self.ui.pushButton_send_message.show()
@@ -13515,6 +14814,14 @@ class InterfaceSignals():
                 logger.info("Text-to-Speech was canceled because the generation was interrupted by the user.")
 
             await self.render_messages(character_name)
+
+            translator_idx = self.configuration_settings.get_main_setting("translator") or 0
+            if first_chunk_received and translator_idx != 0 and character_answer_container:
+                await self._translate_single_message(
+                    character_answer_container["message_id"], 
+                    character_name, 
+                    conversation_method
+                )
             
             if auto_summary_status and interval and int(interval) > 0:
                 asyncio.create_task(
@@ -13548,7 +14855,7 @@ class InterfaceSignals():
 
     async def regenerate_message(self, conversation_method, character_name, message_id):
         """
-        Regenerate message from character.
+        Regenerate message from character with full support for past attachments, Vision & Tools.
         """
         configuration_data = self.configuration_characters.load_configuration()
         character_info = configuration_data["character_list"][character_name]
@@ -13576,7 +14883,7 @@ class InterfaceSignals():
             logger.error(f"Message {message_id} not found in chat_content.")
             return
 
-        all_message_ids = list(chat_content.keys())
+        all_message_ids = sorted(chat_content.keys(), key=lambda k: chat_content[k].get("sequence_number", 0))
         selected_index = all_message_ids.index(message_id)
         ids_to_delete = all_message_ids[selected_index + 1:]
         
@@ -13600,20 +14907,36 @@ class InterfaceSignals():
                 break
             idx -= 1
 
-        user_text_original = ""
-        if last_user_message:
-            current_variant_id = last_user_message.get("current_variant_id", "default")
-            variant = next((v for v in last_user_message.get("variants", []) if v["variant_id"] == current_variant_id), None)
-            if variant:
-                user_text_original = variant.get("text", "")
+        if not last_user_message:
+            logger.error("No preceding user message found for regeneration.")
+            return
 
-        user_text = user_text_original
+        llm_user_text = self._build_rich_user_text_for_context(character_name, last_user_message)
+
+        provider_style = "openai"
+        if conversation_method in self.ANTHROPIC_STYLE_VISION_PROVIDERS:
+            provider_style = "anthropic"
+        vision_capable = (
+            conversation_method in self.OPENAI_STYLE_VISION_PROVIDERS
+            or conversation_method in self.ANTHROPIC_STYLE_VISION_PROVIDERS
+        )
+
+        image_attachments_b64 = []
+        if last_user_message.get("attachments"):
+            for att in last_user_message["attachments"]:
+                if att.get("kind") == "image" and vision_capable:
+                    att_path = att.get("path")
+                    if att_path:
+                        full_img_path = os.path.join(os.getcwd(), "app", "data", ".soul", character_name, att_path)
+                        if os.path.exists(full_img_path):
+                            encoded = self._encode_image_attachment(full_img_path)
+                            if encoded:
+                                image_attachments_b64.append(encoded)
 
         if message_id in self.messages:
             character_answer_container = self.messages[message_id]
             character_answer_label = character_answer_container["label"]
             character_answer_frame = character_answer_container["frame"]
-            
             character_answer_frame.hide()
         else:
             return
@@ -13636,82 +14959,123 @@ class InterfaceSignals():
         first_chunk_received = False
         self.current_typewriter = None
 
-        if user_text:
-            chat_history_raw = chats.get(current_chat, {}).get("chat_history", [])
-            context_messages = []
+        context_messages = []
+        last_user_msg_id = last_user_message.get("message_id")
+        
+        for msg_id in all_message_ids[:all_message_ids.index(last_user_msg_id)]:
+            msg_entry = chat_content[msg_id]
+            is_user_msg = msg_entry.get("is_user", False)
 
-            for message in chat_history_raw[:-1]:
-                u_msg = message.get("user", "")
-                c_msg = message.get("character", "")
-                if u_msg: context_messages.append({"role": "user", "content": f"{u_msg.strip()}"})
-                if c_msg: context_messages.append({"role": "assistant", "content": f"{c_msg.strip()}"})
+            if is_user_msg:
+                hist_user_text = self._build_rich_user_text_for_context(character_name, msg_entry)
+                if hist_user_text.strip():
+                    context_messages.append({"role": "user", "content": hist_user_text.strip()})
+            else:
+                variants = msg_entry.get("variants", [])
+                cur_v_id = msg_entry.get("current_variant_id", "default")
+                c_text = next((v["text"] for v in variants if v.get("variant_id") == cur_v_id), msg_entry.get("text", ""))
+                if c_text.strip():
+                    context_messages.append({"role": "assistant", "content": c_text.strip()})
 
-            messages, activated_lorebook_entries = self.prompt_engine.build_system_prompt_blocks(
-                character_name, user_name, user_description, context_messages, user_text
-            )
+        messages, activated_lorebook_entries = self.prompt_engine.build_system_prompt_blocks(
+            character_name, user_name, user_description, context_messages, llm_user_text,
+            image_attachments=image_attachments_b64 or None, provider_style=provider_style
+        )
 
-            provider = AIFactory.get_provider(conversation_method)
-            if provider:
-                self.log_prompt_structure(messages)
-                generator = provider.generate_stream(messages)
+        provider = AIFactory.get_provider(conversation_method)
+        if provider:
+            if self.tools_enabled and self.tool_registry.has_tools():
+                messages = await self.run_tool_loop(provider, messages, character_name, user_name)
 
-                async for chunk in generator:
-                    if chunk:
-                        if not first_chunk_received:
-                            if typing_widget:
-                                try:
-                                    typing_widget.deleteLater()
-                                    self.chat_container.removeWidget(typing_widget)
-                                except: pass
-                            
-                            character_answer_frame.show()
-                            character_answer_label.setText("")
-                            self.current_typewriter = TypewriterEffect(
-                                character_answer_label, 
-                                character_answer_container["frame"],
-                                self.ui.scrollArea_chat, 
-                                self, 
-                                character_name, 
-                                user_name
-                            )
-                            first_chunk_received = True
+            gen_kwargs = self._get_gen_kwargs(conversation_method)
+            generator = provider.generate_stream(messages, **gen_kwargs)
 
-                        full_text += chunk
-                        self.current_typewriter.write(chunk)
-                        await asyncio.sleep(0.01)
-
-            if self.current_typewriter:
-                await self.current_typewriter.wait_until_finished()
-
-            if full_text.startswith(f"{character_name}:"):
-                full_text = full_text[len(f"{character_name}:"):].lstrip()
-
-            if sow_system_status:
-                if current_sow_system_mode in ["Expressions Images", "Live2D Model", "VRM"]:
-                    if self.emotion_task and not self.emotion_task.done():
-                        self.emotion_task.cancel()
-                        logger.debug("Old emotion detection has been cancelled.")
-
-                    def start_emotion():
-                        self.emotion_task = asyncio.create_task(
-                            self.detect_emotion(character_name, full_text)
+            async for chunk in generator:
+                if chunk:
+                    if not first_chunk_received:
+                        if typing_widget:
+                            try:
+                                typing_widget.deleteLater()
+                                self.chat_container.removeWidget(typing_widget)
+                            except Exception:
+                                pass
+                        
+                        character_answer_frame.show()
+                        character_answer_label.setText("")
+                        self.current_typewriter = TypewriterEffect(
+                            character_answer_label, 
+                            character_answer_container["frame"],
+                            self.ui.scrollArea_chat, 
+                            self, 
+                            character_name, 
+                            user_name
                         )
+                        first_chunk_received = True
 
-                    asyncio.get_event_loop().call_soon(start_emotion)
+                    full_text += chunk
+                    self.current_typewriter.write(chunk)
+                    await asyncio.sleep(0.01)
 
-            final_html = self.markdown_to_html(full_text)
-            final_html = self.apply_macros(final_html, character_name, user_name)
-            character_answer_label.setText(final_html)
-            character_answer_label.setProperty("original_text", final_html)
-            character_answer_label.setProperty("is_translated", False)
+        if self.current_typewriter:
+            await self.current_typewriter.wait_until_finished()
 
-            self.configuration_characters.regenerate_message_in_config(character_name, message_id, full_text)
+        if full_text.startswith(f"{character_name}:"):
+            full_text = full_text[len(f"{character_name}:"):].lstrip()
 
-        await self.render_messages(character_name)
+        if sow_system_status:
+            if current_sow_system_mode in ["Expressions Images", "Live2D Model", "VRM"]:
+                if self.emotion_task and not self.emotion_task.done():
+                    self.emotion_task.cancel()
+                    logger.debug("Old emotion detection has been cancelled.")
+
+                def start_emotion():
+                    self.emotion_task = asyncio.create_task(
+                        self.detect_emotion(character_name, full_text)
+                    )
+
+                asyncio.get_event_loop().call_soon(start_emotion)
+
+        final_html = self.markdown_to_html(full_text)
+        final_html = self.apply_macros(final_html, character_name, user_name)
+        character_answer_label.setText(final_html)
+        character_answer_label.setProperty("original_text", final_html)
+        character_answer_label.setProperty("is_translated", False)
+
+        self.configuration_characters.regenerate_message_in_config(character_name, message_id, full_text)
+
+        await self.first_render_messages(character_name)
 
         QtCore.QTimer.singleShot(0, lambda: self.ui.scrollArea_chat.verticalScrollBar().setValue(
             self.ui.scrollArea_chat.verticalScrollBar().maximum()
         ))
+
+    def _build_rich_user_text_for_context(self, character_name, msg_entry):
+        cur_v_id = msg_entry.get("current_variant_id", "default")
+        variants = msg_entry.get("variants", [])
+        base_text = next((v["text"] for v in variants if v.get("variant_id") == cur_v_id), msg_entry.get("text", ""))
+        
+        msg_attachments = msg_entry.get("attachments", [])
+        if not msg_attachments:
+            return base_text
+
+        attach_blocks = []
+        for att in msg_attachments:
+            att_kind = att.get("kind")
+            att_name = att.get("name", "file")
+            att_rel_path = att.get("path")
+            
+            if att_rel_path:
+                full_att_path = os.path.join(os.getcwd(), "app", "data", ".soul", character_name, att_rel_path)
+                if os.path.exists(full_att_path):
+                    if att_kind == "file":
+                        extracted = self._extract_text_attachment(full_att_path)
+                        attach_blocks.append(f"[Attached file: {att_name}]\n---\n{extracted}\n---")
+                    elif att_kind == "image":
+                        attach_blocks.append(f"[Attached image: {att_name}]")
+
+        if attach_blocks:
+            return (base_text + "\n\n" if base_text.strip() else "") + "\n\n".join(attach_blocks)
+        return base_text
 
     async def perform_auto_summary(self, character_name, user_name, interval, conversation_method):
         """
@@ -13774,7 +15138,9 @@ class InterfaceSignals():
                 current_summary, new_messages_chunk, character_name, user_name
             )
 
-            async for chunk in provider.generate_summary(summary_messages):
+            gen_kwargs = self._get_gen_kwargs(conversation_method)
+
+            async for chunk in provider.generate_summary(summary_messages, **gen_kwargs):
                 full_new_summary += chunk
 
             if full_new_summary and len(full_new_summary) > 50:
@@ -13787,7 +15153,129 @@ class InterfaceSignals():
         except Exception as e:
             logger.error(f"Auto-summary background task failed: {e}")
 
-    async def add_message(self, character_name, text, is_user, message_id, insert_at=None):
+    def _attach_generated_image_context_menu(self, img_label, character_name, message_id, img_full_path):
+        img_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+        def _open_menu(pos, path=img_full_path, mid=message_id):
+            menu = QMenu()
+            menu.setStyleSheet("""
+                QMenu { background-color: #1E1E1E; color: #D4D4D4; border: 1px solid #383838; border-radius: 8px; }
+                QMenu::item { padding: 6px 20px; background-color: transparent; }
+                QMenu::item:selected { background-color: #2D2D2D; color: #FFFFFF; border-radius: 4px; }
+            """)
+            save_action = menu.addAction(self.translations.get("save_image_as", "Save image as..."))
+            regen_action = menu.addAction(self.translations.get("regenerate_image", "Regenerate image"))
+            folder_action = menu.addAction(self.translations.get("show_in_folder", "Show in folder"))
+
+            action = menu.exec(img_label.mapToGlobal(pos))
+            if action == save_action:
+                self._save_generated_image_as(path)
+            elif action == regen_action:
+                asyncio.create_task(self.trigger_image_generation(character_name, mid))
+            elif action == folder_action:
+                self._reveal_in_folder(path)
+
+        img_label.customContextMenuRequested.connect(_open_menu)
+
+    def _save_generated_image_as(self, source_path):
+        try:
+            destination, _ = QFileDialog.getSaveFileName(
+                self.main_window,
+                self.translations.get("save_image_as", "Save image as..."),
+                os.path.basename(source_path),
+                "PNG Image (*.png)"
+            )
+            if destination:
+                shutil.copyfile(source_path, destination)
+        except Exception as e:
+            logger.error(f"Failed to save image to disk: {e}")
+
+    def _reveal_in_folder(self, path):
+        try:
+            folder = os.path.dirname(os.path.abspath(path))
+            if os.name == "nt":
+                os.startfile(folder)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", folder])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+        except Exception as e:
+            logger.error(f"Failed to open folder '{path}': {e}")
+
+    def _build_message_attachment_widget(self, character_name, message_id, attachment, is_fresh):
+        try:
+            if is_fresh:
+                full_path = attachment.get("path")
+            else:
+                relative_path = attachment.get("path")
+                if not relative_path:
+                    return None
+                full_path = os.path.join(os.getcwd(), "app", "data", ".soul", character_name, relative_path)
+
+            if not full_path or not os.path.exists(full_path):
+                return None
+
+            if attachment.get("kind") == "image":
+                pixmap = QPixmap(full_path)
+                if pixmap.isNull():
+                    return None
+                thumb = QLabel()
+                scaled = pixmap.scaled(180, 180, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+                thumb.setPixmap(scaled)
+                thumb.setStyleSheet("border-radius: 8px; margin-top: 4px;")
+                thumb.setCursor(Qt.CursorShape.PointingHandCursor)
+
+                def show_full(evt, p=pixmap):
+                    dlg = QDialog()
+                    dlg.setWindowTitle(attachment.get("name", "Image Preview"))
+                    dlg.setStyleSheet("background-color: #1E1E1E;")
+                    l = QVBoxLayout(dlg)
+                    l.setContentsMargins(0, 0, 0, 0)
+                    lbl = QLabel()
+                    max_w = min(1200, p.width())
+                    max_h = min(900, p.height())
+                    full_scaled = p.scaled(max_w, max_h, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+                    lbl.setPixmap(full_scaled)
+                    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    l.addWidget(lbl)
+                    dlg.exec()
+
+                thumb.mousePressEvent = show_full
+                return thumb
+            else:
+                chip = QFrame()
+                chip.setStyleSheet("""
+                    QFrame {
+                        background-color: rgba(255, 255, 255, 0.06);
+                        border-radius: 8px;
+                    }
+                    QFrame:hover { background-color: rgba(255, 255, 255, 0.1); }
+                """)
+                chip.setCursor(Qt.CursorShape.PointingHandCursor)
+                chip_layout = QHBoxLayout(chip)
+                chip_layout.setContentsMargins(8, 6, 8, 6)
+                chip_layout.setSpacing(6)
+
+                icon_label = QLabel("\U0001F4C4")
+                chip_layout.addWidget(icon_label)
+
+                name = attachment.get("name", "file")
+                display_name = name if len(name) <= 28 else name[:25] + "..."
+                name_label = QLabel(display_name)
+                name_label.setToolTip(name)
+                name_label.setStyleSheet("color: rgba(255,255,255,0.85); font-size: 11px; background: transparent; border: none;")
+                chip_layout.addWidget(name_label)
+
+                def open_file(evt, p=full_path):
+                    self._reveal_in_folder(p)
+
+                chip.mousePressEvent = open_file
+                return chip
+        except Exception as e:
+            logger.error(f"Failed to render attachment widget: {e}")
+            return None
+
+    async def add_message(self, character_name, text, is_user, message_id, insert_at=None, attachments=None):
         if not message_id:
             message_id = str(uuid.uuid4())
 
@@ -13913,13 +15401,15 @@ class InterfaceSignals():
 
         current_chat = char_info["current_chat"]
         chat_content = char_info.get("chats", {}).get(current_chat, {}).get("chat_content", {})
+        
+        current_msg_config_data = chat_content.get(message_id, {})
 
         last_char_index = self.get_last_character_message_index(chat_content)
         has_variants = False
-        variants =[]
+        variants = []
         if last_char_index is not None:
             msg_data = chat_content.get(last_char_index, {})
-            variants = msg_data.get("variants",[])
+            variants = msg_data.get("variants", [])
             has_variants = len(variants) > 1
 
         is_last_char_message = (message_id == last_char_index)
@@ -13979,6 +15469,24 @@ class InterfaceSignals():
             lambda _: self.show_message_menu(character_name, conversation_method, menu_button, is_user, message_id)
         )
 
+        replay_voice_button = None
+        if not is_user and current_msg_config_data.get("tts_audio"):
+            replay_voice_button = QPushButton("\U0001F50A")
+            replay_voice_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            replay_voice_button.setFixedSize(24, 24)
+            replay_voice_button.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+            replay_voice_button.setToolTip(self.translations.get("replay_voice_tooltip", "Play voice message"))
+            replay_voice_button.setStyleSheet("""
+                QPushButton {
+                    background-color: transparent; color: rgba(255, 255, 255, 0.5);
+                    border-radius: 12px; font-size: 12px;
+                }
+                QPushButton:hover { background-color: rgba(255, 255, 255, 0.1); color: white; }
+            """)
+            replay_voice_button.clicked.connect(
+                lambda _, mid=message_id: self.replay_message_audio(character_name, mid)
+            )
+
         header_layout.addWidget(avatar_label)
         header_layout.addWidget(name_label)
         header_layout.addStretch()
@@ -13987,6 +15495,8 @@ class InterfaceSignals():
             header_layout.addWidget(left_button)
             header_layout.addWidget(variant_counter_label)
             header_layout.addWidget(right_button)
+        if replay_voice_button is not None:
+            header_layout.addWidget(replay_voice_button)
         header_layout.addWidget(menu_button)
 
         bubble_layout.addLayout(header_layout)
@@ -14015,13 +15525,56 @@ class InterfaceSignals():
         
         bubble_layout.addWidget(message_label)
 
-        current_chat = char_info["current_chat"]
-        chat_content = char_info.get("chats", {}).get(current_chat, {}).get("chat_content", {})
+        image_rel_path = current_msg_config_data.get("image", None)
+        image_status = current_msg_config_data.get("image_status", None)
 
-        msg_data = chat_content.get(message_id, {})
-        image_rel_path = msg_data.get("image", None)
+        if image_status == "generating":
+            gen_placeholder = QFrame()
+            gen_placeholder.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(255, 255, 255, 0.05);
+                    border: 1px dashed rgba(255, 255, 255, 0.2);
+                    border-radius: 8px;
+                }
+            """)
+            gen_placeholder.setFixedSize(220, 90)
+            gen_layout = QVBoxLayout(gen_placeholder)
+            gen_label = QLabel(self.translations.get("image_gen_placeholder", "\U0001F5BC Generating image..."))
+            gen_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            gen_label.setStyleSheet("color: rgba(255,255,255,0.6); font-size: 12px; background: transparent; border: none;")
+            gen_layout.addWidget(gen_label)
+            bubble_layout.addWidget(gen_placeholder)
 
-        if image_rel_path:
+        elif image_status == "failed":
+            fail_placeholder = QFrame()
+            fail_placeholder.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(255, 80, 80, 0.08);
+                    border: 1px dashed rgba(255, 80, 80, 0.3);
+                    border-radius: 8px;
+                }
+            """)
+            fail_layout = QVBoxLayout(fail_placeholder)
+            fail_label = QLabel(self.translations.get("image_gen_failed", "\u26A0 Image generation failed"))
+            fail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            fail_label.setStyleSheet("color: rgba(255,150,150,0.9); font-size: 12px; background: transparent; border: none;")
+            fail_layout.addWidget(fail_label)
+
+            retry_btn = QPushButton(self.translations.get("retry_button", "Retry"))
+            retry_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            retry_btn.setStyleSheet("""
+                QPushButton { background-color: rgba(255,255,255,0.08); color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; }
+                QPushButton:hover { background-color: rgba(255,255,255,0.15); }
+            """)
+            retry_btn.clicked.connect(
+                lambda _, mid=message_id: asyncio.create_task(
+                    self.trigger_image_generation(character_name, mid, retry_prompt=current_msg_config_data.get("image_prompt"))
+                )
+            )
+            fail_layout.addWidget(retry_btn, 0, Qt.AlignmentFlag.AlignCenter)
+            bubble_layout.addWidget(fail_placeholder)
+
+        elif image_rel_path:
             img_full_path = os.path.join(os.getcwd(), "app", "data", ".soul", character_name, image_rel_path)
             if os.path.exists(img_full_path):
                 img_pixmap = QPixmap(img_full_path)
@@ -14034,7 +15587,7 @@ class InterfaceSignals():
                     
                     def show_full_image(evt, p=img_pixmap):
                         dlg = QDialog()
-                        dlg.setWindowTitle("Image Preview")
+                        dlg.setWindowTitle(self.translations.get("generated_image_title", "Generated Image"))
                         dlg.setStyleSheet("background-color: #1E1E1E;")
                         l = QVBoxLayout(dlg)
                         l.setContentsMargins(0, 0, 0, 0)
@@ -14050,7 +15603,19 @@ class InterfaceSignals():
                         dlg.exec()
                         
                     img_label.mousePressEvent = show_full_image
+                    self._attach_generated_image_context_menu(img_label, character_name, message_id, img_full_path)
                     bubble_layout.addWidget(img_label)
+
+        effective_attachments = attachments if attachments is not None else current_msg_config_data.get("attachments", [])
+        if effective_attachments:
+            attachments_row = QHBoxLayout()
+            attachments_row.setSpacing(8)
+            for attachment in effective_attachments:
+                widget = self._build_message_attachment_widget(character_name, message_id, attachment, attachments is not None)
+                if widget is not None:
+                    attachments_row.addWidget(widget)
+            attachments_row.addStretch()
+            bubble_layout.addLayout(attachments_row)
 
         message_container.addStretch()
         message_container.addWidget(bubble_frame)
@@ -14186,6 +15751,7 @@ class InterfaceSignals():
             regenerate_action = QAction(self.translations.get("chat_regenerate_message", "Regenerate"), None)
             translate_action = QAction(self.translations.get("msg_action_translate", "Translate"), None)
             image_gen_action = QAction(self.translations.get("msg_action_generate_image", "Generate Image"), None)
+            replay_voice_action = QAction(self.translations.get("msg_action_replay_voice", "Play voice message"), None)
 
             edit_icon = QtGui.QIcon("app/gui/icons/edit.png")
             delete_icon = QtGui.QIcon("app/gui/icons/delete.png")
@@ -14193,6 +15759,7 @@ class InterfaceSignals():
             regenerate_icon = QtGui.QIcon("app/gui/icons/regen.png")
             translate_icon = QtGui.QIcon("app/gui/icons/translator.png")
             image_gen_icon = QtGui.QIcon("app/gui/icons/background_icon.png")
+            replay_voice_icon = QtGui.QIcon("app/gui/icons/replay.png")
 
             edit_action.setIcon(edit_icon)
             delete_action.setIcon(delete_icon)
@@ -14200,6 +15767,7 @@ class InterfaceSignals():
             regenerate_action.setIcon(regenerate_icon)
             translate_action.setIcon(translate_icon)
             image_gen_action.setIcon(image_gen_icon)
+            replay_voice_action.setIcon(replay_voice_icon)
 
             try:
                 delete_action.triggered.disconnect()
@@ -14208,6 +15776,7 @@ class InterfaceSignals():
                 regenerate_action.triggered.disconnect()
                 translate_action.triggered.disconnect()
                 image_gen_action.triggered.disconnect()
+                replay_voice_action.triggered.disconnect()
             except TypeError:
                 pass
 
@@ -14222,12 +15791,25 @@ class InterfaceSignals():
                 delete_action.triggered.connect(lambda: asyncio.create_task(self.delete_message(character_name, conversation_method, message_id)))
                 edit_action.triggered.connect(lambda: asyncio.create_task(self.edit_message(character_name, conversation_method, message_id, text)))
 
+                if msg_data_chat_content.get("tts_audio"):
+                    replay_voice_action.triggered.connect(
+                        lambda _, c=character_name, m=message_id: self.replay_message_audio(c, m)
+                    )
+                    menu.addAction(replay_voice_action)
+
                 if self.configuration_settings.get_main_setting("image_gen_enabled"):
                     image_gen_action.triggered.connect(lambda _, c=character_name, m=message_id: asyncio.create_task(self.trigger_image_generation(c, m)))
                     menu.addAction(image_gen_action)
 
                 if sequence_number == 1:
                     menu.addAction(edit_action)
+                    if translator_enabled:
+                        translate_action.triggered.connect(
+                            lambda: asyncio.create_task(
+                                self._translate_single_message(message_id, character_name, conversation_method)
+                            )
+                        )
+                        menu.addAction(translate_action)
                 else:
                     regenerate_action.triggered.connect(lambda _: asyncio.create_task(
                         self.regenerate_message(conversation_method, character_name, message_id)
@@ -14377,11 +15959,13 @@ class InterfaceSignals():
                 msg_type="error"
             )
     
-    async def trigger_image_generation(self, character_name, message_id):
+    async def trigger_image_generation(self, character_name, message_id, retry_prompt=None):
+        current_chat = None
+        chat_content = None
+        msg_data = None
         try:
             char_info = self.configuration_characters.load_configuration()["character_list"][character_name]
             conversation_method = char_info.get("conversation_method", "Local LLM")
-            
             char_description = char_info.get("character_description", "")
             
             current_chat = char_info.get("current_chat", "default")
@@ -14400,66 +15984,85 @@ class InterfaceSignals():
                 logger.warning(f"No text found for message_id {message_id}")
                 return
 
-            chat_history = []
-            msg_keys = sorted(chat_content.keys())[-3:]
-            for k in msg_keys:
-                content = chat_content[k]
-                if "variants" in content:
-                    v_id = content.get("current_variant_id", "default")
-                    txt = next((v["text"] for v in content.get("variants", []) if v["variant_id"] == v_id), "")
-                else:
-                    txt = content.get("text", "")
-                speaker = "Character" if content.get("is_character", True) else "User"
-                chat_history.append(f"{speaker}: {txt[:100]}")
-            
-            conversation_context = "\n".join(chat_history)
+            msg_data["image_status"] = "generating"
+            chat_content[message_id] = msg_data
+            config_data = self.configuration_characters.load_configuration()
+            config_data["character_list"][character_name]["chats"][current_chat]["chat_content"] = chat_content
+            self.configuration_characters.save_configuration_edit(config_data)
+            await self.render_messages(character_name)
 
-            sow_toast(
-                parent=self.main_window,
-                title=self.translations.get("toast_image_gen_title", "Image Generation"),
-                text=self.translations.get("image_gen_started", "Generating image prompt..."),
-                msg_type="success"
-            )
-
-            system_instruction = (
-                "You are an expert prompt engineer for AI image generators (Stable Diffusion, DALL-E, Midjourney). "
-                "Create a detailed, comma-separated prompt that will generate a high-quality image of the character "
-                "in their current scene. Be specific about visual details."
-            )
-
-            user_prompt = f"""Character Information:
-    Name: {character_name}
-    Description: {char_description}
-
-    Recent Conversation Context:
-    {conversation_context}
-
-    Current Message (this is the moment to illustrate):
-    {text}
-
-    ---
-    INSTRUCTIONS:
-    1. Describe the character's EXACT appearance based on Character Information (hair color/style, eye color, clothing, body type, distinctive features).
-    2. Describe their CURRENT pose, facial expression, and body language based on the Current Message.
-    3. Describe the environment/background based on the conversation context.
-    4. Add lighting, mood, and camera angle.
-    5. Include the specified Art Style.
-    6. Output ONLY the image prompt as comma-separated tags. No explanations, no quotes, no markdown.
-
-    Format: [subject], [appearance details], [pose/expression], [clothing], [environment], [lighting], [mood], [art style]
-
-    Image prompt:"""
-
-            messages = [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_prompt}
-            ]
-            
-            provider = AIFactory.get_provider(conversation_method)
-            if provider:
-                img_prompt_text = await self.prompt_engine._memory_llm_call(provider, messages)
+            if retry_prompt:
+                img_prompt_text = retry_prompt
             else:
-                img_prompt_text = text[:100]
+                chat_history = []
+                msg_keys = sorted(chat_content.keys())[-4:]
+                for k in msg_keys:
+                    content = chat_content[k]
+                    if "variants" in content:
+                        v_id = content.get("current_variant_id", "default")
+                        txt = next((v["text"] for v in content.get("variants", []) if v["variant_id"] == v_id), "")
+                    else:
+                        txt = content.get("text", "")
+                    speaker = character_name if content.get("is_character", True) else "User"
+                    chat_history.append(f"{speaker}: {txt[:350]}")
+                
+                conversation_context = "\n".join(chat_history)
+
+                sow_toast(
+                    parent=self.main_window,
+                    title=self.translations.get("toast_image_gen_title", "Image Generation"),
+                    text=self.translations.get("image_gen_started", "Analyzing scene & composing cinematic prompt..."),
+                    msg_type="success"
+                )
+
+                system_instruction = (
+                    "You are an elite Director of Photography and AI Prompt Engineer specializing in FLUX, Midjourney v6, and SDXL. "
+                    "Your sole task is to translate a specific roleplay story moment into a vivid, highly detailed, film-still quality image prompt. "
+                    "You must capture the precise emotion, pose, environment, lighting, and camera composition of the current scene."
+                )
+
+                user_prompt = f"""[CHARACTER SPECIFICATION]
+Name: {character_name}
+Appearance & Outfit Details: {char_description}
+
+[RECENT SCENE CONTEXT]
+{conversation_context}
+
+[EXACT MOMENT TO ILLUSTRATE (PRIMARY FOCUS)]
+{text}
+
+---
+[FEW-SHOT EXAMPLES OF HIGH-QUALITY PROMPTS]
+Example 1 (Intimate/Emotional):
+masterpiece, cinematic digital illustration, 1girl, Elena, long silver hair tied in a loose side braid, sapphire blue eyes, wearing a tattered navy blue cloak over delicate tunic, blushing deeply with a shy smile, looking down nervously, holding a glowing magical amulet with both hands, dim candlelit wooden tavern interior, warm ambient lighting, dust motes floating in air, close-up shot, shallow depth of field, soft bokeh, 8k resolution, highly detailed
+
+Example 2 (Dynamic/Action):
+masterpiece, dynamic anime painting, 1girl, Ryuko, messy crimson hair, fierce glowing eyes, wearing black leather jacket, holding a dark katana, rain-slicked cyberpunk street at night, neon signs reflecting in puddles, cinematic low angle medium shot, dramatic blue and magenta rim lighting, motion blur, cinematic atmospheric fog, hyper-detailed
+
+---
+[DIRECTIVES]
+1. SCENE ACCURACY: Base the character's pose, micro-expression, hand actions, and emotional atmosphere strictly on the [EXACT MOMENT TO ILLUSTRATE].
+2. VISUAL FIDELITY: Incorporate the character's signature visual traits (hair style/color, eye color, clothing) from [CHARACTER SPECIFICATION].
+3. ENVIRONMENT & ATMOSPHERE: Describe the background location, weather, time of day, and sensory atmosphere derived from the scene context.
+4. CAMERA & LIGHTING: Specify cinematic lighting (e.g. volumetric light rays, soft ambient glow, dramatic chiaroscuro) and shot type (e.g. close-up shot, medium shot, shallow depth of field).
+5. STRICT OUTPUT FORMAT: Output ONLY the raw comma-separated prompt tags. Do NOT use markdown code blocks, do NOT write "Prompt:", do NOT add explanations or intro text.
+
+Image prompt:"""
+
+                messages = [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": user_prompt}
+                ]
+                
+                provider = AIFactory.get_provider(conversation_method)
+                if provider:
+                    img_prompt_text = await self.prompt_engine._memory_llm_call(provider, messages)
+                    if img_prompt_text:
+                        img_prompt_text = re.sub(r'^```(python|markdown|json)?\s*', '', img_prompt_text, flags=re.IGNORECASE)
+                        img_prompt_text = re.sub(r'```$', '', img_prompt_text).strip()
+                        img_prompt_text = re.sub(r'^(prompt|image prompt):\s*', '', img_prompt_text, flags=re.IGNORECASE).strip()
+                else:
+                    img_prompt_text = text[:150]
 
             if not img_prompt_text:
                 sow_toast(
@@ -14468,6 +16071,7 @@ class InterfaceSignals():
                     text=self.translations.get("toast_image_gen_prompt_error", "Failed to generate image prompt."),
                     msg_type="error"
                 )
+                await self._mark_image_generation_failed(character_name, current_chat, chat_content, message_id, msg_data)
                 return
 
             sow_toast(
@@ -14483,13 +16087,15 @@ class InterfaceSignals():
             
             if image_path:
                 msg_data["image"] = image_path
+                msg_data["image_prompt"] = img_prompt_text
+                msg_data.pop("image_status", None)
                 
                 config_data = self.configuration_characters.load_configuration()
                 config_data["character_list"][character_name]["chats"][current_chat]["chat_content"] = chat_content
 
                 self.configuration_characters.save_configuration_edit(config_data)
                 
-                await self.first_render_messages(character_name)
+                await self.render_messages(character_name)
             else:
                 sow_toast(
                     parent=self.main_window,
@@ -14498,6 +16104,8 @@ class InterfaceSignals():
                     msg_type="error",
                     duration=5000
                 )
+                msg_data["image_prompt"] = img_prompt_text
+                await self._mark_image_generation_failed(character_name, current_chat, chat_content, message_id, msg_data)
 
         except Exception as e:
             logger.error(f"Image generation error: {e}", exc_info=True)
@@ -14508,6 +16116,19 @@ class InterfaceSignals():
                 msg_type="error",
                 duration=5000
             )
+            if current_chat is not None and chat_content is not None and msg_data is not None:
+                await self._mark_image_generation_failed(character_name, current_chat, chat_content, message_id, msg_data)
+
+    async def _mark_image_generation_failed(self, character_name, current_chat, chat_content, message_id, msg_data):
+        try:
+            msg_data["image_status"] = "failed"
+            chat_content[message_id] = msg_data
+            config_data = self.configuration_characters.load_configuration()
+            config_data["character_list"][character_name]["chats"][current_chat]["chat_content"] = chat_content
+            self.configuration_characters.save_configuration_edit(config_data)
+            await self.render_messages(character_name)
+        except Exception as e:
+            logger.error(f"Failed to mark image generation as failed for {message_id}: {e}")
 
     async def _generate_llm_translation(self, text_to_translate, target_lang, character_name, conversation_method) -> str:
         system_prompt = (
@@ -14841,23 +16462,28 @@ class InterfaceSignals():
         title = self.translations.get("character_edit_start_new_dialogue", "Start new dialogue")
         message = self.translations.get("character_edit_start_new_dialogue_sure", "Are you sure you want to start a new dialogue? The previous dialogue will be deleted.")
 
-        dialog = SowConfirmDialog(
+        confirm_dialog = SowConfirmDialog(
             parent=self.main_window,
             title=title,
             text=message,
             confirm_text="Confirm",
             danger=True
         )
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+        if confirm_dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
 
-        chat_name, ok = QInputDialog.getText(
-            dialog,
-            self.translations.get("new_chat_title", "New Chat"),
-            self.translations.get("new_chat_prompt", "Enter chat name:")
+        input_dialog = SowInputDialog(
+            parent=self.main_window,
+            title=self.translations.get("new_chat_title", "New Chat"),
+            label=self.translations.get("new_chat_prompt", "Enter chat name:"),
+            placeholder=self.translations.get("default_chat_name", "Default Chat")
         )
+        
+        chat_name = ""
+        if input_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            chat_name = input_dialog.get_text()
 
-        if not ok or not chat_name.strip():
+        if not chat_name:
             chat_name = self.translations.get("default_chat_name", "Default Chat")
 
         new_name = name_edit.text()
@@ -14898,51 +16524,123 @@ class InterfaceSignals():
         self.main_window.updateGeometry()
 
     def markdown_to_html(self, text):
+        import html
+
         s = self.get_chat_appearance()
         qc = s.get("quote_color", "#FFA500")
         ic = s.get("italic_color", "#a3a3a3")
-        cbg = s.get("code_bg_color", "#1a1a1a")
+        cbg = s.get("code_bg_color", "#121318")
+        header_bg = s.get("code_header_bg", "#1c1e26")
+        border_color = s.get("code_border", "#2a2d3d")
+        text_color = s.get("code_text_color", "#e1e4ed")
 
-        # 1. Text in double quotes ("text")
+        code_blocks = []
+        inline_blocks = []
+        think_blocks = []
+
+        def replace_code_block(match):
+            lang = match.group(1).strip()
+            code_content = match.group(2)
+
+            escaped_code = html.escape(code_content.strip())
+            lang_display = lang.upper() if lang else "CODE"
+
+            block_html = f'''<table width="100%" style="background-color: {cbg}; border: 1px solid {border_color}; border-radius: 6px; margin: 8px 0; border-collapse: collapse;">
+        <tr>
+            <td style="background-color: {header_bg}; color: #8a8fad; font-size: 10px; font-weight: bold; padding: 4px 10px; font-family: 'Consolas', 'Courier New', monospace; border-bottom: 1px solid {border_color};">
+                {lang_display}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px; color: {text_color}; font-size: 12px; font-family: 'Consolas', 'Courier New', monospace; background-color: {cbg};">
+                <pre style="margin: 0; padding: 0; font-family: 'Consolas', 'Courier New', monospace; white-space: pre-wrap; background-color: {cbg};">{escaped_code}</pre>
+            </td>
+        </tr>
+    </table>'''
+
+            placeholder = f"@@@CODEBLOCK{len(code_blocks)}@@@"
+            code_blocks.append(block_html)
+            return placeholder
+
+        text = re.sub(r'```([a-zA-Z0-9_+-]*)\n?(.*?)```', replace_code_block, text, flags=re.DOTALL)
+
+        def replace_inline_code(match):
+            code_content = html.escape(match.group(1))
+            inline_html = f'<code style="background-color: {cbg}; color: {qc}; padding: 2px 6px; border-radius: 4px; border: 1px solid {border_color}; font-family: \'Consolas\', \'Courier New\', monospace; font-size: 0.9em;">{code_content}</code>'
+            
+            placeholder = f"@@@INLINECODE{len(inline_blocks)}@@@"
+            inline_blocks.append(inline_html)
+            return placeholder
+
+        text = re.sub(r'`([^`]+)`', replace_inline_code, text)
+
+        def replace_think_block(match):
+            think_content = match.group(2).strip()
+            if not think_content:
+                return ""
+
+            escaped_thought = html.escape(think_content).replace("\n", "<br>")
+
+            think_html = f'''<table width="100%" style="background-color: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-left: 3px solid #8B5CF6; border-radius: 6px; margin: 8px 0; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 5px 10px; background-color: rgba(139, 92, 246, 0.08); color: #A78BFA; font-size: 10px; font-weight: bold; font-family: 'Inter Tight SemiBold', sans-serif; letter-spacing: 1px; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+                💭 THINKING PROCESS
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 10px; color: #9CA3AF; font-size: 12px; font-style: italic; line-height: 1.4; font-family: 'Inter Tight Medium', sans-serif;">
+                {escaped_thought}
+            </td>
+        </tr>
+    </table>'''
+
+            placeholder = f"@@@THINKBLOCK{len(think_blocks)}@@@"
+            think_blocks.append(think_html)
+            return placeholder
+
+        text = re.sub(r'<(think|thought|reasoning)>(.*?)</\1>', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
+
+        text = re.sub(r'<(think|thought|reasoning)>(.*)$', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
+
         text = re.sub(r'"(.*?)"', rf'<span style="color: {qc};">"\1"</span>', text)
         text = re.sub(r'“(.*?)”', rf'<span style="color: {qc};">"\1"</span>', text)
 
-        # 2. Bold text (**text** or __text__)
         text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
         text = re.sub(r'__(.*?)__', r'<b>\1</b>', text)
 
-        # 3. Italics (*text* or _text_)
         text = re.sub(r'\*(.*?)\*', rf'<i><span style="color: {ic};">\1</span></i>', text)
         text = re.sub(r'_(.*?)_', rf'<i><span style="color: {ic};">\1</span></i>', text)
 
-        # 4. Headers (#, ##, ###)
         text = re.sub(r'^#\s+(.*)$', r'<h1>\1</h1>', text, flags=re.MULTILINE)
         text = re.sub(r'^##\s+(.*)$', r'<h2>\1</h2>', text, flags=re.MULTILINE)
         text = re.sub(r'^###\s+(.*)$', r'<h3>\1</h3>', text, flags=re.MULTILINE)
 
-        # 5. Numbered lists (1. element)
-        text = re.sub(r'^(\d+\.)\s+(.*)$', r'<ol><li>\2</li></ol>', text, flags=re.MULTILINE)
+        def process_ol(match):
+            block = match.group(0)
+            items = re.findall(r'^\d+\.\s+(.*)$', block, flags=re.MULTILINE)
+            lis = ''.join([f'<li>{item}</li>' for item in items])
+            return f'<ol style="margin: 6px 0; padding-left: 20px;">{lis}</ol>'
 
-        # 6. Lists (* element or - element)
-        text = re.sub(r'^[\*\-]\s+(.*)$', r'<ul><li>\1</li></ul>', text, flags=re.MULTILINE)
+        text = re.sub(r'(?:^\d+\.\s+.*(?:\n|$))+', process_ol, text, flags=re.MULTILINE)
 
-        # 7. Code blocks (```code```)
-        text = re.sub(
-            r'```(.*?)```',
-            rf'<pre style="background-color: {cbg}; color: #c7c7c7; border-radius: 6px; font-family: Inter Tight Light;">\1</pre>',
-            text,
-            flags=re.DOTALL
-        )
+        def process_ul(match):
+            block = match.group(0)
+            items = re.findall(r'^[\*\-]\s+(.*)$', block, flags=re.MULTILINE)
+            lis = ''.join([f'<li>{item}</li>' for item in items])
+            return f'<ul style="margin: 6px 0; padding-left: 20px;">{lis}</ul>'
 
-        # 8. Inline code (`code`)
-        text = re.sub(
-            r'`([^`]+)`',
-            rf'<code style="background-color: {cbg}; color: #c7c7c7; border-radius: 6px; font-family: Inter Tight Light;">\1</code>',
-            text
-        )
+        text = re.sub(r'(?:^[\*\-]\s+.*(?:\n|$))+', process_ul, text, flags=re.MULTILINE)
 
-        # 9. Line break (\n)
         text = text.replace('\n', '<br>')
+
+        for i, block in enumerate(inline_blocks):
+            text = text.replace(f"@@@INLINECODE{i}@@@", block)
+
+        for i, block in enumerate(code_blocks):
+            text = text.replace(f"@@@CODEBLOCK{i}@@@", block)
+
+        for i, block in enumerate(think_blocks):
+            text = text.replace(f"@@@THINKBLOCK{i}@@@", block)
 
         return text
 
@@ -15650,3 +17348,4 @@ class InterfaceSignals():
         """
         dialog = ImageGenSettingsDialog(self.translations, self.configuration_settings, self.configuration_api, self.main_window, parent=self.main_window)
         dialog.exec()
+
