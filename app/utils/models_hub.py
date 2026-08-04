@@ -9,7 +9,8 @@ import time
 from datetime import datetime, timedelta
 
 from PyQt6 import QtCore, QtWidgets, QtGui
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QListWidget, QLabel, QDialog, 
@@ -97,30 +98,39 @@ class ModelRecommendations(QThread):
     def run(self):
         try:
             curated_data = self.load_curated_models()
+            models = curated_data.get("models", []) if curated_data else self.get_fallback_models()
             
-            if not curated_data or "models" not in curated_data:
-                fallback_models = self.get_fallback_models()
-                for model in fallback_models:
-                    model_id = model.get("hf_id", "")
-                    author = model.get("author", "Unknown")
-                    downloads = model.get("downloads", 0)
-                    compatibility_text, is_compatible = self.check_compatibility(model)
-                    self.progress.emit(model_id, author, downloads, compatibility_text, is_compatible)
-                self.finished.emit([m["hf_id"] for m in fallback_models])
-                return
-            
-            models = curated_data["models"]
-            model_ids = []
+            if not models:
+                models = self.get_fallback_models()
 
+            evaluated_models = []
             for model in models:
                 model_id = model.get("hf_id", "")
                 author = model.get("author", "Unknown")
                 downloads = model.get("downloads", 0)
-                
                 compatibility_text, is_compatible = self.check_compatibility(model)
                 
-                model_ids.append(model_id)
-                self.progress.emit(model_id, author, downloads, compatibility_text, is_compatible)
+                evaluated_models.append({
+                    "model_id": model_id,
+                    "author": author,
+                    "downloads": downloads,
+                    "compatibility_text": compatibility_text,
+                    "is_compatible": is_compatible,
+                    "raw_model": model
+                })
+
+            evaluated_models.sort(key=lambda x: x["is_compatible"], reverse=True)
+
+            model_ids = []
+            for item in evaluated_models:
+                model_ids.append(item["model_id"])
+                self.progress.emit(
+                    item["model_id"], 
+                    item["author"], 
+                    item["downloads"], 
+                    item["compatibility_text"], 
+                    item["is_compatible"]
+                )
 
             self.finished.emit(model_ids)
 
@@ -216,7 +226,7 @@ class ModelRecommendations(QThread):
         min_vram = model.get("min_vram_gb", 0)
         rec_vram = model.get("recommended_vram_gb", 4)
         
-        user_ram = self.available_ram_gb
+        user_ram = self.available_ram_gb + 1
         
         if user_ram < min_ram:
             return f"❌ Minimum {min_ram} GB RAM required (you have {user_ram} GB)", False
@@ -325,16 +335,25 @@ class RecommendedModelItemWidget(QWidget):
         """
 
         self.author_label = QLabel(f"👤 {author_label_translation} {author}")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.author_label.setFont(font)
         self.author_label.setFixedHeight(20)
         self.author_label.setStyleSheet(badge_style)
         meta_row_layout.addWidget(self.author_label)
 
         self.downloads_label = QLabel(f"⬇️ {downloads_label_translation} {downloads}")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.downloads_label.setFont(font)
         self.downloads_label.setFixedHeight(20)
         self.downloads_label.setStyleSheet(badge_style)
         meta_row_layout.addWidget(self.downloads_label)
 
         self.compatibility_label = QLabel(f"{compatibility_label_translation} {compatibility_text}")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.compatibility_label.setFont(font)
         self.compatibility_label.setFixedHeight(20)
         
         if "✅" in compatibility_text:
@@ -418,6 +437,40 @@ class RecommendedModelItemWidget(QWidget):
 
         self.btn_download.clicked.connect(lambda: download_model_method(model_id))
 
+        self.btn_hf = QPushButton("🤗")
+        self.btn_hf.setToolTip("Open model page on Hugging Face")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.btn_hf.setFont(font)
+        self.btn_hf.setFixedSize(36, 36)
+        self.btn_hf.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_hf.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_hf.setStyleSheet("""
+            QToolTip {
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 13px; 
+                font-family: 'Inter Tight SemiBold';
+            }
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                font-size: 15px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 210, 30, 0.15);
+                border: 1px solid rgba(255, 210, 30, 0.4);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 210, 30, 0.08);
+            }
+        """)
+        self.btn_hf.clicked.connect(lambda _, mid=model_id: QDesktopServices.openUrl(QUrl(f"https://huggingface.co/{mid}")))
+
+        card_layout.addWidget(self.btn_hf, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter)
         card_layout.addWidget(self.btn_download, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter)
 
         main_layout.addWidget(self.glass_card)
@@ -555,11 +608,17 @@ class ModelItemWidget(QWidget):
         """
 
         self.author_label = QLabel(f"👤 {author_label_translation} {author}")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.author_label.setFont(font)
         self.author_label.setFixedHeight(20)
         self.author_label.setStyleSheet(badge_style)
         meta_row_layout.addWidget(self.author_label)
 
         self.downloads_label = QLabel(f"⬇️ {downloads_label_translation} {downloads}")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.downloads_label.setFont(font)
         self.downloads_label.setFixedHeight(20)
         self.downloads_label.setStyleSheet(badge_style)
         meta_row_layout.addWidget(self.downloads_label)
@@ -606,6 +665,40 @@ class ModelItemWidget(QWidget):
 
         self.btn_download.clicked.connect(lambda: download_model_method(model_id))
 
+        self.btn_hf = QPushButton("🤗")
+        self.btn_hf.setToolTip("Open model page on Hugging Face")
+        font = QtGui.QFont()
+        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.btn_hf.setFont(font)
+        self.btn_hf.setFixedSize(36, 36)
+        self.btn_hf.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_hf.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_hf.setStyleSheet("""
+            QToolTip {
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 13px; 
+                font-family: 'Inter Tight SemiBold';
+            }
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                font-size: 15px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 210, 30, 0.15);
+                border: 1px solid rgba(255, 210, 30, 0.4);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 210, 30, 0.08);
+            }
+        """)
+        self.btn_hf.clicked.connect(lambda _, mid=model_id: QDesktopServices.openUrl(QUrl(f"https://huggingface.co/{mid}")))
+
+        card_layout.addWidget(self.btn_hf, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter)
         card_layout.addWidget(self.btn_download, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter)
 
         main_layout.addWidget(self.glass_card)
