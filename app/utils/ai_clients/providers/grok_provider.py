@@ -15,16 +15,25 @@ class GrokProvider(BaseAIProvider):
 
     async def generate_stream(self, messages: list[dict], **kwargs):
         try:
-            stream = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=kwargs.get("temperature", 0.7),
-                top_p=kwargs.get("top_p", 0.9),
-                max_tokens=kwargs.get("max_tokens", 1000),
-                frequency_penalty=kwargs.get("frequency_penalty", 0.0),
-                presence_penalty=kwargs.get("presence_penalty", 0.0),
-                stream=True,
-            )
+            params = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": kwargs.get("temperature", 0.7),
+                "top_p": kwargs.get("top_p", 0.9),
+                "max_tokens": kwargs.get("max_tokens", 1000),
+                "stream": True,
+            }
+
+            model_lower = self.model.lower()
+            is_reasoning = ("grok-4" in model_lower or "reasoning" in model_lower) \
+                and "non-reasoning" not in model_lower
+            if not is_reasoning:
+                if "frequency_penalty" in kwargs:
+                    params["frequency_penalty"] = kwargs["frequency_penalty"]
+                if "presence_penalty" in kwargs:
+                    params["presence_penalty"] = kwargs["presence_penalty"]
+
+            stream = await self.client.chat.completions.create(**params)
 
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
@@ -43,8 +52,6 @@ class GrokProvider(BaseAIProvider):
                 temperature=kwargs.get("temperature", 0.5),
                 top_p=kwargs.get("top_p", 0.9),
                 max_tokens=kwargs.get("max_tokens", 1000),
-                frequency_penalty=kwargs.get("frequency_penalty", 0.8),
-                presence_penalty=kwargs.get("presence_penalty", 0.3),
                 stream=False,
             )
             yield response.choices[0].message.content or ""
