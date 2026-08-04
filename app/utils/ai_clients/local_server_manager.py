@@ -1,13 +1,16 @@
 import os
 import json
-import yaml
-import psutil
 import logging
 import asyncio
+import platform
 import subprocess
 import socket
 import shlex
 from pathlib import Path
+
+import yaml
+import psutil
+
 from app.configuration import configuration
 
 logger = logging.getLogger("Local Server Manager")
@@ -17,6 +20,7 @@ class LocalServerManager:
     Manages the local launch of the LLM server (llama.cpp backend).
     Handles process creation, termination, lock files, and log streaming for UI feedback.
     """
+
     def __init__(self, ui=None):
         self.ui = ui
         self.configuration_settings = configuration.ConfigurationSettings()
@@ -65,6 +69,8 @@ class LocalServerManager:
                     if 'llama-server' in cmd_line:
                         logger.info(f"llama-server is already running with PID {pid}")
                         return True
+                    else:
+                        self.lock_file.unlink(missing_ok=True)
                 else:
                     self.lock_file.unlink(missing_ok=True)
             except Exception:
@@ -76,12 +82,18 @@ class LocalServerManager:
         return False
 
     def create_lock_file(self):
+        try:
+            loop_time = asyncio.get_running_loop().time()
+        except RuntimeError:
+            loop_time = None
+
         lock_data = {
             'pid': os.getpid(),
             'port': self.SERVER_PORT,
-            'timestamp': str(asyncio.get_event_loop().time()) if asyncio.get_event_loop() else 'unknown'
+            'timestamp': str(loop_time) if loop_time is not None else 'unknown'
         }
         try:
+            self.lock_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.lock_file, 'w') as f:
                 json.dump(lock_data, f)
         except Exception as e:
@@ -93,6 +105,26 @@ class LocalServerManager:
                 self.lock_file.unlink()
         except Exception as e:
             logger.warning(f"Couldn't delete lock file: {e}")
+
+    def resolve_server_executable(self, llm_device, llm_backend):
+        exe_suffix = ".exe" if platform.system() == "Windows" else ""
+        current_server = None
+
+        match llm_device:
+            case 0:
+                current_server = f"app/utils/ai_clients/backend/cpu/llama-server{exe_suffix}"
+            case 1:
+                match llm_backend:
+                    case 0:
+                        current_server = f"app/utils/ai_clients/backend/vulkan/llama-server{exe_suffix}"
+                    case 1:
+                        current_server = f"app/utils/ai_clients/backend/cuda/llama-server{exe_suffix}"
+                    case 2:
+                        current_server = f"app/utils/ai_clients/backend/hip/llama-server{exe_suffix}"
+                    case 3:
+                        current_server = f"app/utils/ai_clients/backend/sycl/llama-server{exe_suffix}"
+
+        return current_server
 
     async def start_server_async(self):
         logger.info("Starting LLM server process...")
@@ -109,24 +141,34 @@ class LocalServerManager:
         llm_backend = self.configuration_settings.get_main_setting("llm_backend")
         reasoning_mode = self.configuration_settings.get_main_setting("reasoning_mode")
 
-        current_server = None
-        match llm_device:
-            case 0:
-                current_server = "app/utils/ai_clients/backend/cpu/llama-server.exe"
-            case 1:
-                match llm_backend:
-                    case 0:
-                        current_server = "app/utils/ai_clients/backend/vulkan/llama-server.exe"
-                    case 1:
-                        current_server = "app/utils/ai_clients/backend/cuda/llama-server.exe"
-                    case 2:
-                        current_server = "app/utils/ai_clients/backend/hip/llama-server.exe"
-                    case 3:
-                        current_server = "app/utils/ai_clients/backend/sycl/llama-server.exe"
-        
+        current_server = self.resolve_server_executable(llm_device, llm_backend)
+
+        if current_server is None:
+            logger.error(f"Unsupported llm_device={llm_device} / llm_backend={llm_backend} combination.")
+            self.update_ui_for_server_state(False)
+            raise RuntimeError(self.translations.get(
+                "error_unsupported_backend",
+                "Unsupported device/backend combination selected for the local model."
+            ))
+
+        if not Path(current_server).exists():
+            logger.error(f"Server executable not found at: {current_server}")
+            self.update_ui_for_server_state(False)
+            raise RuntimeError(self.translations.get(
+                "error_backend_not_found",
+                f"Server executable not found: {current_server}"
+            ))
+
+        if not model_path or not Path(model_path).exists():
+            logger.error(f"Model file not found: {model_path}")
+            self.update_ui_for_server_state(False)
+            raise RuntimeError(self.translations.get(
+                "error_model_not_found",
+                f"Model file not found: {model_path}"
+            ))
+
         gpu_layers = self.configuration_settings.get_main_setting("gpu_layers")
         context_size = self.configuration_settings.get_main_setting("context_size")
-
         mlock_status = self.configuration_settings.get_main_setting("mlock_status")
         flash_attention = self.configuration_settings.get_main_setting("flash_attention_status")
 
@@ -134,25 +176,28 @@ class LocalServerManager:
             logger.warning("Server already running.")
             return
 
+        c_arg = "0" if (context_size is None or context_size <= 0) else str(context_size)
+
         command = [
             current_server,
             "-m", model_path,
-            "-c", str(context_size),
+            "-c", c_arg,
             "--port", str(self.SERVER_PORT),
             "--parallel", "1",
         ]
 
         if reasoning_mode is False:
-            command.extend(["--reasoning-budget", "0"])
-            logger.info("Reasoning mode is disabled.")
+            command.extend(["--reasoning-budget", "0", "--reasoning", "off"])
+            logger.info("Reasoning mode is disabled (--reasoning off + --reasoning-budget 0). Note: some models/quants ignore this flag; a <think> tag filter downstream is still recommended as a safety net.")
 
         chat_template = self.configuration_settings.get_main_setting("chat_template")
-        if chat_template and chat_template.lower() != "auto":
-            template_flag = chat_template.lower().replace("-", "")
+        if chat_template and chat_template.strip().lower() != "auto":
+            template_flag = chat_template.strip().lower()
             command.extend(["--chat-template", template_flag])
             logger.info(f"Using forced Chat Template: {template_flag}")
         else:
-            logger.info("Using Auto Chat Template from GGUF metadata.")
+            command.append("--jinja")
+            logger.info("Using Auto Chat Template with native Jinja engine (--jinja).")
 
         if llm_device == 1:
             if gpu_layers is None or gpu_layers == 0:
@@ -169,9 +214,14 @@ class LocalServerManager:
                 command.extend(["--threads", str(cpu_threads), "--threads-batch", str(cpu_threads)])
                 logger.info(f"Using manual CPU Threads: {cpu_threads}")
 
+        no_mmap_status = self.configuration_settings.get_main_setting("no_mmap_status")
+
         if mlock_status:
-            command.append("--mlock")
+            command.extend(["--load-mode", "mlock"])
             logger.info("Model will be locked in RAM (mlock enabled).")
+        elif no_mmap_status:
+            command.extend(["--load-mode", "none"])
+            logger.info("mmap disabled (--load-mode none).")
 
         kv_cache_type = self.configuration_settings.get_main_setting("kv_cache_type")
         if kv_cache_type and kv_cache_type != "f16":
@@ -187,7 +237,7 @@ class LocalServerManager:
         if cpu_moe_layers and cpu_moe_layers > 0:
             command.extend(["--n-cpu-moe", str(cpu_moe_layers)])
             logger.info(f"MoE Offloading: Keeping experts of {cpu_moe_layers} layers in CPU RAM.")
-        
+
         custom_args_str = self.configuration_settings.get_main_setting("custom_args")
         if custom_args_str and custom_args_str.strip():
             try:
@@ -201,12 +251,21 @@ class LocalServerManager:
 
         self.create_lock_file()
 
-        self.server_process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=False
-        )
+        try:
+            self.server_process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False
+            )
+        except Exception as e:
+            logger.error(f"Failed to launch the server process: {e}", exc_info=True)
+            self.cleanup_lock_file()
+            self.update_ui_for_server_state(False)
+            raise RuntimeError(self.translations.get(
+                "error_server_launch_failed",
+                f"Failed to launch the local server: {e}"
+            ))
 
         asyncio.create_task(self.log_stream(self.server_process.stdout, logger.info))
         asyncio.create_task(self.log_stream(self.server_process.stderr, logger.info))
@@ -215,9 +274,13 @@ class LocalServerManager:
 
         if self.server_process.returncode is not None and self.server_process.returncode != 0:
             logger.error("Server failed to start.")
+            self.server_process = None
             self.cleanup_lock_file()
             self.update_ui_for_server_state(False)
-            raise RuntimeError("Server failed to start.")
+            raise RuntimeError(self.translations.get(
+                "error_server_start_failed",
+                "The local server process exited immediately after launch. Check the logs for details."
+            ))
         else:
             logger.info("Server started successfully.")
 
@@ -235,43 +298,48 @@ class LocalServerManager:
 
             if self.ui:
                 try:
-                    if hasattr(self.ui, 'slide_in_status_container'):
-                        self.ui.slide_in_status_container()
-                    else:
-                        self.ui.progressBar_llm_loading.show()
-                        self.ui.loading_model_label.show()
+                    if not self.model_loaded:
+                        if hasattr(self.ui, 'slide_in_status_container'):
+                            self.ui.slide_in_status_container()
+                        else:
+                            self.ui.progressBar_llm_loading.show()
+                            self.ui.loading_model_label.show()
+                        
+                        if hasattr(self.ui, 'update_system_status'):
+                            self.ui.update_system_status("loading")
                     
-                    if hasattr(self.ui, 'update_system_status'):
-                        self.ui.update_system_status("loading")
-                    
-                    if "main: loading model" in decoded_line:
+                    if "load_model: loading model" in decoded_line and not self.model_loaded:
                         self.ui.progressBar_llm_loading.setValue(20)
                         self.ui.loading_model_label.setText(self.translations.get("model_loading_step_1", "ENGINE INIT..."))
                     
-                    elif "print_info: file format" in decoded_line:
+                    elif ("load:" in decoded_line or "W load:" in decoded_line) and not self.model_loaded:
                         self.ui.progressBar_llm_loading.setValue(40)
                         self.ui.loading_model_label.setText(self.translations.get("model_loading_step_2", "VERIFYING GGUF..."))
 
-                    elif "load_tensors: loading model tensors" in decoded_line:
-                        self.ui.progressBar_llm_loading.setValue(50)
-                        self.ui.loading_model_label.setText(self.translations.get("model_loading_step_3", "LOADING TENSORS..."))
-                    
-                    elif "llama_context: constructing llama_context" in decoded_line:
+                    elif "load_model: initializing" in decoded_line and not self.model_loaded:
                         self.ui.progressBar_llm_loading.setValue(70)
                         self.ui.loading_model_label.setText(self.translations.get("model_loading_step_4", "ALLOCATING CONTEXT..."))
                     
-                    elif "main: model loaded" in decoded_line and not self.model_loaded:
+                    elif "model loaded" in decoded_line and not self.model_loaded:
                         self.ui.progressBar_llm_loading.setValue(85)
                         self.ui.loading_model_label.setText(self.translations.get("model_loading_step_5", "FINALIZING..."))
                     
-                    elif "all slots are idle" in decoded_line:
+                    elif ("listening on http" in decoded_line or "all slots are idle" in decoded_line) and not self.model_loaded:
                         self.ui.progressBar_llm_loading.setValue(100)
                         self.ui.loading_model_label.setText(self.translations.get("model_loading_step_6", "MODEL ONLINE"))
                         self.model_loaded = True
-                        
                         self.update_ui_for_server_state(True)
                     
-                    self.ui.lineEdit_server.show()
+                    if self.model_loaded and "slot launch_slot_" in decoded_line:
+                        if hasattr(self.ui, 'update_system_status'):
+                            self.ui.update_system_status("generating")
+                    
+                    if self.model_loaded and ("slot      release:" in decoded_line or "all slots are idle" in decoded_line):
+                        if hasattr(self.ui, 'update_system_status'):
+                            self.ui.update_system_status("online")
+                    
+                    if hasattr(self.ui, 'lineEdit_server'):
+                        self.ui.lineEdit_server.show()
                     
                 except (RuntimeError, AttributeError) as e:
                     logger.debug(f"UI element no longer exists: {e}")
@@ -341,16 +409,42 @@ class LocalServerManager:
                 self.model_loaded = False
                 await self.start_server_async()
 
+                timeout = 360
+                elapsed = 0
+                
                 while not self.model_loaded:
                     await asyncio.sleep(1)
+                    elapsed += 1
+                    
+                    if self.server_process and self.server_process.returncode is not None:
+                        logger.error(f"Server crashed with code {self.server_process.returncode}")
+                        self.cleanup_lock_file()
+                        self.update_ui_for_server_state(False)
+                        raise RuntimeError("Local server crashed. Check logs (Out of memory?)")
+                    
+                    if elapsed > timeout:
+                        logger.error("Server loading timed out.")
+                        await self.stop_server()
+                        raise RuntimeError("Server loading timed out.")
 
     async def shutdown_server_and_model(self):
         logger.info("Shutting down server and model...")
         await self.stop_server()
         self.update_ui_for_server_state(False)
 
+    def _log_task_exception(self, task):
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Local server task failed: {e}", exc_info=True)
+            self.update_ui_for_server_state(False)
+
     def on_shutdown_button_clicked(self):
-        asyncio.create_task(self.shutdown_server_and_model())
+        task = asyncio.create_task(self.shutdown_server_and_model())
+        task.add_done_callback(self._log_task_exception)
     
     def on_start_server_button_clicked(self):
-        asyncio.create_task(self.ensure_server_running())
+        task = asyncio.create_task(self.ensure_server_running())
+        task.add_done_callback(self._log_task_exception)
