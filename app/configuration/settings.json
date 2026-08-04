@@ -14,9 +14,10 @@
         "model_fps": 1,
         "local_llm": null,
         "llm_device": 1,
-        "llm_backend": 2,
+        "llm_backend": 0,
         "gpu_layers": 30,
         "mlock_status": false,
+	"no_mmap_status": false,
         "flash_attention_status": false,
         "context_size": 2048,
         "temperature": 0.8,
@@ -113,7 +114,8 @@
         "custom_args": "",
         "soul_memory_mode": 0,
         "enable_mcp": false,
-        "enable_tool_calling": true
+        "enable_tool_calling": true,
+	"chat_tools_enabled": false
     },
     "user_data": {
         "default_persona": "None",
@@ -183,7 +185,8 @@
             "sec_bg": "#202020",
             "accent": "#3D5AFE",
             "text": "#E3E3E3"
-        }
+        },
+        "custom_variable_presets": {}
     },
     "character_groups": {}
 }
