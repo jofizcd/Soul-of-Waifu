@@ -1,4 +1,6 @@
 import os
+import shutil
+import re
 import uuid
 import json
 import logging
@@ -150,7 +152,7 @@ class ConfigurationSettings():
 
         if name in lorebooks:
             del lorebooks[name]
-            config["user_data"]["lorebooks"] = lorebooks  # Update reference
+            config["user_data"]["lorebooks"] = lorebooks
             self.save_configuration_edit(config)
 
     def save_lorebooks(self, lorebooks):
@@ -232,25 +234,49 @@ class ConfigurationCharacters():
         with open(self.characters_path, 'w', encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
 
-    def save_character_card(self, character_name, character_title, character_avatar, character_description, character_personality, first_message, scenario, example_messages, alternate_greetings, selected_persona, selected_system_prompt_preset, selected_lorebook, elevenlabs_voice_id, voice_type, rvc_enabled, rvc_file, expression_images_folder, live2d_model_folder, vrm_model_file, conversation_method):
+    def save_character_card(self, character_name, character_title, character_avatar, 
+                            character_description, character_personality, first_message, 
+                            scenario, example_messages, alternate_greetings, selected_persona, 
+                            selected_system_prompt_preset, selected_lorebook, elevenlabs_voice_id, 
+                            voice_type, rvc_enabled, rvc_file, expression_images_folder, 
+                            live2d_model_folder, vrm_model_file, conversation_method, 
+                            selected_lorebooks=None, sow_variables=None):
         """
         Saves or updates a character's card information in the configuration.
-        
-        Args:
-            character_name (str): Character's name.
-            character_title (str): Title or role of the character.
-            character_avatar (str): Path to the avatar image file.
-            character_description (str): Description of the character.
-            character_personality (str): Personality traits and behavior style.
-            first_message (str): Character's first message.
-            elevenlabs_voice_id (str): Voice ID for ElevenLabs TTS.
-            voice_type (str): Type of voice used for TTS.
-            rvc_enabled (bool): Whether RVC is enabled.
-            rvc_file (str): Path to RVC model file.
-            expression_images_folder (str): Path to emotion images folder.
-            live2d_model_folder (str): Path to Live2D model folder.
-            conversation_method (str): Character's conversation method.
         """
+        cached_avatar_path = character_avatar
+        
+        if character_avatar and os.path.exists(character_avatar):
+            try:
+                cache_dir = os.path.join("app", "cache", "avatars")
+                os.makedirs(cache_dir, exist_ok=True)
+                
+                sanitized_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', character_name)
+                
+                _, ext = os.path.splitext(character_avatar)
+                if not ext:
+                    ext = ".png"
+                
+                dest_filename = f"{sanitized_name}_avatar{ext.lower()}"
+                dest_path = os.path.join(cache_dir, dest_filename)
+                
+                abs_src = os.path.abspath(character_avatar)
+                abs_dest = os.path.abspath(dest_path)
+                
+                if abs_src != abs_dest:
+                    shutil.copy2(abs_src, abs_dest)
+                
+                cached_avatar_path = f"app/cache/avatars/{dest_filename}"
+                
+            except Exception as e:
+                print(f"[Error] Failed to cache avatar for {character_name}: {e}")
+                cached_avatar_path = character_avatar
+
+        if selected_lorebooks is None:
+            selected_lorebooks = []
+            if selected_lorebook and selected_lorebook != "None":
+                selected_lorebooks = [selected_lorebook]
+
         configuration_data = self.load_configuration()
         if 'character_list' not in configuration_data:
             configuration_data['character_list'] = {}
@@ -306,8 +332,13 @@ class ConfigurationCharacters():
 
         character_information = " ".join(character_information_parts)
 
+        initial_state = {}
+        if sow_variables:
+            for var in sow_variables:
+                initial_state[var["id"]] = var["default"]
+
         configuration_data['character_list'][character_name] = {
-            "character_avatar": character_avatar,
+            "character_avatar": cached_avatar_path,
             "character_title": character_title,
             "character_description": character_description,
             "character_personality": character_personality,
@@ -318,6 +349,7 @@ class ConfigurationCharacters():
             "selected_persona": selected_persona,
             "selected_system_prompt_preset": selected_system_prompt_preset,
             "selected_lorebook": selected_lorebook,
+            "selected_lorebooks": selected_lorebooks,
             "current_text_to_speech": "Nothing",
             "elevenlabs_voice_id": elevenlabs_voice_id,
             "voice_type": voice_type,
@@ -329,6 +361,7 @@ class ConfigurationCharacters():
             "vrm_model_file": vrm_model_file,
             "conversation_method": conversation_method,
             "character_information": character_information,
+            "sow_variables": sow_variables if sow_variables else [],
             "current_chat": "default",
             "chats": {
                 "default": {
@@ -338,7 +371,8 @@ class ConfigurationCharacters():
                     "summary_text": "",
                     "last_summarized_sequence": 0,
                     "chat_history": chat_history,
-                    "chat_content": chat_content
+                    "chat_content": chat_content,
+                    "variables_state": initial_state
                 }
             }
         }
@@ -408,9 +442,13 @@ class ConfigurationCharacters():
             return
 
         chat_data = character_data["chats"][current_chat_id]
+
         chat_content = chat_data.get("chat_content", {})
 
         sequence_number = len(chat_content) + 1
+
+        existing_entry = chat_content.get(message_id, {})
+
         new_message = {
             "message_id": message_id,
             "sequence_number": sequence_number,
@@ -420,13 +458,19 @@ class ConfigurationCharacters():
             "variants": [
                 {
                     "variant_id": "default",
-                    "text": text
+                    "text": text,
+                    "created_at": datetime.datetime.now().isoformat()
                 }
             ]
         }
+
+        for extra_key in ("image", "image_status", "image_prompt", "tts_audio", "attachments"):
+            if extra_key in existing_entry:
+                new_message[extra_key] = existing_entry[extra_key]
         
         chat_content[message_id] = new_message
         chat_data["chat_content"] = chat_content
+
         character_data["chats"][current_chat_id] = chat_data
         configuration_data['character_list'][character_name] = character_data
 
@@ -646,7 +690,7 @@ class ConfigurationCharacters():
 
         Args:
             character_name (str): Name of the existing character to start a new chat with.
-            conversation_method (str): Method used for conversation (e.g., "Character AI", "Local LLM").
+            conversation_method (str): Method used for conversation.
             new_name (str): New name for the character (optional).
             new_description (str): Character description.
             new_personality (str): Personality traits.
@@ -721,6 +765,11 @@ class ConfigurationCharacters():
         system_prompt_parts.append("Respond as the character, do not break role or add extra explanations.")
         system_prompt = " ".join(system_prompt_parts)
 
+        sow_variables = character_data.get("sow_variables", [])
+        initial_state = {}
+        for var in sow_variables:
+            initial_state[var["id"]] = var["default"]
+
         character_data.update({
             "character_title": new_creator_notes,
             "character_description": new_description,
@@ -739,6 +788,7 @@ class ConfigurationCharacters():
             "current_emotion": "neutral",
             "chat_history": chat_history,
             "chat_content": chat_content,
+            "variables_state": initial_state
         }
         
         if "chats" not in character_data:
@@ -785,31 +835,22 @@ class ConfigurationCharacters():
         if conversation_method is None:
             conversation_method = char_data.get("conversation_method")
 
-        if conversation_method == "Character AI":
-            chat_content = char_data.get("chat_content", {})
-            sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf')))
-            for idx, (msg_id, msg) in enumerate(sorted_messages):
-                msg["sequence_number"] = idx + 1
-            
-            char_data["chat_content"] = chat_content
-            config["character_list"][character_name] = char_data
-        else:
-            chat_id = char_data.get("current_chat")
-            if not chat_id or "chats" not in char_data:
-                return
-            
-            chat_data = char_data["chats"][chat_id]
-            if not chat_data:
-                return
-            
-            chat_content = chat_data.get("chat_content", {})
-            sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf')))
+        chat_id = char_data.get("current_chat")
+        if not chat_id or "chats" not in char_data:
+            return
+        
+        chat_data = char_data["chats"][chat_id]
+        if not chat_data:
+            return
+        
+        chat_content = chat_data.get("chat_content", {})
+        sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf')))
 
-            for idx, (msg_id, msg) in enumerate(sorted_messages):
-                msg["sequence_number"] = idx + 1
+        for idx, (msg_id, msg) in enumerate(sorted_messages):
+            msg["sequence_number"] = idx + 1
 
-            chat_data["chat_content"] = chat_content
-            char_data["chats"][chat_id] = chat_data
-            config["character_list"][character_name] = char_data
+        chat_data["chat_content"] = chat_content
+        char_data["chats"][chat_id] = chat_data
+        config["character_list"][character_name] = char_data
 
         self.save_configuration_edit(config)
