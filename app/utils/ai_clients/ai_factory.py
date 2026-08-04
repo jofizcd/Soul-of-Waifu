@@ -10,6 +10,7 @@ from app.utils.ai_clients.providers.deepseek_provider import DeepSeekProvider
 from app.utils.ai_clients.providers.grok_provider import GrokProvider
 from app.utils.ai_clients.providers.qwen_provider import QwenProvider
 from app.utils.ai_clients.providers.zai_provider import ZAIProvider
+from app.utils.ai_clients.providers.player2_provider import Player2Provider
 
 logger = logging.getLogger("AI Factory")
 
@@ -76,6 +77,9 @@ class AIFactory:
             api_key = config_api.get_token("ZAI_API_TOKEN")
             model = config_settings.get_main_setting("zai_model") or "glm-4.7"
             return ZAIProvider(api_key=api_key, model=model)
+
+        elif conversation_method == "Player2":
+            return Player2Provider()
 
         elif conversation_method == "Local LLM":
             advanced_enabled = config_settings.get_main_setting("adv_sampling")
