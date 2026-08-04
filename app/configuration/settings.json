@@ -17,7 +17,7 @@
         "llm_backend": 0,
         "gpu_layers": 30,
         "mlock_status": false,
-	"no_mmap_status": false,
+		"no_mmap_status": false,
         "flash_attention_status": false,
         "context_size": 2048,
         "temperature": 0.8,
@@ -115,7 +115,7 @@
         "soul_memory_mode": 0,
         "enable_mcp": false,
         "enable_tool_calling": true,
-	"chat_tools_enabled": false
+		"chat_tools_enabled": false
     },
     "user_data": {
         "default_persona": "None",
