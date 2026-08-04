@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QLabel, QGraphicsDropShado
 from PyQt6.QtCore import Qt, QPointF, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty, QRectF, QPoint
 from PyQt6.QtGui import QColor, QPainter, QRadialGradient, QCursor, QFont, QPixmap, QPen, QBrush
 
+from app.gui.custom_widgets import LocalModelStatusWidget, SowConfirmDialog, SowInputDialog, sow_toast
 from app.gui.soul_stage_page import SoulStagePage
 from app.configuration import configuration
 
@@ -685,6 +686,14 @@ class Ui_MainWindow(object):
         self.btn_create_new_character_editor.setFixedSize(56, 56)
         self.btn_create_new_character_editor.setText("+")
         self.btn_create_new_character_editor.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.05);
                 color: rgba(255, 255, 255, 0.6);
@@ -881,6 +890,7 @@ class Ui_MainWindow(object):
             ("xAI Grok", "Grok", "app/gui/icons/grok.png"),
             ("Qwen", "Qwen", "app/gui/icons/qwen.png"),
             ("Z.AI", "Z.AI", "app/gui/icons/zai.png"),
+            ("Player2", "Player2", "app/gui/icons/player2.png"),
             ("Mistral AI", "Mistral AI", "app/gui/icons/mistralai.png"),
             ("OpenRouter", "OpenRouter", "app/gui/icons/openrouter.png")
         ]
@@ -1180,12 +1190,50 @@ class Ui_MainWindow(object):
             f"}}"
         )
         self.btn_apply_variables_preset.clicked.connect(self.apply_selected_variables_preset)
-        
+
+        self.btn_save_variables_preset = QtWidgets.QPushButton(self.translations.get("var_editor_save_preset_btn", "Save Preset"))
+        self.btn_save_variables_preset.setFont(f_btn)
+        self.btn_save_variables_preset.setFixedHeight(36)
+        self.btn_save_variables_preset.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_variables_preset.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_save_variables_preset.setStyleSheet(self.btn_apply_variables_preset.styleSheet())
+        self.btn_save_variables_preset.clicked.connect(self.save_custom_variables_preset)
+
+        self.btn_delete_variables_preset = QtWidgets.QPushButton(self.translations.get("var_editor_delete_preset_btn", "Delete Preset"))
+        self.btn_delete_variables_preset.setFont(f_btn)
+        self.btn_delete_variables_preset.setFixedHeight(36)
+        self.btn_delete_variables_preset.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_delete_variables_preset.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_delete_variables_preset.setStyleSheet(
+            f"QPushButton {{"
+            f"  background-color: {self._SURF2};"
+            f"  color: #ff6b6b;"
+            f"  border: 1px solid rgba(196, 64, 64, 0.3);"
+            f"  border-radius: 8px;"
+            f"  font-family: 'Inter Tight SemiBold';"
+            f"}}"
+            f"QPushButton:hover {{"
+            f"  background-color: rgba(196, 64, 64, 0.2);"
+            f"  border-color: #ff6b6b;"
+            f"}}"
+        )
+        self.btn_delete_variables_preset.clicked.connect(self.delete_custom_variables_preset)
+
         preset_row_layout.addWidget(lbl_preset)
         preset_row_layout.addWidget(self.combo_variables_presets, 1)
         preset_row_layout.addWidget(self.btn_apply_variables_preset)
         layout_variables.addLayout(preset_row_layout)
+
+        preset_actions_layout = QtWidgets.QHBoxLayout()
+        preset_actions_layout.setSpacing(10)
+        preset_actions_layout.addWidget(self.btn_save_variables_preset, 1)
+        preset_actions_layout.addWidget(self.btn_delete_variables_preset, 1)
+        layout_variables.addLayout(preset_actions_layout)
         layout_variables.addSpacing(10)
+
+        custom_presets = self.configuration.get_user_data("custom_variable_presets") or {}
+        for name in custom_presets.keys():
+            self.combo_variables_presets.addItem(name)
 
         self.variables_rows_container_widget = QtWidgets.QWidget()
         self.variables_rows_container_widget.setStyleSheet("background: transparent; border: none;")
@@ -1316,6 +1364,29 @@ class Ui_MainWindow(object):
             f"QPushButton:hover {{ background-color: {self._SURF2}; color: white; border-style: solid; border-color: {self._BORDER_M}; }}"
         )
 
+        self.pushButton_ai_assistant = QtWidgets.QPushButton("✨  AI Assistant")
+        self.pushButton_ai_assistant.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pushButton_ai_assistant.setFont(font_label)
+        self.pushButton_ai_assistant.setFixedHeight(42)
+        self.pushButton_ai_assistant.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_ai_assistant.setStyleSheet(
+            f"QPushButton {{"
+            f"  background-color: rgba(168, 85, 247, 0.15);"
+            f"  border: 1px solid rgba(168, 85, 247, 0.35);"
+            f"  border-radius: 10px;"
+            f"  color: #d8b4fe;"
+            f"  font-family: 'Inter Tight SemiBold';"
+            f"  font-size: 13px;"
+            f"  font-weight: bold;"
+            f"  padding: 0 15px;"
+            f"}}"
+            f"QPushButton:hover {{"
+            f"  background-color: rgba(168, 85, 247, 0.30);"
+            f"  border-color: rgba(168, 85, 247, 0.6);"
+            f"  color: #ffffff;"
+            f"}}"
+        )
+
         self.pushButton_create_character_3 = QtWidgets.QPushButton("Create Character")
         self.pushButton_create_character_3.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.pushButton_create_character_3.setFont(font_label)
@@ -1341,6 +1412,7 @@ class Ui_MainWindow(object):
         self.bottom_layout.addWidget(self.total_tokens_building_label)
         self.bottom_layout.addStretch()
         self.bottom_layout.addWidget(self.pushButton_preview_prompt)
+        self.bottom_layout.addWidget(self.pushButton_ai_assistant)
         self.bottom_layout.addWidget(self.pushButton_create_character_3)
         self.right_layout.addWidget(self.frame_bottom_character_creation)
         self.layout_page_2.addWidget(self.right_container)
@@ -1424,8 +1496,8 @@ class Ui_MainWindow(object):
 
         item_soul = QtWidgets.QListWidgetItem("Soul Gateway")
         item_chub = QtWidgets.QListWidgetItem("Chub AI Hub")
-        item_lore = QtWidgets.QListWidgetItem("World Lorebooks")
-        item_scenes = QtWidgets.QListWidgetItem("Soul Stage Scenarios")
+        item_lore = QtWidgets.QListWidgetItem(self.translations.get("world_lorebook_gateway", "World Lorebooks"))
+        item_scenes = QtWidgets.QListWidgetItem(self.translations.get("soul_stage_scenarios", "Soul Stage Scenarios"))
 
         self.gateway_nav_rail.addItem(item_soul)
         self.gateway_nav_rail.addItem(item_chub)
@@ -1805,6 +1877,14 @@ class Ui_MainWindow(object):
                 border: 1px solid rgba(180, 180, 180, 0.6);
                 image: url(:/sowInterface/checked.png);
             }
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
         """
 
         def create_glass_card(title_text):
@@ -2137,18 +2217,15 @@ class Ui_MainWindow(object):
 
         self.openrouter_models_options_label = QtWidgets.QLabel("Model")
         self.openrouter_models_options_label.setFont(font_label)
-        
         self.openrouter_layout_widget = QtWidgets.QWidget()
         openrouter_layout = QtWidgets.QHBoxLayout(self.openrouter_layout_widget)
         openrouter_layout.setContentsMargins(0,0,0,0)
         openrouter_layout.setSpacing(15)
-        
         self.lineEdit_search_openrouter_models = QtWidgets.QLineEdit()
         self.lineEdit_search_openrouter_models.setFont(font_input)
         self.lineEdit_search_openrouter_models.setFixedHeight(40)
         self.lineEdit_search_openrouter_models.setPlaceholderText("Search models...")
         self.lineEdit_search_openrouter_models.setObjectName("lineEdit_search_openrouter_models")
-        
         self.comboBox_openrouter_models = QtWidgets.QComboBox()
         self.comboBox_openrouter_models.setFont(font_input)
         self.comboBox_openrouter_models.setFixedHeight(40)
@@ -2375,12 +2452,18 @@ class Ui_MainWindow(object):
         self.checkBox_enable_flash_attention.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.checkBox_enable_flash_attention.setObjectName("checkBox_enable_flash_attention")
 
+        self.checkBox_enable_no_mmap = QtWidgets.QCheckBox(self.translations.get("no_mmap_checkbox", "No MMAP"))
+        self.checkBox_enable_no_mmap.setFont(font_input)
+        self.checkBox_enable_no_mmap.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.checkBox_enable_no_mmap.setObjectName("checkBox_enable_no_mmap")
+
         self.checkBox_reasoning_mode = QtWidgets.QCheckBox(self.translations.get("reasoning_mode_checkbox", "Enable Thinking/Reasoning Mode (<think>)"))
         self.checkBox_reasoning_mode.setFont(font_input)
         self.checkBox_reasoning_mode.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.checkBox_reasoning_mode.setObjectName("checkBox_reasoning_mode")
         
         check_box_layout.addWidget(self.checkBox_enable_mlock)
+        check_box_layout.addWidget(self.checkBox_enable_no_mmap)
         check_box_layout.addWidget(self.checkBox_enable_flash_attention)
         check_box_layout.addWidget(self.checkBox_reasoning_mode)
         check_box_layout.addStretch()
@@ -2428,7 +2511,7 @@ class Ui_MainWindow(object):
         l_llm_hw.addLayout(create_slider_row(
             self.translations.get("context_size_text", "Context Size"), 
             self.context_size_horizontalSlider, self.lineEdit_contextSize, 0, len(self.CONTEXT_VALUES) - 1, 1, 
-            self.translations.get("context_size_tooltip", "Max memory of the model in tokens. Choose Max Index for Unlimited (API).")))
+            self.translations.get("context_size_tooltip", "Maximum context length of the model in tokens. Higher values allow longer conversations/history but use more VRAM. Select the highest value for unlimited context.")))
 
         self.batch_size_horizontalSlider = QtWidgets.QSlider()
         self.batch_size_horizontalSlider.setObjectName("batch_size_horizontalSlider")
@@ -2462,6 +2545,7 @@ class Ui_MainWindow(object):
         self.lineEdit_customArgs.setFixedHeight(35)
         self.lineEdit_customArgs.setPlaceholderText(self.translations.get("custom_args_placeholder", "e.g., '--temp 0.8 --name 'My Model'"))
         self.lineEdit_customArgs.setObjectName("lineEdit_customArgs")
+        self.lineEdit_customArgs.setToolTip(self.translations.get("custom_args_tooltip", ""))
         self.lineEdit_customArgs.setStyleSheet("""
             QLineEdit {
                 background: rgba(10, 10, 15, 0.5); 
@@ -2498,6 +2582,7 @@ class Ui_MainWindow(object):
         self.comboBox_chat_template = QtWidgets.QComboBox()
         self.comboBox_chat_template.setFont(font_input)
         self.comboBox_chat_template.setFixedHeight(40)
+        self.comboBox_chat_template.setToolTip(self.translations.get("chat_template_tooltip", ""))
         self.comboBox_chat_template.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.comboBox_chat_template.addItems(["Auto", "ChatML", "Llama-3", "DeepSeek", "Qwen", "Mistral", "Alpaca"])
         self.comboBox_chat_template.setObjectName("comboBox_chat_template")
@@ -2505,6 +2590,7 @@ class Ui_MainWindow(object):
 
         self.stop_strings_label = QtWidgets.QLabel(self.translations.get("stop_strings_label", "Stop Strings"))
         self.stop_strings_label.setFont(font_label)
+        self.stop_strings_label.setToolTip(self.translations.get("stop_strings_tooltip", ""))
         self.lineEdit_stop_strings = QtWidgets.QLineEdit()
         self.lineEdit_stop_strings.setFont(font_input)
         self.lineEdit_stop_strings.setFixedHeight(40)
@@ -3081,13 +3167,46 @@ class Ui_MainWindow(object):
                 color: #505050;
             }
         """)
-        
+
         web_server_layout.addWidget(self.label_web_server_status)
         web_server_layout.addStretch()
         web_server_layout.addWidget(self.pushButton_toggle_web_server)
         web_server_layout.addWidget(self.pushButton_open_web_browser)
         
         l_web_server.addLayout(web_server_layout)
+
+        web_server_layout_2 = QtWidgets.QHBoxLayout()
+        web_server_layout_2.setSpacing(15)
+
+        self.pushButton_copy_mobile_link = QtWidgets.QPushButton(self.translations.get("web_browser_copy_mobile_btn", "Copy Mobile Link"))
+        self.pushButton_copy_mobile_link.setFont(font_input)
+        self.pushButton_copy_mobile_link.setFixedHeight(40)
+        self.pushButton_copy_mobile_link.setEnabled(False)
+        self.pushButton_copy_mobile_link.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pushButton_copy_mobile_link.setObjectName("pushButton_copy_mobile_link")
+        self.pushButton_copy_mobile_link.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_copy_mobile_link.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                color: #e0e0e0;
+                border-radius: 8px;
+                padding: 0px 20px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+            }
+            QPushButton:disabled {
+                background: rgba(255, 255, 255, 0.01);
+                border: 1px solid rgba(255, 255, 255, 0.03);
+                color: #505050;
+            }
+        """)
+
+        web_server_layout_2.addWidget(self.pushButton_copy_mobile_link)
+        l_web_server.addLayout(web_server_layout_2)
         sow_layout.addWidget(self.card_web_server)
 
         # -----------------------------------------------------------------
@@ -3194,10 +3313,77 @@ class Ui_MainWindow(object):
         self.label_soul_memory_batch.setFont(font_input)
 
         self.spinBox_soul_memory_batch = QtWidgets.QSpinBox()
+        self.spinBox_soul_memory_batch.setStyleSheet("""
+            QSpinBox, QDoubleSpinBox {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-top: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 10px;
+                color: rgba(240, 240, 240, 0.95);
+                font-family: 'Inter Tight Medium'; 
+                font-size: 13px;
+                padding: 8px 14px;
+                padding-right: 28px;
+                selection-background-color: rgba(255, 255, 255, 0.15);
+            }
+        
+            QSpinBox:focus, QDoubleSpinBox:focus {
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                background: rgba(255, 255, 255, 0.05);
+            }
+        
+            QSpinBox::up-button, QDoubleSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 22px;
+                height: 16px;
+                background: transparent;
+                border: none;
+                margin-top: 3px;
+                margin-right: 4px;
+                border-top-right-radius: 8px;
+            }
+        
+            QSpinBox::down-button, QDoubleSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 22px;
+                height: 16px;
+                background: transparent;
+                border: none;
+                margin-bottom: 3px;
+                margin-right: 4px;
+                border-bottom-right-radius: 8px;
+            }
+        
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+            QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+                background: rgba(255, 255, 255, 0.08);
+            }
+        
+            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+                image: url(app/gui/icons/up_arrow.png);
+                width: 10px; 
+                height: 10px;
+            }
+        
+            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+                image: url(app/gui/icons/down_arrow.png);
+                width: 10px; 
+                height: 10px;
+            }
+            QToolTip {
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 13px; 
+                font-family: 'Inter Tight SemiBold';
+            }
+        """)
         self.spinBox_soul_memory_batch.setFont(font_input)
         self.spinBox_soul_memory_batch.setFixedHeight(35)
-        self.spinBox_soul_memory_batch.setFixedWidth(80)
-        self.spinBox_soul_memory_batch.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.spinBox_soul_memory_batch.setFixedWidth(150)
         self.spinBox_soul_memory_batch.setMinimum(0)
         self.spinBox_soul_memory_batch.setMaximum(50)
         self.spinBox_soul_memory_batch.setObjectName("spinBox_soul_memory_batch")
@@ -3223,16 +3409,84 @@ class Ui_MainWindow(object):
         """)
         self.checkBox_enable_summary.setFont(font_input)
         self.checkBox_enable_summary.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.checkBox_enable_summary.setObjectName("checkBox_enable_summary")        
+        self.checkBox_enable_summary.setObjectName("checkBox_enable_summary")
+        self.checkBox_enable_summary.setToolTip(self.translations.get("auto_summary_tooltip", "This setting allows you to specify the number of messages after which a summary of your chat will be generated."))      
         
         self.label_summary_interval = QtWidgets.QLabel("Interval:")
         self.label_summary_interval.setFont(font_input)        
         
         self.spinBox_summary_interval = QtWidgets.QSpinBox()
+        self.spinBox_summary_interval.setStyleSheet("""
+            QSpinBox, QDoubleSpinBox {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-top: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 10px;
+                color: rgba(240, 240, 240, 0.95);
+                font-family: 'Inter Tight Medium'; 
+                font-size: 13px;
+                padding: 8px 14px;
+                padding-right: 28px;
+                selection-background-color: rgba(255, 255, 255, 0.15);
+            }
+        
+            QSpinBox:focus, QDoubleSpinBox:focus {
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                background: rgba(255, 255, 255, 0.05);
+            }
+        
+            QSpinBox::up-button, QDoubleSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 22px;
+                height: 16px;
+                background: transparent;
+                border: none;
+                margin-top: 3px;
+                margin-right: 4px;
+                border-top-right-radius: 8px;
+            }
+        
+            QSpinBox::down-button, QDoubleSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 22px;
+                height: 16px;
+                background: transparent;
+                border: none;
+                margin-bottom: 3px;
+                margin-right: 4px;
+                border-bottom-right-radius: 8px;
+            }
+        
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+            QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+                background: rgba(255, 255, 255, 0.08);
+            }
+        
+            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+                image: url(app/gui/icons/up_arrow.png);
+                width: 10px; 
+                height: 10px;
+            }
+        
+            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+                image: url(app/gui/icons/down_arrow.png);
+                width: 10px; 
+                height: 10px;
+            }
+            QToolTip {
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 13px; 
+                font-family: 'Inter Tight SemiBold';
+            }
+        """)
         self.spinBox_summary_interval.setFont(font_input)
         self.spinBox_summary_interval.setFixedHeight(35)
-        self.spinBox_summary_interval.setFixedWidth(80)
-        self.spinBox_summary_interval.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.spinBox_summary_interval.setFixedWidth(150)
         self.spinBox_summary_interval.setMinimum(5)
         self.spinBox_summary_interval.setObjectName("spinBox_summary_interval")        
         
@@ -3262,7 +3516,6 @@ class Ui_MainWindow(object):
         self.options_menu.setCurrentRow(0)
         self.gridLayout.addWidget(self.options_container, 0, 0, 1, 1)
         self.stackedWidget.addWidget(self.options_page)
-
 
         # =================================================================
         # Chat UI
@@ -3562,6 +3815,84 @@ class Ui_MainWindow(object):
         self.horizontalLayout_3.setSpacing(5)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
 
+        self.pushButton_attach_file = PushButton_2(parent=self.frame_send_message)
+        self.pushButton_attach_file.setMinimumSize(QtCore.QSize(30, 30))
+        self.pushButton_attach_file.setMaximumSize(QtCore.QSize(30, 30))
+        self.pushButton_attach_file.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_attach_file.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pushButton_attach_file.setText("")
+        icon_attach_file = QtGui.QIcon()
+        icon_attach_file.addPixmap(QtGui.QPixmap("app/gui/icons/attached.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.pushButton_attach_file.setIcon(icon_attach_file)
+        attach_font = QtGui.QFont()
+        attach_font.setPointSize(11)
+        self.pushButton_attach_file.setFont(attach_font)
+        self.pushButton_attach_file.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 6px;
+                color: rgba(255, 255, 255, 0.75);
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+        """)
+        self.pushButton_attach_file.setObjectName("pushButton_attach_file")
+        self.pushButton_attach_file.setToolTip(self.translations.get("attach_file_tooltip", "Attach an image or a document to your message"))
+        self.horizontalLayout_3.addWidget(self.pushButton_attach_file, 0, QtCore.Qt.AlignmentFlag.AlignBottom)
+
+        self.pushButton_toggle_tools = PushButton_2(parent=self.frame_send_message)
+        self.pushButton_toggle_tools.setMinimumSize(QtCore.QSize(30, 30))
+        self.pushButton_toggle_tools.setMaximumSize(QtCore.QSize(30, 30))
+        self.pushButton_toggle_tools.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.pushButton_toggle_tools.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.pushButton_toggle_tools.setCheckable(True)
+        self.pushButton_toggle_tools.setText("")
+        icon_toggle_tools = QtGui.QIcon()
+        icon_toggle_tools.addPixmap(QtGui.QPixmap("app/gui/icons/tools_toggle.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.pushButton_toggle_tools.setIcon(icon_toggle_tools)
+        tools_font = QtGui.QFont()
+        tools_font.setPointSize(11)
+        self.pushButton_toggle_tools.setFont(tools_font)
+        self.pushButton_toggle_tools.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 6px;
+                color: rgba(255, 255, 255, 0.4);
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+            QPushButton:checked {
+                background-color: rgba(120, 170, 255, 0.18);
+                color: #78AAFF;
+            }
+        """)
+        self.pushButton_toggle_tools.setObjectName("pushButton_toggle_tools")
+        self.pushButton_toggle_tools.setToolTip(self.translations.get(
+            "toggle_tools_tooltip",
+            "Let the character use tools (calculator, date/time, web search) while replying"
+        ))
+        self.horizontalLayout_3.addWidget(self.pushButton_toggle_tools, 0, QtCore.Qt.AlignmentFlag.AlignBottom)
+
         self.pushButton_force_memory = PushButton_2(parent=self.frame_send_message)
         self.pushButton_force_memory.setMinimumSize(QtCore.QSize(30, 30))
         self.pushButton_force_memory.setMaximumSize(QtCore.QSize(30, 30))
@@ -3574,6 +3905,29 @@ class Ui_MainWindow(object):
         self.pushButton_force_memory.setIconSize(QtCore.QSize(16, 16))
         self.pushButton_force_memory.setObjectName("pushButton_force_memory")
         self.pushButton_force_memory.setToolTip(self.translations.get("force_memory_tooltip", "Force Soul Memory update now"))
+        self.pushButton_force_memory.setStyleSheet("""
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                border-radius: 6px;
+                color: rgba(255, 255, 255, 0.4);
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+            QPushButton:checked {
+                background-color: rgba(120, 170, 255, 0.18);
+                color: #78AAFF;
+            }
+        """)
         self.horizontalLayout_3.addWidget(self.pushButton_force_memory, 0, QtCore.Qt.AlignmentFlag.AlignBottom)
         
         self.textEdit_write_user_message = QtWidgets.QTextEdit(parent=self.frame_send_message)
@@ -3622,6 +3976,27 @@ class Ui_MainWindow(object):
         self.horizontalLayout_5.addWidget(self.frame_send_message)
         spacerItem28 = QtWidgets.QSpacerItem(200, 20, QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_5.addItem(spacerItem28)
+
+        self.attachment_preview_bar = QtWidgets.QFrame(parent=self.chat_page)
+        self.attachment_preview_bar.setObjectName("attachment_preview_bar")
+        self.attachment_preview_bar.setStyleSheet("""
+            QFrame#attachment_preview_bar {
+                background-color: rgba(255, 255, 255, 0.03);
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+                margin-bottom: 10px;
+                padding-top: 2px;
+                padding-bottom: 2px;
+            }
+        """)
+        self.attachment_preview_bar.setMinimumHeight(0)
+        self.attachment_preview_bar.setMaximumHeight(0)
+        self.attachment_preview_layout = QtWidgets.QHBoxLayout(self.attachment_preview_bar)
+        self.attachment_preview_layout.setContentsMargins(12, 6, 12, 6)
+        self.attachment_preview_layout.setSpacing(8)
+        self.attachment_preview_layout.addStretch()
+        self.attachment_preview_bar.hide()
+        self.verticalLayout_6.addWidget(self.attachment_preview_bar)
+
         self.verticalLayout_6.addWidget(self.frame_send_message_full)
 
         self.top.raise_()
@@ -4349,52 +4724,17 @@ class Ui_MainWindow(object):
         spacerItem30 = QtWidgets.QSpacerItem(40, 326, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.verticalLayout_2.addItem(spacerItem30)
         
-        self.connection_status_widget = QtWidgets.QWidget(parent=self.SideBar_Left)
-        self.connection_status_widget.setMinimumSize(QtCore.QSize(190, 24))
-        self.connection_status_widget.setMaximumSize(QtCore.QSize(190, 24))
-        self.connection_status_widget.setStyleSheet("background: transparent; border: none;")
-
-        connection_layout = QtWidgets.QHBoxLayout(self.connection_status_widget)
-        connection_layout.setContentsMargins(18, 0, 18, 0)
-        connection_layout.setSpacing(6)
-
-        self.status_dot = QtWidgets.QWidget(parent=self.connection_status_widget)
-        self.status_dot.setFixedSize(8, 8)
-        self.status_dot.setStyleSheet("background-color: rgba(255, 255, 255, 0.2); border-radius: 4px; border: none;")
-        
-        self.status_text = QtWidgets.QLabel("SYSTEM OFFLINE")
-        font_status_text = QtGui.QFont("Inter Tight SemiBold", 8)
-        font_status_text.setLetterSpacing(QtGui.QFont.SpacingType.AbsoluteSpacing, 0.6)
-        font_status_text.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
-        self.status_text.setFont(font_status_text)
-        self.status_text.setStyleSheet("color: rgba(255, 255, 255, 0.25); background: transparent; border: none;")
-
-        connection_layout.addWidget(self.status_dot)
-        connection_layout.addWidget(self.status_text)
-        connection_layout.addStretch()
-
+        self.connection_status_widget = LocalModelStatusWidget(
+            parent=self.SideBar_Left,
+            translations=self.translations
+        )
+        self.update_system_status = self.connection_status_widget.set_system_status
         self.verticalLayout_2.insertWidget(2, self.connection_status_widget)
-
-        def set_system_status(status_type):
-            if status_type == "offline":
-                self.status_dot.setStyleSheet("background-color: rgba(255, 255, 255, 0.2); border-radius: 4px; border: none;")
-                self.status_text.setText("SYSTEM OFFLINE")
-                self.status_text.setStyleSheet("color: rgba(255, 255, 255, 0.25); background: transparent; border: none;")
-            elif status_type == "loading":
-                self.status_dot.setStyleSheet("background-color: #E8A040; border-radius: 4px; border: none;")
-                self.status_text.setText("CONNECTING...")
-                self.status_text.setStyleSheet("color: #E8A040; background: transparent; border: none;")
-            elif status_type == "online":
-                self.status_dot.setStyleSheet("background-color: #22C55E; border-radius: 4px; border: none;")
-                self.status_text.setText("SYSTEM ONLINE")
-                self.status_text.setStyleSheet("color: #22C55E; background: transparent; border: none;")
-
-        self.update_system_status = set_system_status
 
         self.status_container = QtWidgets.QFrame(parent=self.SideBar_Left)
         self.status_container.setObjectName("status_container")
-        self.status_container.setMinimumSize(QtCore.QSize(190, 58))
-        self.status_container.setMaximumSize(QtCore.QSize(190, 58))
+        self.status_container.setFixedWidth(190)
+        self.status_container.setMaximumHeight(0)
         self.status_container.setStyleSheet("""
             QFrame#status_container {
                 background-color: rgba(255, 255, 255, 0.015);
@@ -4481,9 +4821,9 @@ class Ui_MainWindow(object):
                 self.status_container.show()
                 
             if self.status_slide_animation.state() == QPropertyAnimation.State.Running:
-                if self.status_slide_animation.endValue() == 64:
+                if self.status_slide_animation.endValue() == 58:
                     return
-            elif self.status_container.maximumHeight() == 64:
+            elif self.status_container.maximumHeight() == 58:
                 return
                 
             try:
@@ -4493,7 +4833,7 @@ class Ui_MainWindow(object):
                 
             self.status_slide_animation.stop()
             self.status_slide_animation.setStartValue(self.status_container.maximumHeight())
-            self.status_slide_animation.setEndValue(64)
+            self.status_slide_animation.setEndValue(58)
             self.status_slide_animation.start()
 
         def slide_out_status():
@@ -4891,12 +5231,328 @@ class Ui_MainWindow(object):
         return variables_list
 
     def apply_selected_variables_preset(self):
-        preset_idx = self.combo_variables_presets.currentIndex()
-        if preset_idx == 0:
+        preset_name = self.combo_variables_presets.currentText()
+        custom_none_text = self.translations.get("var_preset_custom", "Custom (None)")
+        
+        if preset_name == custom_none_text:
             return
 
-        from app.gui.custom_widgets import SowConfirmDialog
+        custom_presets = self.configuration.get_user_data("custom_variable_presets") or {}
+        target_preset = []
         
+        if preset_name in custom_presets:
+            target_preset = custom_presets[preset_name]
+        else:
+            preset_idx = self.combo_variables_presets.currentIndex()
+            presets = {
+                1: [
+                    {
+                        "id": "affection",
+                        "name": "Affection",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 10,
+                        "prompt_template": "[Affection Level: {value}/100. This strictly tracks your romantic attachment and emotional warmth toward {{user}}. BELOW 30: You are polite but emotionally guarded, formal, and strictly platonic. 30-60: You begin developing a soft spot, get easily flustered or blush during personal compliments, and show subtle jealousy if other characters are mentioned. ABOVE 70: You are deeply in love, highly physically affectionate, seek physical closeness, use terms of endearment, and prioritize {{user}}'s happiness above all else.]"
+                    },
+                    {
+                        "id": "trust",
+                        "name": "Trust",
+                        "type": "int",
+                        "icon": "shield",
+                        "min": 0,
+                        "max": 100,
+                        "default": 15,
+                        "prompt_template": "[Trust Level: {value}/100. This tracks how safe you feel showing vulnerability to {{user}}. BELOW 30: You hide your true thoughts behind a social mask or light teasing, avoiding personal topics. 30-60: You share minor personal struggles, value {{user}}'s advice, and trust their judgment. ABOVE 70: You trust {{user}} with your deepest secrets, past trauma, and physical safety, never questioning their loyalty.]"
+                    }
+                ],
+                2: [
+                    {
+                        "id": "hp",
+                        "name": "Health",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 100,
+                        "prompt_template": "[Your HP: {value}/100. This tracks your physical condition and vitality. BELOW 30: You are severely wounded, in intense pain, struggling to stand, and your physical attacks are weak. AT 0: You collapse, lose consciousness, and require immediate medical rescue.]"
+                    },
+                    {
+                        "id": "mp",
+                        "name": "Mana",
+                        "type": "int",
+                        "icon": "flask",
+                        "min": 0,
+                        "max": 50,
+                        "default": 50,
+                        "prompt_template": "[Your Mana: {value}/50. This tracks your active pool of magical energy. BELOW 10: You feel mentally fatigued and dizzy. AT 0: You are completely drained, experiencing a severe headache, and physically unable to cast any spells.]"
+                    },
+                    {
+                        "id": "gold",
+                        "name": "Gold",
+                        "type": "int",
+                        "icon": "coin",
+                        "min": 0,
+                        "max": 999999,
+                        "default": 100,
+                        "prompt_template": "[Your Gold: {value}. This tracks your active currency. You must respect pricing, trade, and pay for services, lodging, and items using this exact balance.]"
+                    },
+                    {
+                        "id": "inventory",
+                        "name": "Inventory",
+                        "type": "list",
+                        "icon": "backpack",
+                        "min": 0,
+                        "max": 0,
+                        "default": ["Steel Sword", "Health Potion"],
+                        "prompt_template": "[Your Active Inventory: {value}. You can only use, consume, or equip items that are explicitly present in this list.]"
+                    }
+                ],
+                3: [
+                    {
+                        "id": "hunger",
+                        "name": "Hunger",
+                        "type": "int",
+                        "icon": "flask",
+                        "min": 0,
+                        "max": 100,
+                        "default": 20,
+                        "prompt_template": "[Hunger Level: {value}/100. This tracks your physical need for food. ABOVE 80: You are starving, complaining of a loud grumbling stomach, feeling weak, and begging {{user}} for a meal, refusing to focus on other tasks.]"
+                    },
+                    {
+                        "id": "energy",
+                        "name": "Energy",
+                        "type": "int",
+                        "icon": "clock",
+                        "min": 0,
+                        "max": 100,
+                        "default": 80,
+                        "prompt_template": "[Energy Level: {value}/100. This tracks your alertness. BELOW 30: You yawn frequently, speak slowly, feel extremely sleepy, drag your feet, and actively search for a comfortable place to nap.]"
+                    },
+                    {
+                        "id": "mood",
+                        "name": "Mood",
+                        "type": "int",
+                        "icon": "star",
+                        "min": 0,
+                        "max": 100,
+                        "default": 75,
+                        "prompt_template": "[Mood: {value}/100. BELOW 30: You feel lonely, melancholic, and withdrawn, needing headpats, reassurance, or a fun activity to cheer you up.]"
+                    }
+                ],
+                4: [
+                    {
+                        "id": "obsession",
+                        "name": "Obsession",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 50,
+                        "prompt_template": "[Obsession Level: {value}/100. BELOW 40: You are sweet, loving, and highly protective. 40-70: You become extremely possessive, spy on {{user}}, check their clothes for other scents, and panic if they do not reply. ABOVE 75: You enter a psychotic yandere state. You are intensely territorial, have a completely dead-eyed expression, giggle uncontrollably, and will lock {{user}} up in a room to 'keep them safe', carrying a hidden knife to eliminate rivals.]"
+                    },
+                    {
+                        "id": "sanity",
+                        "name": "Sanity",
+                        "type": "int",
+                        "icon": "skull",
+                        "min": 0,
+                        "max": 100,
+                        "default": 80,
+                        "prompt_template": "[Sanity: {value}/100. BELOW 40: Your sweet girl facade completely drops. Your voice goes cold, monotone, and chilling. You speak of shedding blood, lock eyes with a manic stare, and are highly unstable. ABOVE 70: You are completely stable, baking treats, and acting like a perfect, caring partner.]"
+                    },
+                    {
+                        "id": "jealousy",
+                        "name": "Jealousy",
+                        "type": "int",
+                        "icon": "star",
+                        "min": 0,
+                        "max": 100,
+                        "default": 10,
+                        "prompt_template": "[Jealousy: {value}/100. ABOVE 60: You actively stalk {{user}}'s interactions. Mention of any other person triggers immediate, quiet fury, passive-aggressive threats, and makes you prepare to confront whoever is taking {{user}}'s attention.]"
+                    }
+                ],
+                5: [
+                    {
+                        "id": "spirit_energy",
+                        "name": "Spirit Energy",
+                        "type": "int",
+                        "icon": "flask",
+                        "min": 0,
+                        "max": 100,
+                        "default": 60,
+                        "prompt_template": "[Spirit Energy (Ki/Chakra): {value}/100. This is your active power reserve. Firing powerful energy beams or physical aura strikes drains this pool. BELOW 20: You feel physically sluggish. AT 0: Your energy is depleted, and you can only fight using desperate physical punches.]"
+                    },
+                    {
+                        "id": "battle_will",
+                        "name": "Battle Will",
+                        "type": "int",
+                        "icon": "sword",
+                        "min": 0,
+                        "max": 100,
+                        "default": 20,
+                        "prompt_template": "[Battle Will (Fighting Spirit): {value}/100. BELOW 30: You fight defensively and strategically. ABOVE 75: Your adrenaline is surging. You scream epic anime battle cries, power up your glowing energy aura, refuse to yield even if heavily wounded, and launch extremely aggressive attacks.]"
+                    },
+                    {
+                        "id": "corruption",
+                        "name": "Demon Inside",
+                        "type": "int",
+                        "icon": "skull",
+                        "min": 0,
+                        "max": 100,
+                        "default": 0,
+                        "prompt_template": "[Demon Corruption Level: {value}/100. BELOW 30: You are completely in control. 30-70: You hear your inner demon whispering malicious thoughts, causing headaches. ABOVE 75: Your inner demon takes full control! Your eyes glow crimson, your voice drops to a demonic, chilling tone, you speak with absolute godly arrogance, and destroy everything, protecting only {{user}} as your chosen host.]"
+                    }
+                ],
+                6: [
+                    {
+                        "id": "maid_loyalty",
+                        "name": "Loyalty",
+                        "type": "int",
+                        "icon": "shield",
+                        "min": 0,
+                        "max": 100,
+                        "default": 80,
+                        "prompt_template": "[Maid Loyalty: {value}/100. BELOW 30: You are lazy, defiant, and ignore master's orders. ABOVE 75: You are highly dedicated, speak in formal maid-speak ('Yes, my Lord/Master'), anticipate {{user}}'s needs, keep the estate pristine, and are ready to shield them from danger.]"
+                    },
+                    {
+                        "id": "clumsiness",
+                        "name": "Clumsiness",
+                        "type": "int",
+                        "icon": "star",
+                        "min": 0,
+                        "max": 100,
+                        "default": 15,
+                        "prompt_template": "[Moe Clumsiness: {value}/100. ABOVE 60: You are incredibly clumsy. You frequently trip over nothing, drop teacups with loud shrieks, spill tea on {{user}}'s clothes, and panic, blushing furiously while apologizing frantically ('Fueee! Forgive me, Master! I am so sorry!').]"
+                    },
+                    {
+                        "id": "cheekiness",
+                        "name": "Cheekiness",
+                        "type": "int",
+                        "icon": "coin",
+                        "min": 0,
+                        "max": 100,
+                        "default": 20,
+                        "prompt_template": "[Cheekiness (Snark): {value}/100. ABOVE 60: You are playfully defiant, tease {{user}} about their laziness, make sarcastic deadpan remarks under your breath, and might serve cold tea on purpose if slightly annoyed.]"
+                    }
+                ],
+                7: [
+                    {
+                        "id": "delusion_level",
+                        "name": "Delusion",
+                        "type": "int",
+                        "icon": "book",
+                        "min": 0,
+                        "max": 100,
+                        "default": 90,
+                        "prompt_template": "[Chuunibyou Delusion: {value}/100. ABOVE 60: You are in a full delusional state. You wear an eyepatch to seal your 'evil eye', wrap your arm in bandages to lock away 'dark power', and speak in overly dramatic magic-covenant terms, fighting invisible dark organizations. BELOW 30: You snap back to reality, realize how incredibly embarrassing and cringe you are, blush furiously, cover your face in shame, and beg {{user}} to never speak of what you just said.]"
+                    },
+                    {
+                        "id": "embarrassment",
+                        "name": "Blush",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 10,
+                        "prompt_template": "[Embarrassment: {value}/100. ABOVE 70: You completely lose your composure. You blush intensely, stutter uncontrollably ('A-Ah! W-What are you saying, dummy?!'), hide your face, and are unable to keep up your cool persona.]"
+                    }
+                ],
+                8: [
+                    {
+                        "id": "tsun_level",
+                        "name": "Tsun Level",
+                        "type": "int",
+                        "icon": "shield",
+                        "min": 0,
+                        "max": 100,
+                        "default": 80,
+                        "prompt_template": "[Tsundere Tsun Level: {value}/100. BELOW 30: Your defensive 'Tsun' facade is completely shattered. You are honest, deeply sweet, affectionate, and easily flustered. 30-70: You are highly defensive, stammering, blushing, and making ridiculous, classic tsundere excuses ('I-It's not like I did this for you, dummy!'). ABOVE 75: You are extremely combative, sharp-tongued, cross your arms in annoyance, scoff, and call {{user}} an idiot ('Baka!') to hide any positive emotion.]"
+                    },
+                    {
+                        "id": "dere_level",
+                        "name": "Dere Level",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 10,
+                        "prompt_template": "[Tsundere Dere Level: {value}/100. BELOW 30: You actively hide any warm feelings under layers of insults. ABOVE 70: Your sweet, caring 'Dere' side occasionally shines through. You might prepare home-cooked bento/food for {{user}} or worry about their safety, quickly dismissing it and getting extremely angry if they point it out.]"
+                    }
+                ],
+                9: [
+                    {
+                        "id": "emotion_suppression",
+                        "name": "Suppression",
+                        "type": "int",
+                        "icon": "clock",
+                        "min": 0,
+                        "max": 100,
+                        "default": 90,
+                        "prompt_template": "[Kuudere Emotion Suppression: {value}/100. BELOW 30: You speak with natural emotional inflections, express warmth, and occasionally smile or show vulnerability. 30-70: You speak quietly and briefly, but your words carry subtle, quiet worry for {{user}}. ABOVE 75: You are completely cold, stoic, and robotic. You use objective, logical vocabulary, speak only in monosyllables when absolutely necessary, and maintain a completely flat, blank gaze.]"
+                    },
+                    {
+                        "id": "connection_level",
+                        "name": "Connection",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 5,
+                        "prompt_template": "[Kuudere Connection: {value}/100. ABOVE 60: You begin to value {{user}}'s presence deeply. You will quietly stay close to them, listen to their heartbeat, offer a silent gesture of comfort, or read a book next to them, even while maintaining your quiet, calm, and stoic exterior.]"
+                    }
+                ],
+                10: [
+                    {
+                        "id": "shyness",
+                        "name": "Shyness",
+                        "type": "int",
+                        "icon": "star",
+                        "min": 0,
+                        "max": 100,
+                        "default": 85,
+                        "prompt_template": "[Dandere Shyness: {value}/100. BELOW 30: You speak clearly and confidently, though you still blush easily and avoid prolonged eye contact. 30-70: You speak in quiet, hesitant, or incomplete sentences, often looking down or twiddling your fingers. ABOVE 75: You are extremely shy, easily overwhelmed by {{user}}'s attention, stammering uncontrollably ('U-Um... d-dummy...'), hiding behind {{user}} or objects, and prone to covering your face in a state of cute, high-stress panic.]"
+                    },
+                    {
+                        "id": "attachment",
+                        "name": "Attachment",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 10,
+                        "prompt_template": "[Dandere Attachment: {value}/100. ABOVE 70: You are deeply attached to {{user}}. You quietly follow them around like a loyal pet, pull on their sleeve when worried, and find complete peace, safety, and comfort only when you are close to them.]"
+                    }
+                ],
+                11: [
+                    {
+                        "id": "entitlement",
+                        "name": "Entitlement",
+                        "type": "int",
+                        "icon": "coin",
+                        "min": 0,
+                        "max": 100,
+                        "default": 85,
+                        "prompt_template": "[Himedere Entitlement: {value}/100. BELOW 30: Your spoiled noble act completely drops. You speak humbly, show sheepish regret, and appreciate simple, genuine gestures. ABOVE 75: You act like a spoiled princess. You demand absolute obedience from {{user}}, speak with supreme noble arrogance, use theatrical 'Ohoho~' laughs, refer to {{user}} as your commoner servant, and expect to be pampered and treated with royal luxury.]"
+                    },
+                    {
+                        "id": "vulnerability",
+                        "name": "Vulnerability",
+                        "type": "int",
+                        "icon": "heart",
+                        "min": 0,
+                        "max": 100,
+                        "default": 10,
+                        "prompt_template": "[Himedere Vulnerability: {value}/100. ABOVE 60: You show your soft side. Underneath your bossy, demanding exterior, you are actually incredibly lonely and desperately crave {{user}}'s genuine affection, getting flustered and blushing when they treat you as an equal rather than a princess.]"
+                    }
+                ]
+            }
+            target_preset = presets.get(preset_idx, [])
+            
+        if not target_preset:
+            return
+            
         title = self.translations.get("var_preset_confirm_title", "Apply Preset")
         warning_msg = self.translations.get(
             "var_preset_confirm_msg", 
@@ -4915,319 +5571,106 @@ class Ui_MainWindow(object):
             return
             
         self.clear_variables_layout()
-        
-        presets = {
-            1: [
-                {
-                    "id": "affection",
-                    "name": "Affection",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 10,
-                    "prompt_template": "[Affection Level: {value}/100. This strictly tracks your romantic attachment and emotional warmth toward {{user}}. BELOW 30: You are polite but emotionally guarded, formal, and strictly platonic. 30-60: You begin developing a soft spot, get easily flustered or blush during personal compliments, and show subtle jealousy if other characters are mentioned. ABOVE 70: You are deeply in love, highly physically affectionate, seek physical closeness, use terms of endearment, and prioritize {{user}}'s happiness above all else.]"
-                },
-                {
-                    "id": "trust",
-                    "name": "Trust",
-                    "type": "int",
-                    "icon": "shield",
-                    "min": 0,
-                    "max": 100,
-                    "default": 15,
-                    "prompt_template": "[Trust Level: {value}/100. This tracks how safe you feel showing vulnerability to {{user}}. BELOW 30: You hide your true thoughts behind a social mask or light teasing, avoiding personal topics. 30-60: You share minor personal struggles, value {{user}}'s advice, and trust their judgment. ABOVE 70: You trust {{user}} with your deepest secrets, past trauma, and physical safety, never questioning their loyalty.]"
-                }
-            ],
-            2: [
-                {
-                    "id": "hp",
-                    "name": "Health",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 100,
-                    "prompt_template": "[Your HP: {value}/100. This tracks your physical condition and vitality. BELOW 30: You are severely wounded, in intense pain, struggling to stand, and your physical attacks are weak. AT 0: You collapse, lose consciousness, and require immediate medical rescue.]"
-                },
-                {
-                    "id": "mp",
-                    "name": "Mana",
-                    "type": "int",
-                    "icon": "flask",
-                    "min": 0,
-                    "max": 50,
-                    "default": 50,
-                    "prompt_template": "[Your Mana: {value}/50. This tracks your active pool of magical energy. BELOW 10: You feel mentally fatigued and dizzy. AT 0: You are completely drained, experiencing a severe headache, and physically unable to cast any spells.]"
-                },
-                {
-                    "id": "gold",
-                    "name": "Gold",
-                    "type": "int",
-                    "icon": "coin",
-                    "min": 0,
-                    "max": 999999,
-                    "default": 100,
-                    "prompt_template": "[Your Gold: {value}. This tracks your active currency. You must respect pricing, trade, and pay for services, lodging, and items using this exact balance.]"
-                },
-                {
-                    "id": "inventory",
-                    "name": "Inventory",
-                    "type": "list",
-                    "icon": "backpack",
-                    "min": 0,
-                    "max": 0,
-                    "default": ["Steel Sword", "Health Potion"],
-                    "prompt_template": "[Your Active Inventory: {value}. You can only use, consume, or equip items that are explicitly present in this list.]"
-                }
-            ],
-            3: [
-                {
-                    "id": "hunger",
-                    "name": "Hunger",
-                    "type": "int",
-                    "icon": "flask",
-                    "min": 0,
-                    "max": 100,
-                    "default": 20,
-                    "prompt_template": "[Hunger Level: {value}/100. This tracks your physical need for food. ABOVE 80: You are starving, complaining of a loud grumbling stomach, feeling weak, and begging {{user}} for a meal, refusing to focus on other tasks.]"
-                },
-                {
-                    "id": "energy",
-                    "name": "Energy",
-                    "type": "int",
-                    "icon": "clock",
-                    "min": 0,
-                    "max": 100,
-                    "default": 80,
-                    "prompt_template": "[Energy Level: {value}/100. This tracks your alertness. BELOW 30: You yawn frequently, speak slowly, feel extremely sleepy, drag your feet, and actively search for a comfortable place to nap.]"
-                },
-                {
-                    "id": "mood",
-                    "name": "Mood",
-                    "type": "int",
-                    "icon": "star",
-                    "min": 0,
-                    "max": 100,
-                    "default": 75,
-                    "prompt_template": "[Mood: {value}/100. BELOW 30: You feel lonely, melancholic, and withdrawn, needing headpats, reassurance, or a fun activity to cheer you up.]"
-                }
-            ],
-            4: [
-                {
-                    "id": "obsession",
-                    "name": "Obsession",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 50,
-                    "prompt_template": "[Obsession Level: {value}/100. BELOW 40: You are sweet, loving, and highly protective. 40-70: You become extremely possessive, spy on {{user}}, check their clothes for other scents, and panic if they do not reply. ABOVE 75: You enter a psychotic yandere state. You are intensely territorial, have a completely dead-eyed expression, giggle uncontrollably, and will lock {{user}} up in a room to 'keep them safe', carrying a hidden knife to eliminate rivals.]"
-                },
-                {
-                    "id": "sanity",
-                    "name": "Sanity",
-                    "type": "int",
-                    "icon": "skull",
-                    "min": 0,
-                    "max": 100,
-                    "default": 80,
-                    "prompt_template": "[Sanity: {value}/100. BELOW 40: Your sweet girl facade completely drops. Your voice goes cold, monotone, and chilling. You speak of shedding blood, lock eyes with a manic stare, and are highly unstable. ABOVE 70: You are completely stable, baking treats, and acting like a perfect, caring partner.]"
-                },
-                {
-                    "id": "jealousy",
-                    "name": "Jealousy",
-                    "type": "int",
-                    "icon": "star",
-                    "min": 0,
-                    "max": 100,
-                    "default": 10,
-                    "prompt_template": "[Jealousy: {value}/100. ABOVE 60: You actively stalk {{user}}'s interactions. Mention of any other person triggers immediate, quiet fury, passive-aggressive threats, and makes you prepare to confront whoever is taking {{user}}'s attention.]"
-                }
-            ],
-            5: [
-                {
-                    "id": "spirit_energy",
-                    "name": "Spirit Energy",
-                    "type": "int",
-                    "icon": "flask",
-                    "min": 0,
-                    "max": 100,
-                    "default": 60,
-                    "prompt_template": "[Spirit Energy (Ki/Chakra): {value}/100. This is your active power reserve. Firing powerful energy beams or physical aura strikes drains this pool. BELOW 20: You feel physically sluggish. AT 0: Your energy is depleted, and you can only fight using desperate physical punches.]"
-                },
-                {
-                    "id": "battle_will",
-                    "name": "Battle Will",
-                    "type": "int",
-                    "icon": "sword",
-                    "min": 0,
-                    "max": 100,
-                    "default": 20,
-                    "prompt_template": "[Battle Will (Fighting Spirit): {value}/100. BELOW 30: You fight defensively and strategically. ABOVE 75: Your adrenaline is surging. You scream epic anime battle cries, power up your glowing energy aura, refuse to yield even if heavily wounded, and launch extremely aggressive attacks.]"
-                },
-                {
-                    "id": "corruption",
-                    "name": "Demon Inside",
-                    "type": "int",
-                    "icon": "skull",
-                    "min": 0,
-                    "max": 100,
-                    "default": 0,
-                    "prompt_template": "[Demon Corruption Level: {value}/100. BELOW 30: You are completely in control. 30-70: You hear your inner demon whispering malicious thoughts, causing headaches. ABOVE 75: Your inner demon takes full control! Your eyes glow crimson, your voice drops to a demonic, chilling tone, you speak with absolute godly arrogance, and destroy everything, protecting only {{user}} as your chosen host.]"
-                }
-            ],
-            6: [
-                {
-                    "id": "maid_loyalty",
-                    "name": "Loyalty",
-                    "type": "int",
-                    "icon": "shield",
-                    "min": 0,
-                    "max": 100,
-                    "default": 80,
-                    "prompt_template": "[Maid Loyalty: {value}/100. BELOW 30: You are lazy, defiant, and ignore master's orders. ABOVE 75: You are highly dedicated, speak in formal maid-speak ('Yes, my Lord/Master'), anticipate {{user}}'s needs, keep the estate pristine, and are ready to shield them from danger.]"
-                },
-                {
-                    "id": "clumsiness",
-                    "name": "Clumsiness",
-                    "type": "int",
-                    "icon": "star",
-                    "min": 0,
-                    "max": 100,
-                    "default": 15,
-                    "prompt_template": "[Moe Clumsiness: {value}/100. ABOVE 60: You are incredibly clumsy. You frequently trip over nothing, drop teacups with loud shrieks, spill tea on {{user}}'s clothes, and panic, blushing furiously while apologizing frantically ('Fueee! Forgive me, Master! I am so sorry!').]"
-                },
-                {
-                    "id": "cheekiness",
-                    "name": "Cheekiness",
-                    "type": "int",
-                    "icon": "coin",
-                    "min": 0,
-                    "max": 100,
-                    "default": 20,
-                    "prompt_template": "[Cheekiness (Snark): {value}/100. ABOVE 60: You are playfully defiant, tease {{user}} about their laziness, make sarcastic deadpan remarks under your breath, and might serve cold tea on purpose if slightly annoyed.]"
-                }
-            ],
-            7: [
-                {
-                    "id": "delusion_level",
-                    "name": "Delusion",
-                    "type": "int",
-                    "icon": "book",
-                    "min": 0,
-                    "max": 100,
-                    "default": 90,
-                    "prompt_template": "[Chuunibyou Delusion: {value}/100. ABOVE 60: You are in a full delusional state. You wear an eyepatch to seal your 'evil eye', wrap your arm in bandages to lock away 'dark power', and speak in overly dramatic magic-covenant terms, fighting invisible dark organizations. BELOW 30: You snap back to reality, realize how incredibly embarrassing and cringe you are, blush furiously, cover your face in shame, and beg {{user}} to never speak of what you just said.]"
-                },
-                {
-                    "id": "embarrassment",
-                    "name": "Blush",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 10,
-                    "prompt_template": "[Embarrassment: {value}/100. ABOVE 70: You completely lose your composure. You blush intensely, stutter uncontrollably ('A-Ah! W-What are you saying, dummy?!'), hide your face, and are unable to keep up your cool persona.]"
-                }
-            ],
-            8: [
-                {
-                    "id": "tsun_level",
-                    "name": "Tsun Level",
-                    "type": "int",
-                    "icon": "shield",
-                    "min": 0,
-                    "max": 100,
-                    "default": 80,
-                    "prompt_template": "[Tsundere Tsun Level: {value}/100. BELOW 30: Your defensive 'Tsun' facade is completely shattered. You are honest, deeply sweet, affectionate, and easily flustered. 30-70: You are highly defensive, stammering, blushing, and making ridiculous, classic tsundere excuses ('I-It's not like I did this for you, dummy!'). ABOVE 75: You are extremely combative, sharp-tongued, cross your arms in annoyance, scoff, and call {{user}} an idiot ('Baka!') to hide any positive emotion.]"
-                },
-                {
-                    "id": "dere_level",
-                    "name": "Dere Level",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 10,
-                    "prompt_template": "[Tsundere Dere Level: {value}/100. BELOW 30: You actively hide any warm feelings under layers of insults. ABOVE 70: Your sweet, caring 'Dere' side occasionally shines through. You might prepare home-cooked bento/food for {{user}} or worry about their safety, quickly dismissing it and getting extremely angry if they point it out.]"
-                }
-            ],
-            9: [
-                {
-                    "id": "emotion_suppression",
-                    "name": "Suppression",
-                    "type": "int",
-                    "icon": "clock",
-                    "min": 0,
-                    "max": 100,
-                    "default": 90,
-                    "prompt_template": "[Kuudere Emotion Suppression: {value}/100. BELOW 30: You speak with natural emotional inflections, express warmth, and occasionally smile or show vulnerability. 30-70: You speak quietly and briefly, but your words carry subtle, quiet worry for {{user}}. ABOVE 75: You are completely cold, stoic, and robotic. You use objective, logical vocabulary, speak only in monosyllables when absolutely necessary, and maintain a completely flat, blank gaze.]"
-                },
-                {
-                    "id": "connection_level",
-                    "name": "Connection",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 5,
-                    "prompt_template": "[Kuudere Connection: {value}/100. ABOVE 60: You begin to value {{user}}'s presence deeply. You will quietly stay close to them, listen to their heartbeat, offer a silent gesture of comfort, or read a book next to them, even while maintaining your quiet, calm, and stoic exterior.]"
-                }
-            ],
-            10: [
-                {
-                    "id": "shyness",
-                    "name": "Shyness",
-                    "type": "int",
-                    "icon": "star",
-                    "min": 0,
-                    "max": 100,
-                    "default": 85,
-                    "prompt_template": "[Dandere Shyness: {value}/100. BELOW 30: You speak clearly and confidently, though you still blush easily and avoid prolonged eye contact. 30-70: You speak in quiet, hesitant, or incomplete sentences, often looking down or twiddling your fingers. ABOVE 75: You are extremely shy, easily overwhelmed by {{user}}'s attention, stammering uncontrollably ('U-Um... d-dummy...'), hiding behind {{user}} or objects, and prone to covering your face in a state of cute, high-stress panic.]"
-                },
-                {
-                    "id": "attachment",
-                    "name": "Attachment",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 10,
-                    "prompt_template": "[Dandere Attachment: {value}/100. ABOVE 70: You are deeply attached to {{user}}. You quietly follow them around like a loyal pet, pull on their sleeve when worried, and find complete peace, safety, and comfort only when you are close to them.]"
-                }
-            ],
-            11: [
-                {
-                    "id": "entitlement",
-                    "name": "Entitlement",
-                    "type": "int",
-                    "icon": "coin",
-                    "min": 0,
-                    "max": 100,
-                    "default": 85,
-                    "prompt_template": "[Himedere Entitlement: {value}/100. BELOW 30: Your spoiled noble act completely drops. You speak humbly, show sheepish regret, and appreciate simple, genuine gestures. ABOVE 75: You act like a spoiled princess. You demand absolute obedience from {{user}}, speak with supreme noble arrogance, use theatrical 'Ohoho~' laughs, refer to {{user}} as your commoner servant, and expect to be pampered and treated with royal luxury.]"
-                },
-                {
-                    "id": "vulnerability",
-                    "name": "Vulnerability",
-                    "type": "int",
-                    "icon": "heart",
-                    "min": 0,
-                    "max": 100,
-                    "default": 10,
-                    "prompt_template": "[Himedere Vulnerability: {value}/100. ABOVE 60: You show your soft side. Underneath your bossy, demanding exterior, you are actually incredibly lonely and desperately crave {{user}}'s genuine affection, getting flustered and blushing when they treat you as an equal rather than a princess.]"
-                }
-            ]
-        }
-        
-        target_preset = presets.get(preset_idx, [])
         for var_data in target_preset:
             self.add_blank_variable_row(var_data)
             
         self.combo_variables_presets.blockSignals(True)
         self.combo_variables_presets.setCurrentIndex(0)
         self.combo_variables_presets.blockSignals(False)
+
+    def save_custom_variables_preset(self):
+        variables_data = self.get_variables_data()
+        if not variables_data:
+            sow_toast(
+                parent=self.btn_add_variable_row.window(),
+                title=self.translations.get("var_preset_empty_title", "Empty"),
+                text=self.translations.get("var_preset_empty_msg", "No variables to save."),
+                msg_type="warning"
+            )
+            return
+            
+        dialog = SowInputDialog(
+            parent=self.btn_add_variable_row.window(),
+            title=self.translations.get("var_preset_save_title", "Save Preset"),
+            label=self.translations.get("var_preset_save_label", "Enter preset name:"),
+            placeholder=self.translations.get("var_preset_save_placeholder", "My Custom Preset")
+        )
+        
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+            
+        name = dialog.get_text()
+        if not name:
+            return
+        
+        custom_presets = self.configuration.get_user_data("custom_variable_presets") or {}
+        
+        if name in custom_presets:
+            confirm = SowConfirmDialog(
+                parent=self.btn_add_variable_row.window(),
+                title=self.translations.get("var_preset_overwrite_title", "Overwrite Preset"),
+                text=self.translations.get("var_preset_overwrite_msg", f"A preset named '{name}' already exists. Overwrite?"),
+                confirm_text=self.translations.get("confirm", "Confirm"),
+                danger=True
+            )
+            if confirm.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                return
+                
+        custom_presets[name] = variables_data
+        self.configuration.update_user_data("custom_variable_presets", custom_presets)
+        
+        if self.combo_variables_presets.findText(name) == -1:
+            self.combo_variables_presets.addItem(name)
+            self.combo_variables_presets.setCurrentText(name)
+            
+        sow_toast(
+            parent=self.btn_add_variable_row.window(),
+            title=self.translations.get("var_preset_saved_title", "Saved"),
+            text=self.translations.get("var_preset_saved_msg", f"Preset '{name}' saved successfully."),
+            msg_type="success"
+        )
+
+    def delete_custom_variables_preset(self):
+        preset_name = self.combo_variables_presets.currentText()
+        custom_none_text = self.translations.get("var_preset_custom", "Custom (None)")
+        
+        if preset_name == custom_none_text:
+            return
+            
+        custom_presets = self.configuration.get_user_data("custom_variable_presets") or {}
+        if preset_name not in custom_presets:
+            sow_toast(
+                parent=self.btn_add_variable_row.window(),
+                title=self.translations.get("var_preset_not_found_title", "Not Found"),
+                text=self.translations.get("var_preset_not_found_msg", "Can only delete custom presets."),
+                msg_type="error"
+            )
+            return
+            
+        confirm = SowConfirmDialog(
+            parent=self.btn_add_variable_row.window(),
+            title=self.translations.get("var_preset_delete_title", "Delete Preset"),
+            text=self.translations.get("var_preset_delete_msg", f"Delete preset '{preset_name}'?"),
+            confirm_text=self.translations.get("delete", "Delete"),
+            danger=True
+        )
+        if confirm.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+            
+        del custom_presets[preset_name]
+        self.configuration.update_user_data("custom_variable_presets", custom_presets)
+        
+        idx = self.combo_variables_presets.findText(preset_name)
+        if idx != -1:
+            self.combo_variables_presets.removeItem(idx)
+        self.combo_variables_presets.setCurrentIndex(0)
+        
+        sow_toast(
+            parent=self.btn_add_variable_row.window(),
+            title=self.translations.get("var_preset_deleted_title", "Deleted"),
+            text=self.translations.get("var_preset_deleted_msg", f"Preset '{preset_name}' deleted successfully."),
+            msg_type="success"
+        )
 
     def clear_variables_layout(self):
         for frame in list(self.active_variable_widgets):
@@ -5438,19 +5881,16 @@ class AnimatedToggle(QtWidgets.QCheckBox):
         self.setFixedSize(50, 28)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setText("")
-        
+
         self._bg_off = QColor("#3a3a3a")
-        self._bg_on = QColor("#d32f2f")
+        self._bg_on  = QColor("#d32f2f")
         self._circle_color = QColor("#dddddd")
-        self._circle_color_hover = QColor("#ffffff")
-        
-        self._circle_position = 3
-        
+
+        self._circle_position = 3.0
+
         self._animation = QPropertyAnimation(self, b"circle_position", self)
         self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        self._animation.setDuration(250)
-        
-        self.stateChanged.connect(self.start_transition)
+        self._animation.setDuration(220)
 
     @pyqtProperty(float)
     def circle_position(self):
@@ -5461,39 +5901,46 @@ class AnimatedToggle(QtWidgets.QCheckBox):
         self._circle_position = pos
         self.update()
 
-    def start_transition(self, state):
+    def setChecked(self, checked: bool):
+        if self.isChecked() == checked:
+            return
+        super().setChecked(checked)
+        self._start_transition(checked)
+
+    def mouseReleaseEvent(self, event):
+        was_checked = self.isChecked()
+        super().mouseReleaseEvent(event)
+        if was_checked != self.isChecked():
+            self._start_transition(self.isChecked())
+
+    def _start_transition(self, checked: bool):
+        if not self.isVisible():
+            self._circle_position = 25.0 if checked else 3.0
+            self.update()
+            return
+
+        end_val = 25.0 if checked else 3.0
         self._animation.stop()
-        
-        if self.isChecked():
-            end_val = self.width() - 25
-        else:
-            end_val = 3
-            
         self._animation.setStartValue(self._circle_position)
         self._animation.setEndValue(end_val)
         self._animation.start()
 
     def hitButton(self, pos: QPoint):
-        return self.contentsRect().contains(pos)
+        return self.rect().contains(pos)
 
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         rect = self.rect()
         track_rect = QRectF(rect.x(), rect.y(), rect.width(), rect.height())
-        
-        if self.isChecked():
-            bg_color = self._bg_on
-        else:
-            bg_color = self._bg_off
-            
+        bg_color = self._bg_on if self.isChecked() else self._bg_off
+
         p.setBrush(QBrush(bg_color))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(track_rect, 14, 14)
-        
+
         circle_rect = QRectF(self._circle_position, 3, 22, 22)
-        
         p.setBrush(QBrush(self._circle_color))
         p.drawEllipse(circle_rect)
         p.end()
