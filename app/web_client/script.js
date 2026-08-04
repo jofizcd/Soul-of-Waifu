@@ -8,6 +8,28 @@ const HISTORY_LIMIT = 50;
 let isLoadingHistory = false;
 let hasMoreHistory = true;
 
+// Auth Token Parsing
+const urlParams = new URLSearchParams(window.location.search);
+let authToken = urlParams.get('token');
+
+if (authToken) {
+    localStorage.setItem('sow_auth_token', authToken);
+} else {
+    authToken = localStorage.getItem('sow_auth_token') || '';
+}
+
+// Universal authenticated fetch wrapper
+async function authFetch(url, options = {}) {
+    options = { ...options };
+    if (options.headers instanceof Headers) {
+        if (authToken) options.headers.append('X-SOW-Token', authToken);
+    } else {
+        options.headers = { ...options.headers };
+        if (authToken) options.headers['X-SOW-Token'] = authToken;
+    }
+    return fetch(url, options);
+}
+
 // Audio
 let audioQueue = [];
 let isPlayingAudio = false;
@@ -57,7 +79,7 @@ async function init() {
     });
 
     try {
-        const resp = await fetch('/api/config');
+        const resp = await authFetch('/api/config');
         const config = await resp.json();
 
         await loadCharacters();
@@ -66,7 +88,7 @@ async function init() {
         if (config.active_character && config.active_character !== "None") {
             currentCharacter = config.active_character;
             document.getElementById('char-name').innerText = currentCharacter;
-            charAvatarElement.src = `/api/avatar/${currentCharacter}`;
+            charAvatarElement.src = `/api/avatar/${currentCharacter}?token=${encodeURIComponent(authToken)}`;
             statusTextElement.innerText = "Connecting to chat...";
             await loadAvatar(config.active_character);
             await loadHistory(true);
@@ -88,7 +110,7 @@ async function init() {
 // Characters
 async function loadCharacters() {
     try {
-        const resp = await fetch('/api/characters');
+        const resp = await authFetch('/api/characters');
         const data = await resp.json();
         
         if (!characterGrid) return;
@@ -109,7 +131,7 @@ async function loadCharacters() {
             }
 
             card.innerHTML = `
-                <img class="card-avatar" src="/api/avatar/${char}" alt="${char}" loading="lazy">
+                <img class="card-avatar" src="/api/avatar/${char}?token=${encodeURIComponent(authToken)}" alt="${char}" loading="lazy">
                 <h3 class="card-name">${char}</h3>
             `;
 
@@ -124,7 +146,7 @@ async function loadCharacters() {
                 if (mainMenu) mainMenu.classList.add('hidden');
 
                 try {
-                    await fetch('/api/character/switch', {
+                    await authFetch('/api/character/switch', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ character: char })
@@ -145,9 +167,9 @@ async function loadCharacters() {
 
 async function loadBackground() {
     try {
-        const resp = await fetch('/api/background');
+        const resp = await authFetch('/api/background');
         if (resp.ok) {
-            document.body.style.backgroundImage = `url('/api/background?t=${Date.now()}')`;
+            document.body.style.backgroundImage = `url('/api/background?t=${Date.now()}&token=${encodeURIComponent(authToken)}')`;
         }
     } catch (e) {
         console.error("Failed to load background", e);
@@ -157,7 +179,7 @@ async function loadBackground() {
 async function loadAvatar(charName) {
     if (!charName || charName === "None") return;
     try {
-        const resp = await fetch(`/api/avatar_config/${charName}`);
+        const resp = await authFetch(`/api/avatar_config/${charName}`);
         const config = await resp.json();
         currentAvatarMode = config.mode;
 
@@ -519,7 +541,7 @@ async function initVRM(canvas, modelUrl) {
     async function loadIdleAnimation() {
         try {
             const { loadMixamoAnimation } = await import('loadMixamo');
-            const idleUrl = '/app/utils/emotions/vrm/expressions/neutral.fbx';
+            const idleUrl = '/vrm/expressions/neutral.fbx';
             const clip    = await loadMixamoAnimation(idleUrl, currentVrm);
             if (clip && currentMixer) {
                 const action   = currentMixer.clipAction(clip);
@@ -603,7 +625,7 @@ async function loadHistory(isFirstLoad = false) {
     if (!currentCharacter || isLoadingHistory || !hasMoreHistory) return;
     isLoadingHistory = true;
     try {
-        const resp = await fetch(
+        const resp = await authFetch(
             `/api/history/${currentCharacter}?offset=${historyOffset}&limit=${HISTORY_LIMIT}`
         );
         const data = await resp.json();
@@ -633,7 +655,8 @@ async function loadHistory(isFirstLoad = false) {
 
 function connectWebSocket() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(authToken)}`;
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
         console.log("WebSocket connected");
@@ -759,7 +782,7 @@ function enableEditMode(div, id) {
     saveBtn.innerText = 'Save';
     saveBtn.onclick  = async () => {
         const newText = input.value;
-        const resp = await fetch(`/api/messages/${id}`, {
+        const resp = await authFetch(`/api/messages/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ character: currentCharacter, text: newText })
@@ -781,7 +804,7 @@ function enableEditMode(div, id) {
 
 async function deleteMessage(id) {
     if (!confirm("Delete this message?")) return;
-    await fetch(`/api/messages/${id}`, {
+    await authFetch(`/api/messages/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ character: currentCharacter })
@@ -789,7 +812,7 @@ async function deleteMessage(id) {
 }
 
 async function regenerateMessage(id) {
-    await fetch(`/api/messages/${id}/regenerate`, {
+    await authFetch(`/api/messages/${id}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ character: currentCharacter })
@@ -855,7 +878,7 @@ msgInput.onkeypress = (e) => {
     }
 };
 msgInput.oninput          = (e) => { sendBtn.classList.toggle('active', e.target.value.trim().length > 0); };
-if (stopBtn) stopBtn.onclick = async () => { await fetch('/api/generation/stop', { method: 'POST' }); hideTypingIndicator(); };
+if (stopBtn) stopBtn.onclick = async () => { await authFetch('/api/generation/stop', { method: 'POST' }); hideTypingIndicator(); };
 
 function handleIncomingAudio(b64Audio) {
     audioQueue.push(b64Audio);
@@ -921,7 +944,7 @@ async function toggleRecording() {
                 showTypingIndicator();
 
                 try {
-                    const resp   = await fetch('/api/voice/stt', { method: 'POST', body: formData });
+                    const resp   = await authFetch('/api/voice/stt', { method: 'POST', body: formData });
                     const result = await resp.json();
                     if (result.status === 'ok' && result.text) {
                         const el = createMessageElement(result.text, 'user', Date.now().toString());
