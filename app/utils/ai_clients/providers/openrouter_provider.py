@@ -35,7 +35,7 @@ class OpenRouterProvider(BaseAIProvider):
             "max_tokens": kwargs.get("max_tokens", 1000),
             "temperature": kwargs.get("temperature", 0.7),
             "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"]),
+            **({"stop": kwargs["stop"]} if kwargs.get("stop") else {}),
             "extra_headers": self.extra_headers
         }
 
@@ -61,7 +61,7 @@ class OpenRouterProvider(BaseAIProvider):
             "max_tokens": kwargs.get("max_tokens", 1000),
             "temperature": kwargs.get("temperature", 0.5),
             "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"]),
+            **({"stop": kwargs["stop"]} if kwargs.get("stop") else {}),
             "extra_headers": self.extra_headers
         }
 
@@ -82,7 +82,7 @@ class OpenRouterProvider(BaseAIProvider):
             "max_tokens": kwargs.get("max_tokens", 1000),
             "temperature": kwargs.get("temperature", 0.7),
             "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"]),
+            **({"stop": kwargs["stop"]} if kwargs.get("stop") else {}),
             "extra_headers": self.extra_headers
         }
 
