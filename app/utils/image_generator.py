@@ -151,6 +151,7 @@ class ImageGenerator:
             "prompt": prompt,
             "n":      1,
             "size":   "1024x1024",
+            "response_format": "b64_json"
         }
 
         try:
@@ -161,14 +162,9 @@ class ImageGenerator:
                         logger.error("DALL-E generation error %d: %s", gen_resp.status, body[:300])
                         return None
                     gen_data  = await gen_resp.json()
-                    image_url = gen_data["data"][0]["url"]
-
-                async with session.get(image_url) as img_resp:
-                    if img_resp.status == 200:
-                        return await img_resp.read()
-                    else:
-                        logger.error("DALL-E download error %d for URL: %s", img_resp.status, image_url)
-                        return None
+                    
+                    b64 = gen_data["data"]["b64_json"]
+                    return base64.b64decode(b64)
 
         except aiohttp.ClientConnectionError:
             logger.error("DALL-E: network connection failed.")
@@ -262,7 +258,7 @@ class ImageGenerator:
     ) -> Optional[bytes]:
         """
         Generate an image using FLUX Pro via the fal.ai API.
-        Requires a FAL_API_KEY token in api.json.
+        Requires a FAL_API_TOKEN token in api.json.
         """
         fal_key = self.api_config.get_token("FAL_API_TOKEN")
         if not fal_key:
