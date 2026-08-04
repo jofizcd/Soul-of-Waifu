@@ -6,6 +6,7 @@ import logging
 import json
 import aiohttp
 import random
+import hashlib
 from pathlib import Path
 
 import yaml
@@ -46,7 +47,6 @@ def _load_translations() -> dict:
             pass
     return {}
 
-# CUSTOM WIDGETS
 class Live2DWidget(QOpenGLWidget):
     """
     Initializes the Live2DWidget for rendering Live2D models.
@@ -1406,11 +1406,24 @@ class GatewayPreviewDialog(QDialog):
         self.close()
         asyncio.ensure_future(self.import_method(self.asset_title, self.download_url))
 
+AVATAR_GRADIENTS = [
+    ("#FF7A7A", "#E33D3D"),
+    ("#5EEAD4", "#0D9488"),
+    ("#C4B5FD", "#7C3AED"),
+    ("#93C5FD", "#2563EB"),
+    ("#FDE68A", "#D97706"),
+    ("#86EFAC", "#16A34A"),
+    ("#F9A8D4", "#DB2777"),
+    ("#A5B4FC", "#4F46E5"),
+]
+
 class ModelListItemWidget(QWidget):
-    def __init__(self, model_name, file_size_bytes, full_path, refresh_method, launch_server_method, stop_server_method, ui, parent=None, is_server_running=False):
+    def __init__(self, model_name, file_size_bytes, full_path, refresh_method,
+                 launch_server_method, stop_server_method, ui, parent=None,
+                 is_server_running=False):
         super().__init__(parent)
         self.configuration_settings = configuration.ConfigurationSettings()
-        
+
         self.translations = {}
         selected_language = self.configuration_settings.get_main_setting("program_language")
         match selected_language:
@@ -1430,138 +1443,292 @@ class ModelListItemWidget(QWidget):
         self.parent_widget = parent
         self.is_server_running = is_server_running
 
-        self.setFixedHeight(85)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setStyleSheet("background: transparent;")
-        
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 2, 5, 2) 
-        main_layout.setSpacing(0)
-        
-        self.glass_card = QFrame(self)
-        self.glass_style_normal = """
-            QFrame {
-                background-color: rgba(25, 25, 30, 0.4);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 16px;
-            }
-        """
-        self.glass_style_hover = """
-            QFrame {
-                background-color: rgba(35, 35, 45, 0.65);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 16px;
-            }
-        """
-        self.glass_card.setStyleSheet(self.glass_style_normal)
-        
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(25)
-        shadow.setColor(QColor(0, 0, 0, 80))
-        shadow.setOffset(0, 5)
-        self.glass_card.setGraphicsEffect(shadow)
-
-        card_layout = QHBoxLayout(self.glass_card)
-        card_layout.setContentsMargins(12, 10, 12, 10) 
-        card_layout.setSpacing(10)
-
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(6)
-
-        name_row_layout = QHBoxLayout()
-        name_row_layout.setSpacing(8)
-        
-        self.icon_label = QLabel()
-        self.icon_label.setStyleSheet("background: transparent; border: none;")
-        self.icon_label.setFixedSize(18, 18)
-        self.icon_label.setScaledContents(True)
-        name_row_layout.addWidget(self.icon_label)
-
-        self.name_label = QLabel(model_name)
-        font_name = QtGui.QFont("Inter Tight SemiBold", 11, QtGui.QFont.Weight.Bold)
-        font_name.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
-        self.name_label.setFont(font_name)
-        self.name_label.setStyleSheet("color: rgba(255, 255, 255, 0.95); background: transparent; border: none;")
-        name_row_layout.addWidget(self.name_label)
-        name_row_layout.addStretch()
-
-        info_layout.addLayout(name_row_layout)
-
-        meta_row_layout = QHBoxLayout()
-        meta_row_layout.setSpacing(8)
-
-        size_str = self.human_readable_size(file_size_bytes)
-        self.size_badge = QLabel(f"💾 {size_str}")
-        self.size_badge.setFixedHeight(20)
-        self.size_badge.setStyleSheet("""
-            QLabel {
-                background-color: rgba(255, 255, 255, 0.05);
-                color: rgba(255, 255, 255, 0.6);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                padding: 3px 8px;
-                font-size: 10px;
-                font-family: 'Inter Tight Medium';
-            }
-        """)
-        meta_row_layout.addWidget(self.size_badge)
-
-        self.status_badge = QLabel()
-        self.status_badge.setFixedHeight(20)
-        meta_row_layout.addWidget(self.status_badge)
-        meta_row_layout.addStretch()
-        self.status_badge.hide()
-
-        info_layout.addLayout(meta_row_layout)
-        card_layout.addLayout(info_layout, stretch=1)
-
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(10)
-
-        self.btn_set_default = QPushButton(self.translations.get("button_set_default", "Set as Default"))
-        icon_launch = QtGui.QIcon()
-        icon_launch.addPixmap(QtGui.QPixmap("app/gui/icons/default_model.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.btn_set_default.setIcon(icon_launch)
-        self.btn_set_default.setIconSize(QtCore.QSize(14, 14))
-
         current_default_path = self.configuration_settings.get_main_setting("local_llm")
         current_default_name = None
         if current_default_path and os.path.exists(current_default_path):
             current_default_name = os.path.splitext(os.path.basename(current_default_path))[0]
+        self.is_default = current_default_name == self.model_name
 
-        if current_default_name == model_name and is_server_running:
-            self.btn_launch_server = QPushButton(self.translations.get("button_disable_server", "Unload Model"))
+        if self.is_default and is_server_running:
             self.server_loaded = True
         else:
-            self.btn_launch_server = QPushButton(self.translations.get("button_launch_server", "Load Model"))
             self.server_loaded = False
-            
-        self.btn_delete = QPushButton()
-        self.btn_delete.setToolTip(self.translations.get("button_delete_model", "Delete model"))
-        icon_delete = QtGui.QIcon()
-        icon_delete.addPixmap(QtGui.QPixmap("app/gui/icons/bin.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.btn_delete.setIcon(icon_delete)
-        self.btn_delete.setIconSize(QtCore.QSize(16, 16))
+
+        self.setFixedHeight(72)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(6, 4, 6, 4)
+        outer_layout.setSpacing(0)
+
+        self.card = QFrame(self)
+        self.card.setObjectName("card")
+        self._apply_card_style(hover=False)
+
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(18)
+        shadow.setColor(QColor(0, 0, 0, 60))
+        shadow.setOffset(0, 3)
+        self.card.setGraphicsEffect(shadow)
+
+        card_layout = QHBoxLayout(self.card)
+        card_layout.setContentsMargins(0, 0, 0, 0)
+        card_layout.setSpacing(0)
+
+        self.accent_bar = QFrame()
+        self.accent_bar.setFixedWidth(4)
+        self.accent_bar.setFixedHeight(32)
+        card_layout.addWidget(self.accent_bar)
+        self._update_accent_bar()
+
+        content = QWidget()
+        content_layout = QHBoxLayout(content)
+        content_layout.setContentsMargins(12, 8, 12, 8)
+        content_layout.setSpacing(12)
+        card_layout.addWidget(content, stretch=1)
+
+        avatar_box = QWidget()
+        avatar_box.setFixedSize(40, 40)
+        avatar_grid = QGridLayout(avatar_box)
+        avatar_grid.setContentsMargins(0, 0, 0, 0)
+        avatar_grid.setSpacing(0)
+
+        self.avatar_label = QLabel()
+        self.avatar_label.setFixedSize(40, 40)
+        self.avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        c1, c2 = self._avatar_colors(self.model_name)
+        border = "border: 2px solid rgba(255,215,0,0.85);" if self.is_default else "border: none;"
+        self.avatar_label.setStyleSheet(f"""
+            QLabel {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {c1}, stop:1 {c2});
+                border-radius: 20px;
+                {border}
+                color: white;
+                font-family: 'Inter Tight SemiBold';
+                font-size: 15px;
+                font-weight: bold;
+            }}
+        """)
+        self.avatar_label.setText(self.model_name[:1].upper() if self.model_name else "?")
+        avatar_grid.addWidget(self.avatar_label, 0, 0)
+
+        if self.is_default:
+            star_badge = QLabel()
+            font = QtGui.QFont()
+            font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+            star_badge.setFont(font)
+            star_badge.setFixedSize(16, 16)
+            star_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            star_pix = QPixmap("app/gui/icons/star.png")
+            if not star_pix.isNull():
+                star_badge.setPixmap(star_pix.scaled(
+                    11, 11, Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                ))
+            else:
+                star_badge.setText("★")
+                star_badge.setStyleSheet(star_badge.styleSheet() + "color: #FFD700; font-size: 9px;")
+            star_badge.setStyleSheet(star_badge.styleSheet() + """
+                background-color: #1c1c22;
+                border: 1px solid rgba(255,215,0,0.6);
+                border-radius: 8px;
+            """)
+            avatar_grid.addWidget(
+                star_badge, 0, 0,
+                alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight
+            )
+
+        content_layout.addWidget(avatar_box)
+
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(4)
+
+        self.name_label = QLabel(self.model_name)
+        font_name = QtGui.QFont("Inter Tight SemiBold", 11, QtGui.QFont.Weight.Bold)
+        font_name.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.name_label.setFont(font_name)
+        name_color = "#FFD86B" if self.is_default else "rgba(255, 255, 255, 0.92)"
+        self.name_label.setStyleSheet(f"color: {name_color}; background: transparent; border: none;")
+        info_layout.addWidget(self.name_label)
+
+        meta_row = QHBoxLayout()
+        meta_row.setSpacing(6)
+
+        size_str = self.human_readable_size(file_size_bytes)
+        self.size_badge = QLabel(size_str)
+        self.size_badge.setStyleSheet(self._pill_style("rgba(255,255,255,0.06)", "rgba(255,255,255,0.55)"))
+        font = QtGui.QFont()
+        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        self.size_badge.setFont(font)
+        meta_row.addWidget(self.size_badge)
+
+        self.status_badge = QLabel()
+        font = QtGui.QFont()
+        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        self.status_badge.setFont(font)
+        if self.is_default:
+            if is_server_running:
+                self.status_badge.setText("●  Running")
+                self.status_badge.setStyleSheet(self._pill_style("rgba(76,175,80,0.15)", "#81C784"))
+            else:
+                self.status_badge.setText("○  Standby")
+                self.status_badge.setStyleSheet(self._pill_style("rgba(255,255,255,0.05)", "rgba(255,255,255,0.5)"))
+            meta_row.addWidget(self.status_badge)
+        else:
+            self.status_badge.hide()
+
+        meta_row.addStretch()
+        info_layout.addLayout(meta_row)
+        content_layout.addLayout(info_layout, stretch=1)
+
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(6)
 
         btn_font = QtGui.QFont("Inter Tight SemiBold", 9)
         btn_font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
-        
-        for btn in [self.btn_set_default, self.btn_launch_server, self.btn_delete]:
-            btn.setFont(btn_font)
-            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
 
-        self.btn_set_default.setFixedHeight(34)
-        self.btn_launch_server.setFixedHeight(34)
-        self.btn_delete.setFixedSize(34, 34)
+        self.btn_set_default = QPushButton("★  " + self.translations.get("button_set_default", "Set Default"))
+        self.btn_set_default.setFont(btn_font)
+        self.btn_set_default.setFixedHeight(30)
+        self.btn_set_default.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_set_default.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self._style_secondary_pill(self.btn_set_default)
+        self.btn_set_default.clicked.connect(self.on_set_default_clicked)
 
-        self.btn_set_default.setStyleSheet("""
+        if self.server_loaded:
+            label = self.translations.get("button_disable_server", "Unload")
+        else:
+            label = self.translations.get("button_launch_server", "Load")
+        self.btn_launch_server = QPushButton(label)
+        self.btn_launch_server.setFont(btn_font)
+        self.btn_launch_server.setFixedHeight(30)
+        self.btn_launch_server.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.btn_launch_server.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self._style_primary_button(self.btn_launch_server, active=self.server_loaded)
+        if self.server_loaded:
+            self.btn_launch_server.clicked.connect(self.on_unload_model_clicked)
+        else:
+            self.btn_launch_server.clicked.connect(self.on_launch_server_clicked)
+
+        if self.is_default:
+            actions_layout.addWidget(self.btn_launch_server)
+        else:
+            actions_layout.addWidget(self.btn_set_default)
+
+        divider = QFrame()
+        divider.setFixedSize(1, 20)
+        divider.setStyleSheet("background-color: rgba(255,255,255,0.08); border: none;")
+        actions_layout.addWidget(divider)
+
+        self.btn_open_file = self._icon_button(
+            "app/gui/icons/folder.png", 15, "Open file location in Explorer"
+        )
+        self.btn_open_file.clicked.connect(self.on_open_file_location_clicked)
+        actions_layout.addWidget(self.btn_open_file)
+
+        self.btn_delete = self._icon_button(
+            "app/gui/icons/bin.png", 15,
+            self.translations.get("button_delete_model", "Delete model"),
+            danger=True
+        )
+        self.btn_delete.clicked.connect(self.on_delete_clicked)
+        actions_layout.addWidget(self.btn_delete)
+
+        content_layout.addLayout(actions_layout)
+
+        outer_layout.addWidget(self.card)
+        self.setLayout(outer_layout)
+ 
+    def _avatar_colors(self, name):
+        idx = int(hashlib.md5(name.encode("utf-8")).hexdigest(), 16) % len(AVATAR_GRADIENTS)
+        return AVATAR_GRADIENTS[idx]
+ 
+    def _pill_style(self, bg, color):
+        return f"""
+            QLabel {{
+                background-color: {bg};
+                color: {color};
+                border-radius: 6px;
+                padding: 2px 8px;
+                font-size: 10px;
+                font-family: 'Inter Tight Medium';
+            }}
+        """
+ 
+    def _apply_card_style(self, hover):
+        bg = "rgba(255, 255, 255, 0.055)" if hover else "rgba(255, 255, 255, 0.03)"
+        if hover and self.is_default:
+            border = "rgba(255, 215, 0, 0.35)"
+        elif hover:
+            border = "rgba(255, 255, 255, 0.16)"
+        else:
+            border = "rgba(255, 255, 255, 0.06)"
+        self.card.setStyleSheet(f"""
+            QFrame#card {{
+                background-color: {bg};
+                border: 1px solid {border};
+                border-radius: 14px;
+            }}
+        """)
+ 
+    def _update_accent_bar(self):
+        if self.is_default and self.is_server_running:
+            color = "qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #66BB6A, stop:1 #2E7D32)"
+        elif self.is_default:
+            color = "qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #FFD86B, stop:1 #D97706)"
+        else:
+            color = "rgba(255,255,255,0.05)"
+        self.accent_bar.setStyleSheet(f"""
+            QFrame {{
+                background: {color};
+                border-top-left-radius: 14px;
+                border-bottom-left-radius: 14px;
+            }}
+        """)
+ 
+    def _style_primary_button(self, btn, active):
+        if active:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(230, 81, 0, 0.18);
+                    color: #FFCC80;
+                    border-radius: 8px;
+                    border: 1px solid rgba(255, 152, 0, 0.35);
+                    padding: 0px 14px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(230, 81, 0, 0.35);
+                    border: 1px solid rgba(255, 152, 0, 0.6);
+                    color: #ffffff;
+                }
+                QPushButton:pressed { background-color: rgba(230, 81, 0, 0.12); }
+            """)
+        else:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(46, 125, 50, 0.18);
+                    color: #A5D6A7;
+                    border-radius: 8px;
+                    border: 1px solid rgba(76, 175, 80, 0.35);
+                    padding: 0px 14px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(46, 125, 50, 0.35);
+                    border: 1px solid rgba(76, 175, 80, 0.6);
+                    color: #ffffff;
+                }
+                QPushButton:pressed { background-color: rgba(46, 125, 50, 0.12); }
+            """)
+ 
+    def _style_secondary_pill(self, btn):
+        btn.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.05);
                 color: rgba(255, 255, 255, 0.8);
                 border-radius: 8px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                padding: 0px 15px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                padding: 0px 14px;
             }
             QPushButton:hover {
                 background-color: rgba(255, 255, 255, 0.15);
@@ -1570,119 +1737,45 @@ class ModelListItemWidget(QWidget):
             }
             QPushButton:pressed { background-color: rgba(255, 255, 255, 0.08); }
         """)
-
-        if self.server_loaded:
-            self.btn_launch_server.setStyleSheet("""
+ 
+    def _icon_button(self, icon_path, icon_size, tooltip, danger=False):
+        btn = QPushButton()
+        btn.setToolTip(tooltip)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(icon_path), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        btn.setIcon(icon)
+        btn.setIconSize(QtCore.QSize(icon_size, icon_size))
+        btn.setFixedSize(30, 30)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        if danger:
+            btn.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(230, 81, 0, 0.2);
-                    color: #FFCC80;
+                    background-color: rgba(211, 47, 47, 0.08);
                     border-radius: 8px;
-                    border: 1px solid rgba(255, 152, 0, 0.3);
-                    padding: 0px 15px;
+                    border: 1px solid rgba(244, 67, 54, 0.18);
                 }
                 QPushButton:hover {
-                    background-color: rgba(230, 81, 0, 0.4);
-                    border: 1px solid rgba(255, 152, 0, 0.6);
-                    color: #ffffff;
+                    background-color: rgba(211, 47, 47, 0.28);
+                    border: 1px solid rgba(244, 67, 54, 0.5);
                 }
-                QPushButton:pressed { background-color: rgba(230, 81, 0, 0.1); }
+                QPushButton:pressed { background-color: rgba(211, 47, 47, 0.05); }
             """)
         else:
-            self.btn_launch_server.setStyleSheet("""
+            btn.setStyleSheet("""
                 QPushButton {
-                    background-color: rgba(46, 125, 50, 0.2);
-                    color: #A5D6A7;
+                    background-color: rgba(255, 255, 255, 0.04);
                     border-radius: 8px;
-                    border: 1px solid rgba(76, 175, 80, 0.3);
-                    padding: 0px 15px;
+                    border: 1px solid rgba(255, 255, 255, 0.10);
                 }
                 QPushButton:hover {
-                    background-color: rgba(46, 125, 50, 0.4);
-                    border: 1px solid rgba(76, 175, 80, 0.6);
-                    color: #ffffff;
+                    background-color: rgba(255, 255, 255, 0.14);
+                    border: 1px solid rgba(255, 255, 255, 0.28);
                 }
-                QPushButton:pressed { background-color: rgba(46, 125, 50, 0.1); }
+                QPushButton:pressed { background-color: rgba(255, 255, 255, 0.04); }
             """)
-
-        self.btn_delete.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(211, 47, 47, 0.1);
-                border-radius: 8px;
-                border: 1px solid rgba(244, 67, 54, 0.2);
-            }
-            QPushButton:hover {
-                background-color: rgba(211, 47, 47, 0.3);
-                border: 1px solid rgba(244, 67, 54, 0.5);
-            }
-            QPushButton:pressed { background-color: rgba(211, 47, 47, 0.05); }
-        """)
-
-        if current_default_name == model_name:
-            pixmap = QPixmap("app/gui/icons/star.png")
-            self.icon_label.setPixmap(pixmap)
-            self.name_label.setStyleSheet("color: #FFD700; font-weight: bold; background: transparent; border: none;")
-            
-            self.status_badge.show()
-            if is_server_running:
-                self.status_badge.setText("🟢 Active")
-                self.status_badge.setStyleSheet("""
-                    QLabel { background-color: rgba(76, 175, 80, 0.15); color: #81C784; border: 1px solid rgba(76, 175, 80, 0.3);
-                    border-radius: 6px; padding: 3px 8px; font-size: 10px; font-weight: bold; }
-                """)
-            else:
-                self.status_badge.setText("⚪ Standby")
-                self.status_badge.setStyleSheet("""
-                    QLabel { background-color: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 6px; padding: 3px 8px; font-size: 10px; font-weight: bold; }
-                """)
-                
-            actions_layout.addWidget(self.btn_launch_server)
-        else:
-            self.icon_label.hide()
-            actions_layout.addWidget(self.btn_set_default)
-
-        self.btn_open_file = QPushButton()
-        self.btn_open_file.setToolTip("Open file location in Explorer")
-        icon_folder = QtGui.QIcon()
-        icon_folder.addPixmap(
-            QtGui.QPixmap("app/gui/icons/folder.png"),
-            QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off
-        )
-        self.btn_open_file.setIcon(icon_folder)
-        self.btn_open_file.setIconSize(QtCore.QSize(15, 15))
-        self.btn_open_file.setFixedSize(34, 34)
-        self.btn_open_file.setFont(btn_font)
-        self.btn_open_file.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.btn_open_file.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.btn_open_file.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.04);
-                border-radius: 8px;
-                border: 1px solid rgba(255, 255, 255, 0.10);
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.14);
-                border: 1px solid rgba(255, 255, 255, 0.28);
-            }
-            QPushButton:pressed { background-color: rgba(255, 255, 255, 0.04); }
-        """)
-
-        actions_layout.addWidget(self.btn_open_file)
-        actions_layout.addWidget(self.btn_delete)
-        card_layout.addLayout(actions_layout)
-
-        self.btn_set_default.clicked.connect(self.on_set_default_clicked)
-        self.btn_open_file.clicked.connect(self.on_open_file_location_clicked)
-        self.btn_delete.clicked.connect(self.on_delete_clicked)
-        
-        if self.server_loaded:
-            self.btn_launch_server.clicked.connect(self.on_unload_model_clicked)
-        else:
-            self.btn_launch_server.clicked.connect(self.on_launch_server_clicked)
-            
-        main_layout.addWidget(self.glass_card)
-        self.setLayout(main_layout)
-    
+        return btn
+ 
     def load_translation(self, language):
         file_path = f"app/translations/{language}.yaml"
         if os.path.exists(file_path):
@@ -1690,55 +1783,61 @@ class ModelListItemWidget(QWidget):
                 self.translations = yaml.safe_load(file)
         else:
             self.translations = {}
-
+ 
     def human_readable_size(self, size_bytes):
         for unit in ['B', 'KB', 'MB', 'GB']:
             if size_bytes < 1024:
                 return f"{size_bytes:.2f} {unit}"
             size_bytes /= 1024
         return f"{size_bytes:.2f} TB"
-
+ 
     def on_set_default_clicked(self):
         self.configuration_settings.update_main_setting("local_llm", self.full_path)
         self.refresh_method()
-    
+ 
     def on_launch_server_clicked(self):
-        self.btn_launch_server.setText(self.translations.get("button_disable_server", "Unload model"))
+        self.btn_launch_server.setText(self.translations.get("button_disable_server", "Unload"))
         QApplication.processEvents()
         self.server_loaded = True
-        
+        self.is_server_running = True
+        self._style_primary_button(self.btn_launch_server, active=True)
+        self._update_accent_bar()
+ 
         try:
             self.btn_launch_server.clicked.disconnect()
         except (TypeError, RuntimeError):
             pass
-        
+ 
         self.btn_launch_server.clicked.connect(self.on_unload_model_clicked)
         self.launch_server_method()
-    
+ 
     def on_unload_model_clicked(self):
-        self.btn_launch_server.setText(self.translations.get("button_launch_server", "Load model"))
+        self.btn_launch_server.setText(self.translations.get("button_launch_server", "Load"))
         QApplication.processEvents()
         self.server_loaded = False
-        
+        self.is_server_running = False
+        self._style_primary_button(self.btn_launch_server, active=False)
+        self._update_accent_bar()
+ 
         try:
             self.btn_launch_server.clicked.disconnect()
         except (TypeError, RuntimeError):
             pass
-        
+ 
         self.btn_launch_server.clicked.connect(self.on_launch_server_clicked)
         self.stop_server_method()
-
+ 
     def on_delete_clicked(self):
-        model_name = self.name_label.text()
-        
+        model_name = self.model_name
+ 
         title = self.translations.get("delete_model", "Delete LLM")
         first_text = self.translations.get("model_widget_delete", "Do you want to delete the model:")
         second_text = self.translations.get("model_widget_delete_2", "This action cannot be canceled.")
-        
+ 
         message_text = f"{first_text} '{model_name}'?\n\n{second_text}"
-        
+ 
         parent_win = self.window() if hasattr(self, "window") else self
-
+ 
         dialog = SowConfirmDialog(
             parent=parent_win,
             title=title,
@@ -1746,16 +1845,16 @@ class ModelListItemWidget(QWidget):
             confirm_text="Delete",
             danger=True
         )
-
+ 
         if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             try:
                 os.remove(self.full_path)
                 self.refresh_method()
-                
+ 
                 sow_toast(
                     parent=parent_win,
                     title="Deleted",
-                    text=f"Model deleted successfully.",
+                    text="Model deleted successfully.",
                     msg_type="success"
                 )
             except Exception as e:
@@ -1765,21 +1864,21 @@ class ModelListItemWidget(QWidget):
                     text=f"Couldn't delete the model:\n{str(e)}",
                     msg_type="error"
                 )
-        
+ 
     def enterEvent(self, event):
-        self.glass_card.setStyleSheet(self.glass_style_hover)
+        self._apply_card_style(hover=True)
         super().enterEvent(event)
-
+ 
     def leaveEvent(self, event):
-        self.glass_card.setStyleSheet(self.glass_style_normal)
+        self._apply_card_style(hover=False)
         super().leaveEvent(event)
-    
+ 
     def on_open_file_location_clicked(self):
         try:
             subprocess.Popen(["explorer", "/select,", os.path.abspath(self.full_path)])
         except Exception as e:
             parent_win = self.window() if hasattr(self, "window") else self
-
+ 
             sow_toast(
                 parent=parent_win,
                 title="Error",
@@ -2489,14 +2588,17 @@ class AnimatedHoverButton(QtWidgets.QPushButton):
         self.anim.valueChanged.connect(self._update_color)
 
         self.setStyleSheet("""
-            background-color: transparent; 
-            border: none;
+            QPushButton {
+                background-color: transparent; 
+                border: none;
+            }
             QToolTip { 
                 background-color: rgba(25, 25, 30, 0.95); 
                 color: #E0E0E0; 
                 border: 1px solid rgba(255, 255, 255, 0.15); 
                 border-radius: 6px; 
-                padding: 6px 10px; font-size: 12px; 
+                padding: 6px 10px; 
+                font-size: 12px; 
                 font-weight: 500; 
             }
         """)
@@ -3446,109 +3548,6 @@ class SoulMemoryViewer(QtWidgets.QDialog):
         elif index == 3:
             self.load_agent_logs()
 
-class SoulStageNarratorBubble(QFrame):
-    STYLE = """
-        QFrame {
-            background-color: rgba(30, 24, 10, 0.85);
-            border-left: 3px solid #c8952a;
-            border-top-right-radius: 10px;
-            border-bottom-right-radius: 10px;
-            margin: 6px 80px 6px 14px;
-        }
-        QLabel#narrator_header {
-            color: #c8952a;
-            font-family: 'Inter Tight SemiBold', Arial;
-            font-size: 10px;
-            font-weight: bold;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            padding: 6px 14px 0px 14px;
-            background: transparent;
-            border: none;
-        }
-        QLabel#narrator_label {
-            color: #e8cfa0;
-            font-family: 'Georgia', 'Crimson Pro', serif;
-            font-size: 15px;
-            font-style: italic;
-            padding: 6px 14px 10px 14px;
-            background: transparent;
-            border: none;
-        }
-    """
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet(self.STYLE)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        self.header_label = QLabel("⬡  NARRATOR")
-        self.header_label.setObjectName("narrator_header")
-        layout.addWidget(self.header_label)
-        self.text_label = QLabel()
-        self.text_label.setObjectName("narrator_label")
-        self.text_label.setWordWrap(True)
-        self.text_label.setTextFormat(Qt.TextFormat.RichText)
-        self.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.text_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(self.text_label)
-
-    def append_text(self, chunk: str):
-        self.text_label.setText(self.text_label.text() + chunk)
-
-    def set_text(self, text: str):
-        self.text_label.setText(text)
-
-class SoulStagePartyBar(QWidget):
-    def __init__(self, party_names: list, on_stop, on_interrupt, parent=None):
-        super().__init__(parent)
-        self.setObjectName("soul_stage_bar")
-        self.setFixedHeight(42)
-        self.setStyleSheet("""
-            QWidget#soul_stage_bar {
-                background-color: rgba(15, 10, 25, 0.95);
-                border-bottom: 1px solid rgba(160, 120, 255, 0.25);
-            }
-            QLabel#stage_title {
-                color: #8a6fe8; font-family: 'Inter Tight SemiBold', Arial;
-                font-size: 11px; font-weight: bold; letter-spacing: 1.2px;
-            }
-            QPushButton#btn_interrupt {
-                background: rgba(240,160,40,0.15); border: 1px solid rgba(240,160,40,0.35);
-                border-radius: 6px; color: #f0c060; font-size: 11px; padding: 3px 10px;
-            }
-            QPushButton#btn_interrupt:hover { background: rgba(240,160,40,0.35); color: #fff; }
-            QPushButton#btn_stop {
-                background: rgba(220,50,50,0.15); border: 1px solid rgba(220,50,50,0.35);
-                border-radius: 6px; color: #f08080; font-size: 11px; padding: 3px 10px;
-            }
-            QPushButton#btn_stop:hover { background: rgba(220,50,50,0.35); color: #fff; }
-        """)
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 0, 14, 0)
-        layout.setSpacing(12)
-        title = QLabel("⬡ SOUL STAGE")
-        title.setObjectName("stage_title")
-        layout.addWidget(title)
-        for name in party_names:
-            pill = QLabel(f"✦ {name}")
-            pill.setStyleSheet("""
-                QLabel { background: rgba(100,80,200,0.18); border: 1px solid rgba(100,80,200,0.35);
-                border-radius: 10px; color: #a090e8; font-size: 11px; padding: 2px 10px; }
-            """)
-            layout.addWidget(pill)
-        layout.addStretch()
-        btn_i = QPushButton("⚡ Вмешаться")
-        btn_i.setObjectName("btn_interrupt")
-        btn_i.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_i.clicked.connect(on_interrupt)
-        layout.addWidget(btn_i)
-        btn_s = QPushButton("✕ Выйти")
-        btn_s.setObjectName("btn_stop")
-        btn_s.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_s.clicked.connect(on_stop)
-        layout.addWidget(btn_s)
-
 class CharacterFolderCard(QtWidgets.QFrame):
     def __init__(self, group_name: str, char_count: int, preview_avatars: list, main_app, parent=None):
         super().__init__(parent)
@@ -3691,13 +3690,21 @@ class CharacterFolderCard(QtWidgets.QFrame):
         self.main_app._open_folder_editor(self.group_name)
 
     def _on_delete_clicked(self):
-        from app.gui.soul_stage_page import RPGConfirmDialog
-        
         title = self.translations.get("folder_delete_confirm_title", "Delete Folder")
         msg = self.translations.get("folder_delete_confirm_msg", "Delete this folder?")
         detail = f"'{self.group_name}' · " + self.translations.get("folder_delete_detail", "Characters will return to the main list.")
+        
+        full_text = f"{msg}<br><span style='color: rgba(255,255,255,0.4); font-size: 9pt;'>{detail}</span>"
 
-        if RPGConfirmDialog.ask(title, msg, self.translations.get("delete", "Delete"), detail, self.window()):
+        dlg = SowConfirmDialog(
+            parent=self.window(),
+            title=title,
+            text=full_text,
+            confirm_text=self.translations.get("delete", "Delete"),
+            danger=True
+        )
+
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             groups = self.main_app._get_groups()
             groups.pop(self.group_name, None)
             self.main_app._save_groups(groups)
@@ -3793,7 +3800,6 @@ class EditorCharacterItemWidget(QWidget):
             
         layout.addWidget(avatar_label)
 
-# DIALOGS
 class _GlowPanel(QtWidgets.QFrame):
     def paintEvent(self, event):
         p = QtGui.QPainter(self)
@@ -3992,7 +3998,7 @@ class AboutDialog(QtWidgets.QDialog):
             Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(880, 540)
+        self.resize(950, 650)
 
         font = QtGui.QFont("Inter Tight Medium")
         font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
@@ -4050,31 +4056,16 @@ class AboutDialog(QtWidgets.QDialog):
             logo_lbl.setStyleSheet(
                 "font-size: 46pt; color: rgba(255,255,255,0.4);"
                 "border: 1px solid rgba(255,255,255,0.1);"
-                "border-radius: 80px;"
+                "border-radius: 70px;"
             )
 
         lp.addWidget(logo_lbl, 0, Qt.AlignmentFlag.AlignHCenter)
-
-        name_lbl = QtWidgets.QLabel("SOUL OF WAIFU")
-        name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        name_lbl.setStyleSheet(
-            "font-size: 7.5pt; letter-spacing: 3.5px; font-weight: 700;"
-            "color: rgba(255,255,255,0.18); margin-top: 16px;"
-        )
-        lp.addWidget(name_lbl)
-
-        dots_lbl = QtWidgets.QLabel("· · ·")
-        dots_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dots_lbl.setStyleSheet(
-            "color: rgba(255,255,255,0.15); font-size: 13pt; margin-top: 10px;"
-        )
-        lp.addWidget(dots_lbl)
 
         lp.addSpacing(20)
 
         lp.addStretch()
 
-        ver_bottom = QtWidgets.QLabel("v2.4.0")
+        ver_bottom = QtWidgets.QLabel("v2.4.5")
         ver_bottom.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ver_bottom.setStyleSheet(
             "font-size: 8.5pt; color: rgba(255,255,255,0.17);"
@@ -4096,13 +4087,14 @@ class AboutDialog(QtWidgets.QDialog):
         title_lbl = QtWidgets.QLabel("Soul of Waifu")
         title_lbl.setObjectName("title_label")
 
-        version_badge = QtWidgets.QLabel("v2.4.0")
+        version_badge = QtWidgets.QLabel("v2.4.5")
         version_badge.setObjectName("version_badge")
         version_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_badge.setFixedHeight(22)
 
-        close_x = QtWidgets.QPushButton("×")
+        close_x = QtWidgets.QPushButton("X")
         close_x.setObjectName("close_x_btn")
+        close_x.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         close_x.setFixedSize(28, 28)
         close_x.setCursor(Qt.CursorShape.PointingHandCursor)
         close_x.clicked.connect(self.accept)
@@ -4188,25 +4180,33 @@ class AboutDialog(QtWidgets.QDialog):
         author_lbl.setObjectName("footer_text")
         author_lbl.setOpenExternalLinks(True)
 
+        website_btn = QtWidgets.QPushButton(t.get("website_btn", "Website"))
+        website_btn.setFixedHeight(34)
+        website_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        website_btn.clicked.connect(
+            lambda: _open_url("https://jofizcd.github.io/soul-of-waifu-site/")
+        )
+
+        docs_btn = QtWidgets.QPushButton(t.get("docs_btn", "Docs"))
+        docs_btn.setFixedHeight(34)
+        docs_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        docs_btn.clicked.connect(
+            lambda: _open_url("https://jofizcd.github.io/soul-of-waifu-site/docs/")
+        )
+
         donate_btn = QtWidgets.QPushButton(t.get("support_btn", "Support"))
         donate_btn.setObjectName("donate_btn")
         donate_btn.setFixedHeight(34)
         donate_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         donate_btn.clicked.connect(
-            lambda: _open_url("https://boosty.to/jofizcd/")
+            lambda: _open_url("https://www.donationalerts.com/r/jofizcd")
         )
-
-        close_btn = QtWidgets.QPushButton(
-            t.get("update_available_close", "Close")
-        )
-        close_btn.setFixedHeight(34)
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.clicked.connect(self.accept)
 
         fl.addWidget(author_lbl)
         fl.addStretch()
+        fl.addWidget(website_btn)
+        fl.addWidget(docs_btn)
         fl.addWidget(donate_btn)
-        fl.addWidget(close_btn)
 
         rp.addWidget(footer)
 
@@ -4216,7 +4216,6 @@ class AboutDialog(QtWidgets.QDialog):
 
         outer.addWidget(main_frame)
 
-# Chat Helpers
 class ResponsiveEmotionLabel(QtWidgets.QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -5414,6 +5413,489 @@ class SowConfirmDialog(QtWidgets.QDialog):
         self._animate_out()
         self._hide_overlay(then=_finish)
 
+class SowInputDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, title="Input", label="Enter value:", 
+                 text="", placeholder="", confirm_text="Confirm", cancel_text="Cancel"):
+        super().__init__(parent)
+        self.setModal(True)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self._accent = "#60A5FA"
+        self._overlay = None
+
+        self._build_ui(title, label, text, placeholder, confirm_text, cancel_text)
+
+    def _build_ui(self, title, label, text, placeholder, confirm_text, cancel_text):
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        self._card = QtWidgets.QFrame()
+        self._card.setObjectName("Card")
+        self._card.setFixedWidth(400)
+        self._card.setStyleSheet("""
+            QFrame#Card {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgb(26, 26, 34),
+                    stop:1 rgb(18, 18, 26));
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 16px;
+            }
+        """)
+
+        lay = QtWidgets.QVBoxLayout(self._card)
+        lay.setContentsMargins(28, 28, 28, 24)
+        lay.setSpacing(0)
+
+        lbl_title = QtWidgets.QLabel(title)
+        f_title = QFont("Inter Tight", 15, QFont.Weight.Bold)
+        f_title.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        lbl_title.setFont(f_title)
+        lbl_title.setStyleSheet(f"color: #E2E8F0; background: transparent;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_title.setWordWrap(True)
+        lay.addWidget(lbl_title)
+
+        lay.addSpacing(10)
+
+        lbl_text = QtWidgets.QLabel(label)
+        f_text = QFont("Inter", 10)
+        f_text.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        lbl_text.setFont(f_text)
+        lbl_text.setStyleSheet("color: rgba(226,232,240,0.55); background: transparent;")
+        lbl_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_text.setWordWrap(True)
+        lay.addWidget(lbl_text)
+
+        lay.addSpacing(16)
+
+        self.input_field = QtWidgets.QLineEdit()
+        self.input_field.setFixedHeight(42)
+        self.input_field.setText(text)
+        self.input_field.setPlaceholderText(placeholder)
+        self.input_field.setStyleSheet("""
+            QLineEdit {
+                background-color: rgb(18, 18, 26);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: #E2E8F0;
+                padding: 0 14px;
+                selection-background-color: rgba(96, 165, 250, 0.4);
+            }
+            QLineEdit:focus {
+                border: 1px solid rgba(96, 165, 250, 0.5);
+                background-color: rgb(22, 22, 30);
+            }
+        """)
+        self.input_field.returnPressed.connect(self.accept)
+        lay.addWidget(self.input_field)
+
+        lay.addSpacing(24)
+
+        line = QtWidgets.QFrame()
+        line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        line.setStyleSheet("background: rgba(255,255,255,0.07); max-height: 1px; border: none;")
+        lay.addWidget(line)
+        lay.addSpacing(20)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        f_btn = QFont("Inter Tight", 11, QFont.Weight.DemiBold)
+        f_btn.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+
+        btn_cancel = QtWidgets.QPushButton(cancel_text)
+        btn_cancel.setFixedHeight(40)
+        btn_cancel.setFont(f_btn)
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.setStyleSheet("""
+            QPushButton {
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 10px;
+                color: rgba(226,232,240,0.7);
+            }
+            QPushButton:hover {
+                background: rgba(255,255,255,0.1);
+                border-color: rgba(255,255,255,0.2);
+                color: #E2E8F0;
+            }
+            QPushButton:pressed {
+                background: rgba(255,255,255,0.07);
+            }
+        """)
+        btn_cancel.clicked.connect(self.reject)
+
+        btn_confirm = QtWidgets.QPushButton(confirm_text)
+        btn_confirm.setFixedHeight(40)
+        btn_confirm.setFont(f_btn)
+        btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background: rgba(96,165,250,0.12);
+                border: 1px solid rgba(96,165,250,0.35);
+                border-radius: 10px;
+                color: #60A5FA;
+            }
+            QPushButton:hover {
+                background: rgba(96,165,250,0.22);
+                border-color: rgba(96,165,250,0.6);
+            }
+            QPushButton:pressed {
+                background: rgba(96,165,250,0.15);
+            }
+        """)
+        btn_confirm.clicked.connect(self.accept)
+
+        btn_row.addWidget(btn_cancel, 3)
+        btn_row.addWidget(btn_confirm, 2)
+        lay.addLayout(btn_row)
+
+        root.addWidget(self._card, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def get_text(self):
+        return self.input_field.text().strip()
+
+    def _show_overlay(self):
+        if not self.parent():
+            return
+
+        self._overlay = QtWidgets.QWidget(self.parent())
+        self._overlay.setGeometry(self.parent().rect())
+        self._overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self._overlay.show()
+        self._overlay.raise_()
+        self.raise_()
+
+        self._ov_effect = QGraphicsOpacityEffect(self._overlay)
+        self._ov_effect.setOpacity(0.0)
+        self._overlay.setGraphicsEffect(self._ov_effect)
+        self._overlay.setStyleSheet("background: rgba(0, 0, 0, 180);")
+
+        self._ov_anim_in = QPropertyAnimation(self._ov_effect, b"opacity")
+        self._ov_anim_in.setDuration(200)
+        self._ov_anim_in.setStartValue(0.0)
+        self._ov_anim_in.setEndValue(1.0)
+        self._ov_anim_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._ov_anim_in.start()
+
+        self._overlay.mousePressEvent = lambda e: self.reject()
+
+    def _hide_overlay(self, then=None):
+        if not self._overlay:
+            if then:
+                then()
+            return
+
+        self._ov_anim_out = QPropertyAnimation(self._ov_effect, b"opacity")
+        self._ov_anim_out.setDuration(180)
+        self._ov_anim_out.setStartValue(self._ov_effect.opacity())
+        self._ov_anim_out.setEndValue(0.0)
+        self._ov_anim_out.setEasingCurve(QEasingCurve.Type.InCubic)
+
+        def _cleanup():
+            self._overlay.deleteLater()
+            self._overlay = None
+            if then:
+                then()
+
+        self._ov_anim_out.finished.connect(_cleanup)
+        self._ov_anim_out.start()
+
+    def _animate_in(self):
+        self.setWindowOpacity(0.0)
+
+        self._dlg_anim_in = QPropertyAnimation(self, b"windowOpacity")
+        self._dlg_anim_in.setDuration(200)
+        self._dlg_anim_in.setStartValue(0.0)
+        self._dlg_anim_in.setEndValue(1.0)
+        self._dlg_anim_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._dlg_anim_in.start()
+
+    def _animate_out(self, then=None):
+        self._dlg_anim_out = QPropertyAnimation(self, b"windowOpacity")
+        self._dlg_anim_out.setDuration(160)
+        self._dlg_anim_out.setStartValue(self.windowOpacity())
+        self._dlg_anim_out.setEndValue(0.0)
+        self._dlg_anim_out.setEasingCurve(QEasingCurve.Type.InCubic)
+        if then:
+            self._dlg_anim_out.finished.connect(then)
+        self._dlg_anim_out.start()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+
+        if self.parent():
+            parent_rect = self.parent().rect()
+            parent_global = self.parent().mapToGlobal(parent_rect.topLeft())
+            x = parent_global.x() + (parent_rect.width() - self.width()) // 2
+            y = parent_global.y() + (parent_rect.height() - self.height()) // 2
+            self.move(x, y)
+
+        self._show_overlay()
+        self._animate_in()
+        
+        QtCore.QTimer.singleShot(250, self.input_field.setFocus)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.reject()
+
+    def reject(self):
+        def _finish():
+            self._overlay = None
+            super(SowInputDialog, self).reject()
+
+        self._animate_out()
+        self._hide_overlay(then=_finish)
+
+    def accept(self):
+        def _finish():
+            self._overlay = None
+            super(SowInputDialog, self).accept()
+
+        self._animate_out()
+        self._hide_overlay(then=_finish)
+
+class SowSelectDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, title="Select", label="Select an option:", 
+                 items=[], confirm_text="Confirm", cancel_text="Cancel"):
+        super().__init__(parent)
+        self.setModal(True)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self._overlay = None
+
+        self._build_ui(title, label, items, confirm_text, cancel_text)
+
+    def _build_ui(self, title, label, items, confirm_text, cancel_text):
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        self._card = QtWidgets.QFrame()
+        self._card.setObjectName("Card")
+        self._card.setFixedWidth(400)
+        self._card.setStyleSheet("""
+            QFrame#Card {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgb(26, 26, 34), stop:1 rgb(18, 18, 26));
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 16px;
+            }
+        """)
+
+        lay = QtWidgets.QVBoxLayout(self._card)
+        lay.setContentsMargins(28, 28, 28, 24)
+        lay.setSpacing(0)
+
+        lbl_title = QtWidgets.QLabel(title)
+        f_title = QFont("Inter Tight", 15, QFont.Weight.Bold)
+        f_title.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        lbl_title.setFont(f_title)
+        lbl_title.setStyleSheet("color: #E2E8F0; background: transparent;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(lbl_title)
+
+        lay.addSpacing(10)
+
+        lbl_text = QtWidgets.QLabel(label)
+        f_text = QFont("Inter", 10)
+        f_text.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        lbl_text.setFont(f_text)
+        lbl_text.setStyleSheet("color: rgba(226,232,240,0.55); background: transparent;")
+        lbl_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(lbl_text)
+
+        lay.addSpacing(16)
+
+        self.combo_box = QtWidgets.QComboBox()
+        self.combo_box.addItems(items)
+        self.combo_box.setFixedHeight(42)
+        self.combo_box.setStyleSheet("""
+            QComboBox {
+                background-color: rgba(18, 18, 26);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                color: #E2E8F0;
+                padding: 0 14px;
+            }
+            QComboBox:hover { border: 1px solid rgba(96, 165, 250, 0.3); }
+            QComboBox::drop-down { border: none; width: 30px; }
+            QComboBox::down-arrow { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #6F6B63; }
+            QComboBox QAbstractItemView {
+                background-color: rgb(26, 26, 34);
+                color: #E2E8F0;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                selection-background-color: rgba(96, 165, 250, 0.2);
+                outline: none;
+                padding: 6px;
+            }
+        """)
+        lay.addWidget(self.combo_box)
+
+        lay.addSpacing(24)
+
+        line = QtWidgets.QFrame()
+        line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        line.setStyleSheet("background: rgba(255,255,255,0.07); max-height: 1px; border: none;")
+        lay.addWidget(line)
+        lay.addSpacing(20)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        f_btn = QFont("Inter Tight", 11, QFont.Weight.DemiBold)
+        f_btn.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+
+        btn_cancel = QtWidgets.QPushButton(cancel_text)
+        btn_cancel.setFixedHeight(40)
+        btn_cancel.setFont(f_btn)
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.setStyleSheet("""
+            QPushButton {
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 10px;
+                color: rgba(226,232,240,0.7);
+            }
+            QPushButton:hover {
+                background: rgba(255,255,255,0.1);
+                border-color: rgba(255,255,255,0.2);
+                color: #E2E8F0;
+            }
+        """)
+        btn_cancel.clicked.connect(self.reject)
+
+        btn_confirm = QtWidgets.QPushButton(confirm_text)
+        btn_confirm.setFixedHeight(40)
+        btn_confirm.setFont(f_btn)
+        btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background: rgba(96,165,250,0.12);
+                border: 1px solid rgba(96,165,250,0.35);
+                border-radius: 10px;
+                color: #60A5FA;
+            }
+            QPushButton:hover {
+                background: rgba(96,165,250,0.22);
+                border-color: rgba(96,165,250,0.6);
+            }
+        """)
+        btn_confirm.clicked.connect(self.accept)
+
+        btn_row.addWidget(btn_cancel, 3)
+        btn_row.addWidget(btn_confirm, 2)
+        lay.addLayout(btn_row)
+
+        root.addWidget(self._card, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def get_selected_item(self):
+        return self.combo_box.currentText()
+
+    def _show_overlay(self):
+        if not self.parent():
+            return
+
+        self._overlay = QtWidgets.QWidget(self.parent())
+        self._overlay.setGeometry(self.parent().rect())
+        self._overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self._overlay.show()
+        self._overlay.raise_()
+        self.raise_()
+
+        self._ov_effect = QtWidgets.QGraphicsOpacityEffect(self._overlay)
+        self._ov_effect.setOpacity(0.0)
+        self._overlay.setGraphicsEffect(self._ov_effect)
+        self._overlay.setStyleSheet("background: rgba(0, 0, 0, 180);")
+
+        self._ov_anim_in = QtCore.QPropertyAnimation(self._ov_effect, b"opacity")
+        self._ov_anim_in.setDuration(200)
+        self._ov_anim_in.setStartValue(0.0)
+        self._ov_anim_in.setEndValue(1.0)
+        self._ov_anim_in.setEasingCurve(QtCore.QEasingCurve.Type.OutCubic)
+        self._ov_anim_in.start()
+
+        self._overlay.mousePressEvent = lambda e: self.reject()
+
+    def _hide_overlay(self, then=None):
+        if not self._overlay:
+            if then:
+                then()
+            return
+
+        self._ov_anim_out = QtCore.QPropertyAnimation(self._ov_effect, b"opacity")
+        self._ov_anim_out.setDuration(180)
+        self._ov_anim_out.setStartValue(self._ov_effect.opacity())
+        self._ov_anim_out.setEndValue(0.0)
+        self._ov_anim_out.setEasingCurve(QtCore.QEasingCurve.Type.InCubic)
+
+        def _cleanup():
+            self._overlay.deleteLater()
+            self._overlay = None
+            if then:
+                then()
+
+        self._ov_anim_out.finished.connect(_cleanup)
+        self._ov_anim_out.start()
+
+    def _animate_in(self):
+        self.setWindowOpacity(0.0)
+
+        self._dlg_anim_in = QtCore.QPropertyAnimation(self, b"windowOpacity")
+        self._dlg_anim_in.setDuration(200)
+        self._dlg_anim_in.setStartValue(0.0)
+        self._dlg_anim_in.setEndValue(1.0)
+        self._dlg_anim_in.setEasingCurve(QtCore.QEasingCurve.Type.OutCubic)
+        self._dlg_anim_in.start()
+
+    def _animate_out(self, then=None):
+        self._dlg_anim_out = QtCore.QPropertyAnimation(self, b"windowOpacity")
+        self._dlg_anim_out.setDuration(160)
+        self._dlg_anim_out.setStartValue(self.windowOpacity())
+        self._dlg_anim_out.setEndValue(0.0)
+        self._dlg_anim_out.setEasingCurve(QtCore.QEasingCurve.Type.InCubic)
+        if then:
+            self._dlg_anim_out.finished.connect(then)
+        self._dlg_anim_out.start()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+
+        if self.parent():
+            parent_rect = self.parent().rect()
+            parent_global = self.parent().mapToGlobal(parent_rect.topLeft())
+            x = parent_global.x() + (parent_rect.width() - self.width()) // 2
+            y = parent_global.y() + (parent_rect.height() - self.height()) // 2
+            self.move(x, y)
+
+        self._show_overlay()
+        self._animate_in()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.reject()
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.accept()
+
+    def reject(self):
+        def _finish():
+            self._overlay = None
+            super(SowSelectDialog, self).reject()
+
+        self._animate_out()
+        self._hide_overlay(then=_finish)
+
+    def accept(self):
+        def _finish():
+            self._overlay = None
+            super(SowSelectDialog, self).accept()
+
+        self._animate_out()
+        self._hide_overlay(then=_finish)
+
 class PersonasEditorDialog(QDialog):
     _BG       = "#0C0C10"
     _SURF1    = "#111117"
@@ -6343,24 +6825,37 @@ class SystemPromptEditorDialog(QDialog):
         ])
         
     def _create_new_preset(self):
-        preset_name_text = self.translations.get("system_prompt_editor_preset_name", "Enter the preset name:")
-        name, ok = QInputDialog.getText(self, self.translations.get("system_prompt_editor_new_preset", "New preset"), preset_name_text)
-        if ok and name.strip():
-            name = name.strip()
-            preset_data = {
-                "prompt": "You are {{char}}, you must answer as {{char}}.",
-                "order": [
-                    "System prompt",
-                    "Character's information",
-                    "Persona information",
-                    "Lorebook",
-                    "Story Summary",
-                    "Author's notes"
-                ]
-            }
-            self.configuration_settings.update_preset(name, preset_data)
-            self._update_preset_combo()
-            self.preset_combo.setCurrentText(name)
+        dialog = SowInputDialog(
+            parent=self,
+            title=self.translations.get("system_prompt_editor_new_preset", "New preset"),
+            label=self.translations.get("system_prompt_editor_preset_name", "Enter the preset name:"),
+            placeholder="My Custom Prompt"
+        )
+        
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            name = dialog.get_text()
+            if name:
+                preset_data = {
+                    "prompt": "You are {{char}}, you must answer as {{char}}.",
+                    "order": [
+                        "System prompt",
+                        "Character's information",
+                        "Persona information",
+                        "Lorebook",
+                        "Story Summary",
+                        "Author's notes"
+                    ]
+                }
+                self.configuration_settings.update_preset(name, preset_data)
+                self._update_preset_combo()
+                self.preset_combo.setCurrentText(name)
+                
+                sow_toast(
+                    parent=self,
+                    title=self.translations.get("system_prompt_editor_title", "Prompt Editor"),
+                    text=self.translations.get("preset_saved_successfully", "Preset saved successfully."),
+                    msg_type="success"
+                )
 
     def _delete_current_preset(self):
         presets = self.configuration_settings.get_user_data("presets") or {}
@@ -7025,8 +7520,8 @@ class LorebookEditorDialog(QDialog):
         self.depth_combo.setFont(self.f_input)
         self.depth_combo.setStyleSheet(self._s_combo("LBDepthCombo"))
  
-        self.btn_import = self._text_icon_btn("app/gui/icons/import_icon.png", self.translations.get("lorebook_editor_import_lorebook", "Import JSON"), "LBBtnImport")
-        self.btn_export = self._text_icon_btn("app/gui/icons/export_icon.png", self.translations.get("lorebook_editor_export_lorebook", "Export JSON"), "LBBtnExport")
+        self.btn_import = self._text_icon_btn("app/gui/icons/import.png", self.translations.get("lorebook_editor_import_lorebook", "Import JSON"), "LBBtnImport")
+        self.btn_export = self._text_icon_btn("app/gui/icons/export.png", self.translations.get("lorebook_editor_export_lorebook", "Export JSON"), "LBBtnExport")
  
         self.btn_save_all = QPushButton(self.translations.get("lorebook_apply_changes_btn", "APPLY CHANGES"))
         self.btn_save_all.setObjectName("LBBtnSave")
@@ -7160,11 +7655,13 @@ class LorebookEditorDialog(QDialog):
         b.setToolTip(tip); b.setCursor(Qt.CursorShape.PointingHandCursor)
         if danger:
             b.setStyleSheet(
+                f"QToolTip {{ background-color: {self._SURF3}; color: {self._TEXT}; border: 1px solid {self._BORDER_M}; border-radius: 6px; padding: 6px; }}"
                 f"QPushButton#{obj}{{background:{self._DNG_MUT};border:1px solid rgba(196,64,64,0.18);border-radius:6px;}}"
                 f"QPushButton#{obj}:hover{{background:{self._DNG_GLO};border-color:rgba(196,64,64,0.45);}}"
             )
         else:
             b.setStyleSheet(
+                f"QToolTip {{ background-color: {self._SURF3}; color: {self._TEXT}; border: 1px solid {self._BORDER_M}; border-radius: 6px; padding: 6px; }}"
                 f"QPushButton#{obj}{{background:{self._SURF2};border:1px solid {self._BORDER};border-radius:6px;}}"
                 f"QPushButton#{obj}:hover{{background:{self._SURF3};border-color:{self._BORDER_M};}}"
             )
@@ -7435,22 +7932,40 @@ class LorebookEditorDialog(QDialog):
             self.empty_state.setVisible(True)
             self.populate_entry_list()
 
+    def _show_name_dialog(self, title: str, label_text: str, default_text: str = "") -> str | None:
+        dialog = SowInputDialog(
+            parent=self,
+            title=title,
+            label=label_text,
+            text=default_text,
+            placeholder=default_text or "Enter name..."
+        )
+        
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            return dialog.get_text()
+        return None
+    
     def create_lorebook(self):
         title = self.translations.get("lorebook_editor_new_lorebook", "New Lorebook")
         label = self.translations.get("lorebook_editor_lorebook_name", "Name:")
 
-        name, ok = QInputDialog.getText(self, title, label)
-        if not (ok and name.strip()):
+        name = self._show_name_dialog(title, label)
+        
+        if not name:
             return
-        name = name.strip()
+
         if name in self.lorebooks:
             error_title = self.translations.get("lorebook_editor_rename_error_title", "Error")
             error_text = self.translations.get("lorebook_editor_rename_error_exists", "A lorebook with this name already exists.")
-            sow_toast(self.main_window, error_title, error_text, "error"); return
+            sow_toast(self.main_window, error_title, error_text, "error")
+            return
+        
         self.lorebooks[name] = {"name": name, "n_depth": 3, "entries": []}
         self.configuration_settings.update_lorebook(name, self.lorebooks[name])
-        self.load_lorebooks(); self.update_lorebook_combo()
-        self.lorebook_combo.setCurrentText(name); self.apply_current_lorebook()
+        self.load_lorebooks()
+        self.update_lorebook_combo()
+        self.lorebook_combo.setCurrentText(name)
+        self.apply_current_lorebook()
  
     def rename_lorebook_action(self):
         old = self.lorebook_combo.currentText()
@@ -7459,14 +7974,20 @@ class LorebookEditorDialog(QDialog):
         title = self.translations.get("lorebook_editor_rename_lorebook", "Rename Lorebook")
         label = self.translations.get("lorebook_editor_rename_label", "New name for '{name}':").format(name=old)
 
-        new, ok = QInputDialog.getText(self, title, label, text=old)
-        if not (ok and new.strip() and new != old): return
-        new = new.strip()
-        data = self.lorebooks.pop(old); data["name"] = new; self.lorebooks[new] = data
+        new = self._show_name_dialog(title, label, default_text=old)
+        
+        if not new or new == old:
+            return
+
+        data = self.lorebooks.pop(old)
+        data["name"] = new
+        self.lorebooks[new] = data
+        
         self.configuration_settings.delete_lorebook(old)
         self.configuration_settings.update_lorebook(new, data)
         self.current_lorebook_name = new
-        self.load_lorebooks(); self.update_lorebook_combo()
+        self.load_lorebooks()
+        self.update_lorebook_combo()
         self.lorebook_combo.setCurrentText(new)
  
     def delete_lorebook_action(self):
@@ -7519,6 +8040,13 @@ class LorebookEditorDialog(QDialog):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+
+            raw_entries = data.get("entries", [])
+            if isinstance(raw_entries, dict):
+                data["entries"] = list(raw_entries.values())
+            elif not isinstance(raw_entries, list):
+                data["entries"] = []
+
             name = data.get("name", "Imported")
             while name in self.lorebooks:
                 name += "_copy"
@@ -8864,26 +9392,176 @@ class Live2DMotionLinkerDialog(QDialog):
         except Exception as e:
             logger.debug(f"Failed to parse motion groups: {e}")
             return []
-            
+
     def load_mapping(self) -> dict:
         config = self.configuration_characters.load_configuration()
         char_info = config.get("character_list", {}).get(self.character_name, {})
         return char_info.get("emotion_motions", {})
-        
+
     def reset_to_defaults(self):
         for emo, combo in self.combos.items():
             combo.setCurrentIndex(0)
-            
+           
     def save_mapping(self):
         mapping = {}
         for emo, combo in self.combos.items():
             mapped_val = combo.itemData(combo.currentIndex())
             if mapped_val != "default":
                 mapping[emo] = mapped_val
-        
+
         config = self.configuration_characters.load_configuration()
         if "character_list" in config and self.character_name in config["character_list"]:
             config["character_list"][self.character_name]["emotion_motions"] = mapping
             self.configuration_characters.save_configuration_edit(config)
             sow_toast(self, "Success", "Emotion-to-Motion mapping saved successfully!", "success")
             self.accept()
+
+class StatusDot(QtWidgets.QWidget):
+    def __init__(self, parent=None, dot_size=8, box_size=20):
+        super().__init__(parent)
+        self._dot_size = dot_size
+        self._color = QtGui.QColor(255, 255, 255, 140)
+        self._glow = 0.22
+        self._pulse_anim = None
+        self.setFixedSize(box_size, box_size)
+
+    def get_color(self):
+        return self._color
+
+    def set_color(self, color):
+        self._color = color
+        self.update()
+
+    color = QtCore.pyqtProperty(QtGui.QColor, get_color, set_color)
+
+    def get_glow(self):
+        return self._glow
+
+    def set_glow(self, value):
+        self._glow = value
+        self.update()
+
+    glow = QtCore.pyqtProperty(float, get_glow, set_glow)
+
+    def start_pulse(self):
+        if self._pulse_anim and self._pulse_anim.state() == QtCore.QAbstractAnimation.State.Running:
+            return
+        self._pulse_anim = QtCore.QPropertyAnimation(self, b"glow", self)
+        self._pulse_anim.setDuration(1400)
+        self._pulse_anim.setStartValue(0.22)
+        self._pulse_anim.setKeyValueAt(0.5, 0.65)
+        self._pulse_anim.setEndValue(0.22)
+        self._pulse_anim.setEasingCurve(QtCore.QEasingCurve.Type.InOutSine)
+        self._pulse_anim.setLoopCount(-1)
+        self._pulse_anim.start()
+
+    def stop_pulse(self):
+        if self._pulse_anim:
+            self._pulse_anim.stop()
+            self._pulse_anim = None
+        self.set_glow(0.22)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+
+        cx = self.width() / 2
+        cy = self.height() / 2
+        core_r = self._dot_size / 2
+        halo_r = core_r * (1.4 + self._glow * 1.6)
+
+        halo_color = QtGui.QColor(self._color)
+        halo_color.setAlphaF(min(self._color.alphaF() * (0.35 + self._glow * 0.5), 0.7))
+        painter.setBrush(halo_color)
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.drawEllipse(QtCore.QPointF(cx, cy), halo_r, halo_r)
+
+        painter.setBrush(self._color)
+        painter.drawEllipse(QtCore.QPointF(cx, cy), core_r, core_r)
+
+class LocalModelStatusWidget(QtWidgets.QWidget):
+    STYLES = {
+        "offline": {
+            "color": QtGui.QColor(255, 255, 255, 64),
+            "text_color": "rgba(255, 255, 255, 0.3)",
+            "pulse": False,
+            "key": "local_model_state_offline",
+            "default": "MODEL OFFLINE",
+        },
+        "loading": {
+            "color": QtGui.QColor(0xE8, 0xA0, 0x40),
+            "text_color": "#E8A040",
+            "pulse": True,
+            "key": "local_model_state_connecting",
+            "default": "LOADING MODEL...",
+        },
+        "generating": {
+            "color": QtGui.QColor(0x3B, 0x82, 0xF6),
+            "text_color": "#3B82F6",
+            "pulse": True,
+            "key": "local_model_state_generating",
+            "default": "GENERATING...",
+        },
+        "online": {
+            "color": QtGui.QColor(0x22, 0xC5, 0x5E),
+            "text_color": "#22C55E",
+            "pulse": False,
+            "key": "local_model_state_online",
+            "default": "MODEL READY",
+        },
+    }
+
+    def __init__(self, parent=None, translations=None):
+        super().__init__(parent)
+        self.translations = translations or (lambda key, default: default)
+        self._color_anim = None
+ 
+        self.setMinimumSize(QtCore.QSize(190, 24))
+        self.setMaximumSize(QtCore.QSize(190, 24))
+        self.setStyleSheet("background: transparent; border: none;")
+ 
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(13, 0, 18, 0)
+        layout.setSpacing(8)
+ 
+        self.status_dot = StatusDot(parent=self)
+
+        first_model_status = self.translations.get("local_model_state_offline", "MODEL OFFLINE")
+
+        self.status_text = QtWidgets.QLabel(first_model_status, parent=self)
+        font_status_text = QtGui.QFont("Inter Tight SemiBold", 8)
+        font_status_text.setLetterSpacing(QtGui.QFont.SpacingType.AbsoluteSpacing, 0.6)
+        font_status_text.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.status_text.setFont(font_status_text)
+        self.status_text.setStyleSheet(
+            f"color: {self.STYLES['offline']['text_color']}; background: transparent; border: none;"
+        )
+ 
+        layout.addWidget(self.status_dot)
+        layout.addWidget(self.status_text)
+        layout.addStretch()
+
+    def set_system_status(self, status_type):
+        style = self.STYLES.get(status_type)
+        if style is None:
+            return
+
+        self.status_text.setText(self.translations.get(style["key"], style["default"]))
+        self.status_text.setStyleSheet(
+            f"color: {style['text_color']}; background: transparent; border: none;"
+        )
+
+        if self._color_anim:
+            self._color_anim.stop()
+
+        self._color_anim = QtCore.QPropertyAnimation(self.status_dot, b"color", self.status_dot)
+        self._color_anim.setDuration(220)
+        self._color_anim.setStartValue(self.status_dot.color)
+        self._color_anim.setEndValue(style["color"])
+        self._color_anim.setEasingCurve(QtCore.QEasingCurve.Type.OutCubic)
+        self._color_anim.start()
+
+        if style["pulse"]:
+            self.status_dot.start_pulse()
+        else:
+            self.status_dot.stop_pulse()
