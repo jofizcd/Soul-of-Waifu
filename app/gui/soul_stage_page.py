@@ -1,8 +1,13 @@
 import os
+import re
+import copy
 import json
 import uuid
 import yaml
+import random
 import datetime
+
+from typing import Optional
 
 from pathlib import Path
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -13,6 +18,8 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QScrollArea, QStackedWidget,
     QLineEdit, QTextEdit, QComboBox, QFileDialog, QMessageBox,
 )
+
+from app.gui.custom_widgets import SowSelectDialog, SowInputDialog, SowConfirmDialog
 
 SOUL_STAGE_DIR = Path(".soul_stage")
 SCENES_FILE    = SOUL_STAGE_DIR / "scenes.json"
@@ -274,29 +281,93 @@ SCROLLBAR = """
     }
     QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.30); }
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+    QToolTip {
+        background-color: rgba(25, 25, 30, 0.95); 
+        color: #E0E0E0; 
+        border: 1px solid rgba(255, 255, 255, 0.15); 
+        border-radius: 6px; 
+        padding: 6px 10px; font-size: 13px; 
+        font-family: 'Inter Tight SemiBold';
+    }
 """
 
 INPUT = """
-    QLineEdit, QTextEdit, QComboBox {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-top: 1px solid rgba(255,255,255,0.12);
+    QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 10px;
-        color: rgba(240,240,240,0.95);
-        font-family: 'Inter Tight Medium'; font-size: 13px;
+        color: rgba(240, 240, 240, 0.95);
+        font-family: 'Inter Tight Medium'; 
+        font-size: 13px;
         padding: 8px 14px;
-        selection-background-color: rgba(255,255,255,0.15);
+        padding-right: 28px;
+        selection-background-color: rgba(255, 255, 255, 0.15);
     }
-    QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
-        border: 1px solid rgba(255,255,255,0.25);
-        background: rgba(255,255,255,0.05);
+
+    QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.05);
     }
+
     QComboBox::drop-down { border: none; width: 30px; }
     QComboBox::down-arrow { image: url(app/gui/icons/arrow_down.png); width: 12px; height: 12px; }
     QComboBox QAbstractItemView {
-        background: #0d0d0f; border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 8px; color: rgba(240,240,240,0.95);
-        selection-background-color: rgba(255,255,255,0.1); padding: 4px;
+        background: #0d0d0f; 
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px; 
+        color: rgba(240, 240, 240, 0.95);
+        selection-background-color: rgba(255, 255, 255, 0.1); 
+        padding: 4px;
+    }
+
+    QSpinBox::up-button, QDoubleSpinBox::up-button {
+        subcontrol-origin: border;
+        subcontrol-position: top right;
+        width: 22px;
+        height: 16px;
+        background: transparent;
+        border: none;
+        margin-top: 3px;
+        margin-right: 4px;
+        border-top-right-radius: 8px;
+    }
+
+    QSpinBox::down-button, QDoubleSpinBox::down-button {
+        subcontrol-origin: border;
+        subcontrol-position: bottom right;
+        width: 22px;
+        height: 16px;
+        background: transparent;
+        border: none;
+        margin-bottom: 3px;
+        margin-right: 4px;
+        border-bottom-right-radius: 8px;
+    }
+
+    QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+    QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+        image: url(app/gui/icons/up_arrow.png);
+        width: 10px; 
+        height: 10px;
+    }
+
+    QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+        image: url(app/gui/icons/down_arrow.png);
+        width: 10px; 
+        height: 10px;
+    }
+    QToolTip {
+        background-color: rgba(25, 25, 30, 0.95); 
+        color: #E0E0E0; 
+        border: 1px solid rgba(255, 255, 255, 0.15); 
+        border-radius: 6px; 
+        padding: 6px 10px; font-size: 13px; 
+        font-family: 'Inter Tight SemiBold';
     }
 """
 
@@ -308,6 +379,14 @@ CB_STYLE = """
     }
     QCheckBox::indicator:checked {
         background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+    }
+    QToolTip {
+        background-color: rgba(25, 25, 30, 0.95); 
+        color: #E0E0E0; 
+        border: 1px solid rgba(255, 255, 255, 0.15); 
+        border-radius: 6px; 
+        padding: 6px 10px; font-size: 13px; 
+        font-family: 'Inter Tight SemiBold';
     }
 """
 
@@ -725,6 +804,8 @@ class SoulStageLobbyView(QWidget):
             "conversation_method": scene_data.get("conversation_method", "Local LLM"),
             "persona": scene_data.get("persona", "None"),
             "lorebook": scene_data.get("lorebook", []),
+            "lock_bg": scene_data.get("lock_bg", False),
+            "disable_ambient": scene_data.get("disable_ambient", False),
         }
 
         file_path, _ = QFileDialog.getSaveFileName(
@@ -857,6 +938,40 @@ class SceneEditorView(QWidget):
         r_env2.addLayout(cb, 5)
         r_env2.addLayout(ca, 5)
         ly2.addLayout(r_env2)
+
+        lock_row = QHBoxLayout()
+        lock_row.setSpacing(16)
+
+        self.f_lock_bg = QtWidgets.QCheckBox(
+            self.translations.get("lock_background", "🔒 Lock background (prevent auto-change)")
+        )
+        self.f_lock_bg.setFont(_font("Inter Tight Medium", 12))
+        self.f_lock_bg.setStyleSheet(CB_STYLE)
+        self.f_lock_bg.setToolTip(
+            self.translations.get(
+                "lock_background_hint",
+                "When enabled, the background image stays fixed and will NOT change "
+                "automatically during the scene — even if the location changes."
+            )
+        )
+        lock_row.addWidget(self.f_lock_bg)
+
+        self.f_disable_ambient = QtWidgets.QCheckBox(
+            self.translations.get("disable_ambient", "🔇 Disable ambient audio (play in silence)")
+        )
+        self.f_disable_ambient.setFont(_font("Inter Tight Medium", 12))
+        self.f_disable_ambient.setStyleSheet(CB_STYLE)
+        self.f_disable_ambient.setToolTip(
+            self.translations.get(
+                "disable_ambient_hint",
+                "When enabled, no ambient audio will play during the scene. "
+                "Useful when you want silence or when you have limited audio assets."
+            )
+        )
+        lock_row.addWidget(self.f_disable_ambient)
+
+        ly2.addLayout(lock_row)
+
         fly.addWidget(sec2)
 
         sec3 = _GlassSection(self.translations.get("section_opening", "III.  STORY OPENING"))
@@ -925,8 +1040,21 @@ class SceneEditorView(QWidget):
         self.f_persona.setFixedHeight(38)
         ly4b.addWidget(self.f_persona)
 
+        ly4b.addWidget(_FieldLabel(
+            self.translations.get("max_actor_depth", "Max Actors Per Turn"),
+            self.translations.get("max_actor_depth_hint",
+                "How many party members and NPCs may speak in a single turn (1-6, default 3).")
+        ))
+        from PyQt6.QtWidgets import QSpinBox
+        self.f_max_actor_depth = QSpinBox()
+        self.f_max_actor_depth.setRange(1, 6)
+        self.f_max_actor_depth.setValue(3)
+        self.f_max_actor_depth.setFixedHeight(38)
+        self.f_max_actor_depth.setStyleSheet(INPUT)
+        ly4b.addWidget(self.f_max_actor_depth)
+
         self._selected_lorebooks = []
-        ly4b.addWidget(_FieldLabel(self.translations.get("lorebooks", "Lorebooks  (optional)")))
+        ly4b.addWidget(_FieldLabel(self.translations.get("lorebooks_soul_stage_page", "Lorebooks  (optional)")))
         self.btn_lorebook = QPushButton("None")
         self.btn_lorebook.setFixedHeight(38)
         self.btn_lorebook.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -946,6 +1074,19 @@ class SceneEditorView(QWidget):
         """)
         self.btn_lorebook.clicked.connect(self._open_lorebook_selector)
         ly4b.addWidget(self.btn_lorebook)
+        ly4b.addWidget(_FieldLabel(
+            self.translations.get("dice_rolls", "Dice Rolls"),
+            self.translations.get("dice_rolls_hint", "Lets the GM call for d20/2d6/3d6 checks on risky or contested actions.")
+        ))
+        self.f_dice_enabled = QtWidgets.QCheckBox(
+            self.translations.get("dice_rolls_enable", "🎲 Enable Dice Rolls for this scene")
+        )
+        self.f_dice_enabled.setFont(_font("Inter Tight Medium", 13))
+        self.f_dice_enabled.setStyleSheet(CB_STYLE)
+        ly4b.addWidget(self.f_dice_enabled)
+
+        ly4b.addStretch()
+        bot.addWidget(sec4b, 4)
         ly4b.addStretch()
         bot.addWidget(sec4b, 4)
         fly.addLayout(bot)
@@ -1017,10 +1158,16 @@ class SceneEditorView(QWidget):
         self.f_tone.setCurrentText(scene_data.get("gm_tone", "Epic Fantasy"))
         self.f_method.setCurrentIndex({
             "Local LLM": 0, "Open AI": 1, "Anthropic": 2, "Google Gemini": 3,
-            "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9
+            "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9,
+            "Player2": 10
         }.get(scene_data.get("conversation_method", "Local LLM"), 0))
         self.f_persona.setCurrentText(scene_data.get("persona", "None"))
         self.f_narrator_style.setCurrentText(scene_data.get("narrator_style", "Standard evocative present-tense prose"))
+        self.f_max_actor_depth.setValue(int(scene_data.get("max_actor_depth", 3)))
+        self.f_dice_enabled.setChecked(bool(scene_data.get("dice_rolls_enabled", False)))
+
+        self.f_lock_bg.setChecked(bool(scene_data.get("lock_bg", False)))
+        self.f_disable_ambient.setChecked(bool(scene_data.get("disable_ambient", False)))
         
         lb_data = scene_data.get("lorebook", [])
         if isinstance(lb_data, str):
@@ -1054,6 +1201,10 @@ class SceneEditorView(QWidget):
         self.f_tone.setCurrentIndex(0)
         self.f_method.setCurrentIndex(0)
         self.f_narrator_style.setCurrentIndex(0)
+        self.f_max_actor_depth.setValue(3)
+        self.f_dice_enabled.setChecked(False)
+        self.f_lock_bg.setChecked(False)
+        self.f_disable_ambient.setChecked(False)
         self.f_bg_image.setCurrentIndex(0)
         self.f_ambient.setCurrentIndex(0)
         self._selected_lorebooks = []
@@ -1084,6 +1235,9 @@ class SceneEditorView(QWidget):
         }.get(import_data.get("conversation_method", "Local LLM"), 0))
         self.f_persona.setCurrentText(import_data.get("persona", "None"))
         self.f_narrator_style.setCurrentText(import_data.get("narrator_style", "Standard evocative present-tense prose"))
+        self.f_dice_enabled.setChecked(bool(import_data.get("dice_rolls_enabled", False)))
+        self.f_lock_bg.setChecked(bool(import_data.get("lock_bg", False)))
+        self.f_disable_ambient.setChecked(bool(import_data.get("disable_ambient", False)))
         lb_data = import_data.get("lorebook", [])
         if isinstance(lb_data, str):
             if lb_data and lb_data != "None":
@@ -1124,8 +1278,12 @@ class SceneEditorView(QWidget):
             "conversation_method": self.f_method.currentText(),
             "persona":          self.f_persona.currentText(),
             "lorebook":         self._selected_lorebooks,
+            "max_actor_depth":  int(self.f_max_actor_depth.value()),
+            "dice_rolls_enabled": self.f_dice_enabled.isChecked(),
             "starting_bg":      self.f_bg_image.currentText(),
             "starting_ambient": self.f_ambient.currentText(),
+            "lock_bg":          self.f_lock_bg.isChecked(),
+            "disable_ambient":  self.f_disable_ambient.isChecked(),
             "created_at":       exist.get("created_at", now),
             "last_played":      exist.get("last_played", ""),
             "chat_log":         exist.get("chat_log", []),
@@ -1272,15 +1430,102 @@ class _BaseChatBubble(QFrame):
     def text_label(self):
         return self._text_label
 
-class SoulStageNarratorBubble(_BaseChatBubble):
+def format_dice_dict(d: dict) -> str:
+    label = d.get("label", "Check")
+    notation = d.get("notation", "1d20")
+    modifier = d.get("modifier", 0) or 0
+    total = d.get("total", 0)
+    dc = d.get("dc")
+    success = d.get("success")
+    mod_str = f"{'+' if modifier >= 0 else ''}{modifier}" if modifier else ""
+    base = f"{label} ({notation}{mod_str}) = {total}"
+    if dc is None:
+        return base
+    outcome = "Success" if success else "Failure"
+    return f"{base} vs DC {dc} — {outcome}"
+
+
+class SoulStageDiceCard(QFrame):
     def __init__(self, parent=None):
-        translations = _load_translations()
-        super().__init__(
-            name=translations.get("narrator", "NARRATOR"),
-            avatar_path="app/gui/icons/scene_main.png",
-            bg_color="rgba(35, 28, 15, 0.85)",
-            parent=parent
-        )
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent; border: none;")
+
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(10, 2, 10, 2)
+        outer.addStretch()
+
+        self.card = QFrame()
+        self.card.setObjectName("dice_card")
+        card_layout = QHBoxLayout(self.card)
+        card_layout.setContentsMargins(14, 8, 14, 8)
+        card_layout.setSpacing(10)
+
+        self.icon_lbl = QLabel("🎲")
+        self.icon_lbl.setStyleSheet("background: transparent; border: none; font-size: 16px;")
+        card_layout.addWidget(self.icon_lbl)
+
+        self.text_label = QLabel("Rolling…")
+        self.text_label.setWordWrap(True)
+        self.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.text_label.setStyleSheet("""
+            QLabel {
+                color: rgba(240, 235, 220, 0.92);
+                font-size: 13px;
+                font-weight: 600;
+                background: transparent;
+                border: none;
+            }
+        """)
+        card_layout.addWidget(self.text_label, 1)
+
+        outer.addWidget(self.card)
+        outer.addStretch()
+
+        self._apply_accent(None)
+
+        self._timer = QtCore.QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._ticks_left = 0
+        self._final_text = ""
+        self._final_success = None
+        self._roll_sides = 20
+
+    def _apply_accent(self, success):
+        if success is True:
+            border = "rgba(90, 220, 130, 0.60)"
+        elif success is False:
+            border = "rgba(230, 90, 90, 0.60)"
+        else:
+            border = "rgba(255, 210, 90, 0.60)"
+        self.card.setStyleSheet(f"""
+            QFrame#dice_card {{
+                background: rgba(28, 26, 20, 0.85);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-left: 3px solid {border};
+                border-radius: 10px;
+            }}
+        """)
+
+    def animate_to(self, result_text: str, success, sides: int = 20) -> None:
+        self._final_text = result_text
+        self._final_success = success
+        self._roll_sides = max(2, sides)
+        self._ticks_left = 6
+        self._timer.start(55)
+
+    def set_final(self, result_text: str, success) -> None:
+        self._timer.stop()
+        self.text_label.setText(result_text)
+        self._apply_accent(success)
+
+    def _tick(self):
+        self._ticks_left -= 1
+        if self._ticks_left <= 0:
+            self._timer.stop()
+            self.text_label.setText(self._final_text)
+            self._apply_accent(self._final_success)
+        else:
+            self.text_label.setText(str(random.randint(1, self._roll_sides)))
 
 class SoulStageNPCBubble(_BaseChatBubble):
     def __init__(self, npc_name: str, archetype: str, avatar_path: str = None, parent=None):
@@ -1726,140 +1971,200 @@ class InventoryPanel(QtWidgets.QDialog):
 class ChoicesBar(QFrame):
     choice_selected = pyqtSignal(str)
 
-    _FRAME_STYLE = """
-        QFrame#choices_bar {
-            background: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1,
-                stop:0 rgba(18, 18, 22, 0.0),
-                stop:0.3 rgba(14, 14, 18, 0.85),
-                stop:1 rgba(10, 10, 12, 0.95));
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            border-bottom: none;
-        }
-    """
-
-    _HINT_STYLE = (
-        "color: rgba(255,255,255,0.40); font-family: 'Inter Tight Medium';"
-        " font-size: 9px; letter-spacing: 1px; background: transparent; border: none;"
-    )
+    _THEMES = {
+        "encounter": {
+            "accent": "#FF5555",
+            "bg_accent": "rgba(255, 85, 85, 0.14)",
+            "border": "rgba(255, 85, 85, 0.45)",
+            "icon": "⚔️",
+            "label": "TACTICAL CHOICE",
+        },
+        "discovery": {
+            "accent": "#FFD15C",
+            "bg_accent": "rgba(255, 209, 92, 0.14)",
+            "border": "rgba(255, 209, 92, 0.45)",
+            "icon": "✦",
+            "label": "DISCOVERY",
+        },
+        "visitor": {
+            "accent": "#A080FF",
+            "bg_accent": "rgba(160, 128, 255, 0.14)",
+            "border": "rgba(160, 128, 255, 0.45)",
+            "icon": "👤",
+            "label": "RESPONSE",
+        },
+        "twist": {
+            "accent": "#50E3C2",
+            "bg_accent": "rgba(80, 227, 194, 0.14)",
+            "border": "rgba(80, 227, 194, 0.45)",
+            "icon": "⚡",
+            "label": "PLOT TWIST",
+        },
+        "romance": {
+            "accent": "#FF65A3",
+            "bg_accent": "rgba(255, 101, 163, 0.14)",
+            "border": "rgba(255, 101, 163, 0.45)",
+            "icon": "♥",
+            "label": "INTIMATE MOMENT",
+        },
+        "none": {
+            "accent": "#70A0FF",
+            "bg_accent": "rgba(112, 160, 255, 0.14)",
+            "border": "rgba(112, 160, 255, 0.45)",
+            "icon": "◈",
+            "label": "CHOOSE YOUR ACTION",
+        },
+    }
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("choices_bar")
-        self.setStyleSheet(self._FRAME_STYLE)
         self._event_type = "none"
         self.translations = _load_translations()
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(20, 8, 20, 6)
-        root.setSpacing(6)
+        self.setStyleSheet("""
+            QFrame#choices_bar {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0.00 rgba(14, 14, 18, 0.0),
+                    stop:0.20 rgba(12, 12, 16, 0.88),
+                    stop:0.80 rgba(10, 10, 14, 0.88),
+                    stop:1.00 rgba(8, 8, 12, 0.0));
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                border-bottom: none;
+                margin-bottom: 6px;
+            }
+        """)
 
-        hint_row = QHBoxLayout()
-        hint_row.setContentsMargins(0, 0, 0, 0)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 12, 24, 22)
+        root.setSpacing(10)
+
+        hdr_row = QHBoxLayout()
+        hdr_row.setContentsMargins(0, 0, 0, 0)
+        hdr_row.setSpacing(8)
+
+        self._badge_icon = QLabel("◈")
+        self._badge_icon.setFont(_font("Inter Tight SemiBold", 10))
+        self._badge_icon.setStyleSheet("background: transparent; border: none;")
+        hdr_row.addWidget(self._badge_icon)
+
         self._hint_lbl = QLabel(self.translations.get("choice_hint_none", "CHOOSE YOUR ACTION  —  OR TYPE YOUR OWN"))
-        self._hint_lbl.setStyleSheet(self._HINT_STYLE)
-        self._hint_lbl.setFont(_font("Inter Tight SemiBold", 8, bold=True))
-        hint_row.addWidget(self._hint_lbl)
-        hint_row.addStretch()
+        self._hint_lbl.setFont(_font("Inter Tight SemiBold", 9, bold=True))
+        self._hint_lbl.setStyleSheet("color: rgba(255, 255, 255, 0.50); letter-spacing: 1.5px; background: transparent; border: none;")
+        hdr_row.addWidget(self._hint_lbl)
+        hdr_row.addStretch()
 
         self._btn_dismiss = QPushButton("✕")
-        self._btn_dismiss.setFixedSize(18, 18)
+        self._btn_dismiss.setFixedSize(20, 20)
         self._btn_dismiss.setCursor(Qt.CursorShape.PointingHandCursor)
         self._btn_dismiss.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._btn_dismiss.setToolTip("Hide choices")
         self._btn_dismiss.setStyleSheet("""
-            QPushButton { background: transparent; border: none;
-                color: rgba(255,255,255,50); font-size: 10px; }
-            QPushButton:hover { color: rgba(255,255,255,150); }
-        """)
-        self._btn_dismiss.clicked.connect(self.clear_choices)
-        hint_row.addWidget(self._btn_dismiss)
-        root.addLayout(hint_row)
-
-        self._buttons_row = QHBoxLayout()
-        self._buttons_row.setContentsMargins(0, 0, 0, 0)
-        self._buttons_row.setSpacing(8)
-        root.addLayout(self._buttons_row)
-
-        self.hide()
-
-    def _build_btn_style(self) -> str:
-        return """
             QPushButton {
                 background: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                border-top: 1px solid rgba(255, 255, 255, 0.20);
+                border: none;
                 border-radius: 10px;
-                color: rgba(255, 255, 255, 0.85);
-                font-family: 'Inter Tight Medium';
-                font-size: 12px;
-                padding: 7px 16px;
-                text-align: center;
+                color: rgba(255, 255, 255, 0.40);
+                font-size: 11px;
             }
             QPushButton:hover {
-                background: rgba(255, 255, 255, 0.08);
-                border-color: rgba(255, 255, 255, 0.25);
-                color: white;
-            }
-            QPushButton:pressed {
                 background: rgba(255, 255, 255, 0.12);
-                border-color: rgba(255, 255, 255, 0.40);
+                color: rgba(255, 255, 255, 0.90);
             }
-        """
+        """)
+        self._btn_dismiss.clicked.connect(self.clear_choices)
+        hdr_row.addWidget(self._btn_dismiss)
+
+        root.addLayout(hdr_row)
+
+        self._grid_w = QWidget()
+        self._grid_w.setStyleSheet("background: transparent;")
+        self._grid_layout = QGridLayout(self._grid_w)
+        self._grid_layout.setContentsMargins(0, 0, 0, 0)
+        self._grid_layout.setSpacing(10)
+
+        root.addWidget(self._grid_w)
+        self.hide()
 
     def show_choices(self, choices: list[str], event_type: str = "none"):
         if not choices:
             self.hide()
             return
 
-        self._event_type = event_type
+        self._event_type = event_type if event_type in self._THEMES else "none"
+        theme = self._THEMES[self._event_type]
 
-        while self._buttons_row.count():
-            child = self._buttons_row.takeAt(0)
+        self._badge_icon.setText(theme["icon"])
+        self._badge_icon.setStyleSheet(f"color: {theme['accent']}; font-size: 13px; background: transparent; border: none;")
+
+        hint_text = self.translations.get(f"choice_hint_{self._event_type}", f"{theme['label']}  —  OR TYPE YOUR OWN ACTION")
+        self._hint_lbl.setText(hint_text.upper())
+        self._hint_lbl.setStyleSheet(f"color: {theme['accent']}; letter-spacing: 1.5px; background: transparent; border: none;")
+
+        while self._grid_layout.count():
+            child = self._grid_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
 
-        btn_style = self._build_btn_style()
+        acc = theme["accent"]
+        bg_acc = theme["bg_accent"]
+        border_acc = theme["border"]
 
-        for text in choices[:4]:
-            btn = QPushButton(text)
+        btn_style = f"""
+            QPushButton {{
+                background: rgba(20, 20, 26, 0.80);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-left: 3px solid {acc};
+                border-radius: 10px;
+                color: rgba(240, 240, 245, 0.92);
+                font-family: 'Inter Tight Medium';
+                font-size: 12px;
+                padding: 10px 16px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background: {bg_acc};
+                border-color: {border_acc};
+                border-left: 5px solid {acc};
+                color: #FFFFFF;
+            }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.12);
+            }}
+        """
+
+        num_choices = min(len(choices), 4)
+        for i in range(num_choices):
+            text = choices[i]
+            btn = QPushButton(f"  [{i + 1}]   {text}")
             btn.setFont(_font("Inter Tight Medium", 12))
             btn.setStyleSheet(btn_style)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            btn.setSizePolicy(
-                QtWidgets.QSizePolicy.Policy.Preferred,
-                QtWidgets.QSizePolicy.Policy.Fixed,
-            )
-            btn.setFixedHeight(34)
+            btn.setMinimumHeight(42)
 
-            btn_shadow = QtWidgets.QGraphicsDropShadowEffect()
-            btn_shadow.setBlurRadius(12)
-            btn_shadow.setOffset(0, 3)
-            btn_shadow.setColor(QColor(0, 0, 0, 80))
-            btn.setGraphicsEffect(btn_shadow)
+            shadow = QtWidgets.QGraphicsDropShadowEffect()
+            shadow.setBlurRadius(14)
+            shadow.setOffset(0, 3)
+            shadow.setColor(QColor(0, 0, 0, 90))
+            btn.setGraphicsEffect(shadow)
 
-            btn.clicked.connect(
-                lambda checked, t=text: self._on_choice_clicked(t)
-            )
-            self._buttons_row.addWidget(btn)
+            btn.clicked.connect(lambda checked, t=text: self._on_choice_clicked(t))
 
-        self._buttons_row.addStretch()
+            row = i // 2
+            col = i % 2
 
-        hint_map = {
-            "encounter": self.translations.get("choice_hint_encounter", "REACT TO THE THREAT  —  OR TYPE YOUR OWN"),
-            "discovery": self.translations.get("choice_hint_discovery", "WHAT DO YOU DO?  —  OR TYPE YOUR OWN"),
-            "visitor":   self.translations.get("choice_hint_visitor", "HOW DO YOU RESPOND?  —  OR TYPE YOUR OWN"),
-            "twist":     self.translations.get("choice_hint_twist", "YOUR MOVE  —  OR TYPE YOUR OWN"),
-            "romance":   self.translations.get("choice_hint_romance", "CHOOSE YOUR RESPONSE  —  OR TYPE YOUR OWN"),
-            "none":      self.translations.get("choice_hint_none", "CHOOSE YOUR ACTION  —  OR TYPE YOUR OWN"),
-        }
-        self._hint_lbl.setText(hint_map.get(event_type, hint_map["none"]))
+            if num_choices == 1 or (i == 2 and num_choices == 3):
+                self._grid_layout.addWidget(btn, row, col, 1, 2)
+            else:
+                self._grid_layout.addWidget(btn, row, col)
 
         self.show()
         self.adjustSize()
 
     def clear_choices(self):
-        while self._buttons_row.count():
-            child = self._buttons_row.takeAt(0)
+        while self._grid_layout.count():
+            child = self._grid_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
         self.hide()
@@ -1977,75 +2282,6 @@ class RPGOpenSceneDialog(QtWidgets.QDialog):
         dlg = RPGOpenSceneDialog(scene_title, entry_count, parent)
         dlg.exec()
         return dlg.result_action
-
-
-class RPGConfirmDialog(QtWidgets.QDialog):
-    def __init__(self, title: str, message: str, confirm_text: str = "Delete",
-                 detail: str = "", parent=None):
-        super().__init__(parent)
-        self._confirmed = False
-        self.translations = _load_translations()
-        self.setWindowTitle(title)
-        self.setMinimumWidth(420)
-        self.setFixedHeight(220)
-        self.setStyleSheet("""
-            QDialog { background-color: #0d0d10; color: #e8e8e8; }
-            QLabel { background: transparent; border: none; }
-        """)
-
-        root = QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 24)
-        root.setSpacing(0)
-
-        header_row = QHBoxLayout()
-        header_row.setSpacing(14)
-        warn_icon = QLabel("⚠")
-        warn_icon.setStyleSheet("font-size: 28px; color: #FF6B6B;")
-        warn_icon.setFixedWidth(34)
-        header_row.addWidget(warn_icon)
-
-        text_col = QVBoxLayout()
-        text_col.setSpacing(4)
-        msg_lbl = QLabel(message)
-        msg_lbl.setFont(_font("Inter Tight SemiBold", 13))
-        msg_lbl.setStyleSheet("color: #ffffff;")
-        msg_lbl.setWordWrap(True)
-        text_col.addWidget(msg_lbl)
-        if detail:
-            det_lbl = QLabel(detail)
-            det_lbl.setFont(_font("Inter Tight Medium", 10))
-            det_lbl.setStyleSheet("color: rgba(255,255,255,0.45);")
-            det_lbl.setWordWrap(True)
-            text_col.addWidget(det_lbl)
-        header_row.addLayout(text_col, 1)
-        root.addLayout(header_row)
-        root.addSpacing(16)
-        root.addWidget(_rpg_divider())
-        root.addSpacing(16)
-
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
-        btn_cancel = _rpg_ghost_btn(self.translations.get("cancel", "Cancel"))
-        btn_cancel.clicked.connect(self.reject)
-        btn_row.addWidget(btn_cancel)
-        btn_row.addStretch()
-        btn_confirm = _rpg_primary_btn(confirm_text, "220,60,60")
-        btn_confirm.setFixedWidth(140)
-        btn_confirm.clicked.connect(self._on_confirm)
-        btn_row.addWidget(btn_confirm)
-        root.addLayout(btn_row)
-
-    def _on_confirm(self):
-        self._confirmed = True
-        self.accept()
-
-    @staticmethod
-    def ask(title: str, message: str, confirm_text: str = "Delete",
-            detail: str = "", parent=None) -> bool:
-        dlg = RPGConfirmDialog(title, message, confirm_text, detail, parent)
-        dlg.exec()
-        return dlg._confirmed
-
 
 class RPGMemorySelectDialog(QtWidgets.QDialog):
     def __init__(self, party_names: list, parent=None):
@@ -2231,7 +2467,7 @@ class WorldInfoDialog(QtWidgets.QDialog):
         self.npc_registry = npc_registry
         self.translations = _load_translations()
         self.setWindowTitle(self.translations.get("world_state_title", "World State — Soul Stage"))
-        self.setMinimumSize(720, 580)
+        self.setMinimumSize(800, 600)
         self.setStyleSheet("""
             QDialog {
                 background-color: #0c0c0e;
@@ -2340,6 +2576,9 @@ class WorldInfoDialog(QtWidgets.QDialog):
             (self.translations.get("tab_facts", "Key Facts"), self._build_facts_tab),
             (self.translations.get("tab_inventory", "Inventory"), self._build_inventory_tab),
             (self.translations.get("tab_status", "Status"), self._build_status_tab),
+            (self.translations.get("tab_resources", "Resources"), self._build_resources_tab),
+            (self.translations.get("tab_lore", "Lore Cards"), self._build_lore_tab),
+            (self.translations.get("tab_campaign", "Campaign Board"), self._build_campaign_tab),
             (self.translations.get("tab_npcs", "Active NPCs"), self._build_npcs_tab),
         ]
         
@@ -2524,6 +2763,91 @@ class WorldInfoDialog(QtWidgets.QDialog):
         l.addStretch()
         return self._scroll_wrap(w)
 
+    def _build_resources_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_resources", "Resources & Skills")))
+
+        self.edit_resources = QTextEdit()
+        self.edit_resources.setPlaceholderText("health: 8/10\nenergy: 4/6\nstress: 2/6")
+        self.edit_resources.setMinimumHeight(140)
+        self._set_font(self.edit_resources, "Inter Tight Medium", 13)
+        self._field_col(
+            l, self.translations.get("field_resources", "Resources"), self.edit_resources,
+            self.translations.get("field_resources_hint", 'Format: "name: current/max" (one per line)')
+        )
+
+        self.edit_skills = QTextEdit()
+        self.edit_skills.setPlaceholderText("stealth: +3\npersuasion: +1\nathletics: -1")
+        self.edit_skills.setMinimumHeight(140)
+        self._set_font(self.edit_skills, "Inter Tight Medium", 13)
+        self._field_col(
+            l, self.translations.get("field_skills", "Skills"), self.edit_skills,
+            self.translations.get("field_skills_hint", 'Format: "skill: modifier" (-5 to +10, one per line)')
+        )
+
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_lore_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_lore", "Campaign Lore")))
+
+        hint = QLabel(self.translations.get(
+            "hint_lore_format",
+            "One card per block, separated by a blank line. Cards are injected into the "
+            "story only when their triggers appear in the scene."
+        ))
+        self._set_font(hint, "Inter Tight Medium", 10)
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: rgba(255,255,255,0.35); margin-bottom: 4px;")
+        l.addWidget(hint)
+
+        self.edit_lore = QTextEdit()
+        self.edit_lore.setPlaceholderText(
+            "### King Alaric\n"
+            "category: npc\n"
+            "triggers: king, alaric, throne\n"
+            "visibility: party\n"
+            "He secretly poisoned his brother to take the throne.\n"
+        )
+        self.edit_lore.setMinimumHeight(320)
+        self._set_font(self.edit_lore, "Inter Tight Medium", 12)
+        l.addWidget(self.edit_lore)
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_campaign_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_campaign", "Campaign Board")))
+
+        self.edit_objectives = QTextEdit()
+        self.edit_objectives.setPlaceholderText(
+            "Find the missing heir | 1/3 | active | Rumors point toward the northern port.\n"
+            "Win the king's trust | 3/3 | complete | \n"
+        )
+        self.edit_objectives.setMinimumHeight(180)
+        self._set_font(self.edit_objectives, "Inter Tight Medium", 12)
+        self._field_col(
+            l, self.translations.get("field_objectives", "Objectives"), self.edit_objectives,
+            self.translations.get("field_objectives_hint",
+                'Format: "title | current/max | status | description" (status: active/complete/failed)')
+        )
+
+        self.edit_clocks = QTextEdit()
+        self.edit_clocks.setPlaceholderText(
+            "Guards Alerted | 0/4 | Rises each time the party is seen doing something suspicious.\n"
+            "Ritual Completes | 2/6 | The cultists need six nights of moonlight.\n"
+        )
+        self.edit_clocks.setMinimumHeight(180)
+        self._set_font(self.edit_clocks, "Inter Tight Medium", 12)
+        self._field_col(
+            l, self.translations.get("field_clocks", "Clocks"), self.edit_clocks,
+            self.translations.get("field_clocks_hint", 'Format: "title | current/max | description"')
+        )
+
+        l.addStretch()
+        return self._scroll_wrap(w)
+
     def _build_npcs_tab(self) -> QWidget:
         w, l = self._inner_widget()
         l.addWidget(self._section_label(self.translations.get("section_npcs", "Characters in Scene")))
@@ -2548,6 +2872,136 @@ class WorldInfoDialog(QtWidgets.QDialog):
         
         return self._scroll_wrap(w)
 
+    @staticmethod
+    def _format_resources(resources: dict) -> str:
+        return "\n".join(f"{name}: {pool.get('current', 0)}/{pool.get('max', 0)}" for name, pool in resources.items())
+
+    @staticmethod
+    def _parse_resources(text: str, existing: dict) -> dict:
+        result = copy.deepcopy(existing)
+        for line in text.splitlines():
+            if ":" not in line:
+                continue
+            name, _, rest = line.partition(":")
+            name = name.strip().lower()
+            rest = rest.strip()
+            if not name or "/" not in rest:
+                continue
+            cur_s, _, max_s = rest.partition("/")
+            try:
+                cur, mx = int(cur_s.strip()), int(max_s.strip())
+            except ValueError:
+                continue
+            mx = max(1, min(999, mx))
+            cur = max(0, min(mx, cur))
+            result[name] = {"current": cur, "max": mx}
+        return result
+
+    @staticmethod
+    def _format_skills(skills: dict) -> str:
+        return "\n".join(f"{name}: {value:+d}" for name, value in skills.items())
+
+    @staticmethod
+    def _parse_skills(text: str) -> dict:
+        result = {}
+        for line in text.splitlines():
+            if ":" not in line:
+                continue
+            name, _, value = line.partition(":")
+            name = name.strip().lower()
+            if not name:
+                continue
+            try:
+                result[name] = max(-5, min(10, int(value.strip())))
+            except ValueError:
+                continue
+        return result
+
+    @staticmethod
+    def _format_lore_cards(cards: list) -> str:
+        blocks = []
+        for c in cards:
+            lines = [f"### {c.get('title', 'Untitled')}"]
+            lines.append(f"category: {c.get('category', 'Lore')}")
+            lines.append(f"triggers: {', '.join(c.get('triggers', []))}")
+            lines.append(f"visibility: {c.get('visibility', 'party')}")
+            if not c.get("enabled", True):
+                lines.append("enabled: false")
+            lines.append(str(c.get("content", "")))
+            lines.append(f"[id: {c.get('id', '')}]")
+            blocks.append("\n".join(lines))
+        return "\n\n".join(blocks)
+
+    @staticmethod
+    def _parse_lore_cards(text: str) -> list:
+        cards = []
+        blocks = re.split(r"\n\s*\n(?=###\s)", text.strip())
+        for block in blocks:
+            block = block.strip()
+            if not block.startswith("###"):
+                continue
+            lines = block.splitlines()
+            title = lines[0][3:].strip()
+            data = {"title": title, "category": "Lore", "triggers": [], "visibility": "party", "enabled": True}
+            content_lines = []
+            for line in lines[1:]:
+                stripped = line.strip()
+                m_id = re.match(r"^\[id:\s*(.*?)\]$", stripped)
+                if m_id:
+                    if m_id.group(1).strip():
+                        data["id"] = m_id.group(1).strip()
+                    continue
+                if stripped.lower().startswith("category:"):
+                    data["category"] = stripped.split(":", 1)[1].strip()
+                elif stripped.lower().startswith("triggers:"):
+                    data["triggers"] = [t.strip() for t in stripped.split(":", 1)[1].split(",") if t.strip()]
+                elif stripped.lower().startswith("visibility:"):
+                    data["visibility"] = stripped.split(":", 1)[1].strip()
+                elif stripped.lower().startswith("enabled:"):
+                    data["enabled"] = stripped.split(":", 1)[1].strip().lower() not in ("false", "0", "no")
+                else:
+                    content_lines.append(line)
+            data["content"] = "\n".join(content_lines).strip()
+            if data["title"] or data["content"]:
+                cards.append(data)
+        return cards
+
+    @staticmethod
+    def _format_campaign_entries(entries: list, is_clock: bool) -> str:
+        lines = []
+        for e in entries:
+            if is_clock:
+                lines.append(f"{e.get('title','')} | {e.get('current',0)}/{e.get('max',4)} | {e.get('description','')}")
+            else:
+                lines.append(f"{e.get('title','')} | {e.get('current',0)}/{e.get('max',1)} | {e.get('status','active')} | {e.get('description','')}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_campaign_entries(text: str, is_clock: bool) -> list:
+        entries = []
+        for line in text.splitlines():
+            if not line.strip() or "|" not in line:
+                continue
+            parts = [p.strip() for p in line.split("|")]
+            title = parts[0]
+            if not title:
+                continue
+            cur, mx = 0, (4 if is_clock else 1)
+            if len(parts) > 1 and "/" in parts[1]:
+                cur_s, _, mx_s = parts[1].partition("/")
+                try:
+                    cur, mx = int(cur_s.strip()), int(mx_s.strip())
+                except ValueError:
+                    pass
+            if is_clock:
+                description = parts[2] if len(parts) > 2 else ""
+                entries.append({"title": title, "current": cur, "max": mx, "description": description})
+            else:
+                status = parts[2].strip().lower() if len(parts) > 2 and parts[2].strip() else "active"
+                description = parts[3] if len(parts) > 3 else ""
+                entries.append({"title": title, "current": cur, "max": mx, "status": status, "description": description})
+        return entries
+
     def _populate(self):
         ws = self.world_state
         
@@ -2561,6 +3015,12 @@ class WorldInfoDialog(QtWidgets.QDialog):
         self.edit_facts.setPlainText("\n".join(f"{k}: {v}" for k, v in ws.key_facts.items()))
         self.edit_inventory.setPlainText("\n".join(ws.player_inventory))
         self.edit_status.setPlainText("\n".join(ws.player_status))
+        self.edit_resources.setPlainText(self._format_resources(ws.resources))
+        self.edit_skills.setPlainText(self._format_skills(ws.player_skills))
+        self.edit_lore.setPlainText(self._format_lore_cards(ws.lore_registry.to_dict()))
+        board = ws.campaign_board.to_dict()
+        self.edit_objectives.setPlainText(self._format_campaign_entries(board.get("objectives", []), is_clock=False))
+        self.edit_clocks.setPlainText(self._format_campaign_entries(board.get("clocks", []), is_clock=True))
 
         if self.npc_registry:
             npcs = self.npc_registry.list_active()
@@ -2619,10 +3079,30 @@ class WorldInfoDialog(QtWidgets.QDialog):
         ws.player_status =[
             st.strip() for st in self.edit_status.toPlainText().splitlines() if st.strip()
         ]
+
+        ws.resources = self._parse_resources(self.edit_resources.toPlainText(), ws.resources)
+        ws.player_skills = self._parse_skills(self.edit_skills.toPlainText())
+
+        parsed_cards = self._parse_lore_cards(self.edit_lore.toPlainText())
+        ws.lore_registry.cards = {}
+        for card_data in parsed_cards:
+            ws.lore_registry.upsert(card_data)
+
+        parsed_objectives = self._parse_campaign_entries(self.edit_objectives.toPlainText(), is_clock=False)
+        parsed_clocks = self._parse_campaign_entries(self.edit_clocks.toPlainText(), is_clock=True)
+        ws.campaign_board.objectives = []
+        for obj_data in parsed_objectives:
+            ws.campaign_board.upsert_objective(obj_data)
+        ws.campaign_board.clocks = []
+        for clk_data in parsed_clocks:
+            ws.campaign_board.upsert_clock(clk_data)
+
         self.world_state_changed.emit({
             "location": ws.location, "time_of_day": ws.time_of_day,
             "atmosphere": ws.atmosphere, "key_facts": ws.key_facts,
             "player_inventory": ws.player_inventory, "player_status": ws.player_status,
+            "resources": ws.resources, "player_skills": ws.player_skills,
+            "lore_cards": ws.lore_registry.to_dict(), "campaign_board": ws.campaign_board.to_dict(),
         })
         self.accept()
 
@@ -2647,6 +3127,7 @@ class SoulStageChatView(QFrame):
     world_info_clicked = pyqtSignal()
     continue_plot     = pyqtSignal()
     choice_made         = pyqtSignal(str)
+    export_clicked      = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2717,6 +3198,93 @@ class SoulStageChatView(QFrame):
         self._party_row.setSpacing(4)
         tl.addWidget(self.party_container)
 
+        dv2 = QFrame(); dv2.setFrameShape(QFrame.Shape.VLine); dv2.setFixedWidth(1)
+        dv2.setStyleSheet("background: rgba(255,255,255,0.08); margin: 10px 4px;")
+        tl.addWidget(dv2)
+
+        combo_style = """
+            QComboBox {
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.10);
+                border-radius: 8px;
+                color: rgba(255,255,255,0.75);
+                font-family: 'Inter Tight Medium';
+                font-size: 11px;
+                padding: 3px 10px;
+                min-height: 22px;
+            }
+            QComboBox:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
+            QComboBox::drop-down { border: none; width: 16px; }
+            QComboBox QAbstractItemView {
+                background-color: #1a1a1e; color: #e8e8e8;
+                selection-background-color: rgba(255,255,255,0.12);
+                border: 1px solid rgba(255,255,255,0.1);
+                outline: none;
+            }
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
+        """
+
+        self.mode_combo = QtWidgets.QComboBox()
+        self.mode_combo.addItem(self.translations.get("mode_say", "💬 Say"), "say")
+        self.mode_combo.addItem(self.translations.get("mode_do", "⚔ Do"), "do")
+        self.mode_combo.addItem(self.translations.get("mode_think", "💭 Think"), "think")
+        self.mode_combo.addItem(self.translations.get("mode_director", "🎬 Director"), "director")
+        self.mode_combo.setFixedWidth(110)
+        self.mode_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.mode_combo.setStyleSheet(combo_style)
+        self.mode_combo.setToolTip(self.translations.get(
+            "mode_tooltip",
+            "Say: spoken aloud · Do: an action · Think: silent inner thought · "
+            "Director: an out-of-character note to the GM (advances the plot, not spoken by you)"
+        ))
+        tl.addWidget(self.mode_combo)
+
+        target_lbl = QLabel(self.translations.get("target_next_label", "Next:"))
+        target_lbl.setFont(_font(size=11))
+        target_lbl.setStyleSheet("color: rgba(255,255,255,0.35);")
+        tl.addWidget(target_lbl)
+
+        self.target_combo = QtWidgets.QComboBox()
+        self.target_combo.addItem(self.translations.get("target_auto", "Auto"), None)
+        self.target_combo.setFixedWidth(140)
+        self.target_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.target_combo.setStyleSheet(combo_style)
+        self.target_combo.setToolTip(self.translations.get(
+            "target_tooltip", "Manually choose who speaks next instead of letting the GM decide."
+        ))
+        tl.addWidget(self.target_combo)
+
+        self.whisper_checkbox = QtWidgets.QCheckBox(self.translations.get("whisper_label", "Private"))
+        self.whisper_checkbox.setFont(_font(size=11))
+        self.whisper_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.whisper_checkbox.setStyleSheet("""
+            QCheckBox { color: rgba(255,255,255,0.55); spacing: 6px; }
+            QCheckBox::indicator { width: 14px; height: 14px; border-radius: 4px;
+                border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.04); }
+            QCheckBox::indicator:checked { background: rgba(150,130,255,0.6); border-color: rgba(150,130,255,0.8); }
+            QToolTip { 
+                background-color: rgba(25, 25, 30, 0.95); 
+                color: #E0E0E0; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 6px; 
+                padding: 6px 10px; font-size: 12px; 
+                font-weight: 500; 
+            }
+        """)
+        self.whisper_checkbox.setToolTip(self.translations.get(
+            "whisper_tooltip",
+            "When checked, your message becomes private knowledge only the selected "
+            "character has — the rest of the party won't know."
+        ))
+        tl.addWidget(self.whisper_checkbox)
+
         tl.addStretch()
 
         def _icon_btn(icon_path: str, tooltip: str, color_rgb: str = "255,255,255", alpha_normal: float = 0.08) -> QPushButton:
@@ -2749,6 +3317,14 @@ class SoulStageChatView(QFrame):
                         stop:1 rgba(255, 255, 255, 0.10));
                     border: 1px solid rgba(255, 255, 255, 0.08);
                 }}
+                QToolTip {{
+                    background-color: rgba(25, 25, 30, 0.95); 
+                    color: #E0E0E0; 
+                    border: 1px solid rgba(255, 255, 255, 0.15); 
+                    border-radius: 6px; 
+                    padding: 6px 10px; font-size: 12px; 
+                    font-weight: 500; 
+                }}
             """)
             return btn
 
@@ -2763,6 +3339,10 @@ class SoulStageChatView(QFrame):
         self.btn_continue_plot = _icon_btn("app/gui/icons/play.png", "Continue Plot", "180,80,220")
         self.btn_continue_plot.clicked.connect(self.continue_plot.emit)
         tl.addWidget(self.btn_continue_plot)
+
+        self.btn_export = _icon_btn("app/gui/icons/export.png", "Export to Markdown", "255,210,90")
+        self.btn_export.clicked.connect(self.export_clicked.emit)
+        tl.addWidget(self.btn_export)   
 
         self.btn_interrupt = _icon_btn("app/gui/icons/stop.png", "Intervene (stop AI turn)", "255,180,50")
         self.btn_interrupt.clicked.connect(self.interrupted)
@@ -3031,6 +3611,41 @@ class SoulStageChatView(QFrame):
         )
         self.inventory_hud.hide()
 
+    def set_actor_options(self, party_names: list, npc_names: Optional[list] = None):
+        current = self.target_combo.currentData()
+        self.target_combo.blockSignals(True)
+        self.target_combo.clear()
+        self.target_combo.addItem(self.translations.get("target_auto", "Auto"), None)
+        for name in list(party_names or []) + list(npc_names or []):
+            self.target_combo.addItem(name, name)
+        idx = self.target_combo.findData(current)
+        self.target_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.target_combo.blockSignals(False)
+
+    def compose_message(self, raw_text: str) -> dict:
+        mode = self.mode_combo.currentData() or "say"
+        text = (raw_text or "").strip()
+
+        if mode == "do":
+            formatted = text if text.startswith("*") else f"*{text}*"
+        elif mode == "think":
+            formatted = f"*(silently thinking to myself) {text}*" if text else text
+        elif mode == "director":
+            formatted = f"[SYSTEM DIRECTIVE — DIRECTOR NOTE]: {text}" if text else text
+        else:
+            formatted = text
+
+        target = self.target_combo.currentData()
+        manual_next_actor = target if (mode != "director" and target) else None
+        private_recipient = target if (self.whisper_checkbox.isChecked() and target) else None
+
+        return {
+            "text": formatted,
+            "manual_next_actor": manual_next_actor,
+            "private_recipient": private_recipient,
+            "mode": mode,
+        }
+
     def load_scene(self, scene_data: dict, scene_id: str):
         self.scene_data = scene_data
         self._scene_id  = scene_id
@@ -3261,14 +3876,19 @@ class SoulStagePage(QWidget):
             detail = detail_template.replace("{title}", title).replace("{count}", str(log_n))
         else:
             detail = f'"{title}"'
-        confirmed = RPGConfirmDialog.ask(
-            title=self.translations.get("delete_scene_title", "Delete Scene"),
-            message=self.translations.get("delete_scene_confirm", "Permanently delete this scene?"),
-            confirm_text=self.translations.get("delete", "Delete"),
-            detail=detail,
+
+        message = self.translations.get("delete_scene_confirm", "Permanently delete this scene?")
+        full_text = f"{message}<br><span style='color: rgba(255,255,255,0.4); font-size: 9pt;'>{detail}</span>"
+
+        dialog = SowConfirmDialog(
             parent=self,
+            title=self.translations.get("delete_scene_title", "Delete Scene"),
+            text=full_text,
+            confirm_text=self.translations.get("delete", "Delete"),
+            danger=True
         )
-        if confirmed:
+
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             data["scenes"].pop(scene_id, None)
             _save_scenes(data)
             self.lobby_view.refresh()
