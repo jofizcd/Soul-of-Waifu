@@ -23,6 +23,14 @@ options_button: " Options"
 
 
 # ──────────────────────────────────────────────────────────
+# LOCAL LANGUAGE MODEL STATUS
+# ──────────────────────────────────────────────────────────
+local_model_state_offline: "MODEL OFFLINE"
+local_model_state_connecting: "LOADING MODEL..."
+local_model_state_generating: "GENERATING..."
+local_model_state_online: "MODEL READY"
+
+# ──────────────────────────────────────────────────────────
 # MAIN TAB — NO CHARACTERS
 # ──────────────────────────────────────────────────────────
 no_characters_advice: "You haven't added any characters. Click on the button and create it"
@@ -38,10 +46,10 @@ no_characters_description: |-
 welcome_label: "Welcome to Soul of Waifu, User"
 add_character_title: "Character Information"
 more_btn_tooltip: "Character Information"
-call_btn_text: "Open the Soul of Waifu System"
-voice_btn_text: "Open Text-To-Speech options"
-expressions_btn_text: "Open expressions options"
-delete_btn_text: "Delete character"
+call_btn_text: "Call"
+voice_btn_text: "Voice Settings"
+expressions_btn_text: "Expression Settings"
+delete_btn_text: "Delete Character"
 background_changer_title: "Chat Background"
 background_changer_label_1: "Choose a background for the chat"
 background_changer_default_btn: "Default"
@@ -107,6 +115,7 @@ provider_name_qwen: "Qwen"
 provider_name_zai: "Z.AI"
 provider_name_mistral: "Mistral AI"
 provider_name_openrouter: "OpenRouter"
+provider_name_player2: "Player2"
 
 provider_desc_local: "Run models completely offline with maximum privacy and no censorship"
 provider_desc_openai: "Industry-leading quality and reliability for roleplay"
@@ -118,6 +127,7 @@ provider_desc_qwen: "Powerful multilingual reasoning and strong narrative capabi
 provider_desc_zai: "Fast, coherent, and excellent at storytelling — strong Claude alternative"
 provider_desc_mistral: "High-performance open models with excellent speed and quality balance"
 provider_desc_openrouter: "Access to hundreds of top models in one place — the ultimate aggregator"
+provider_desc_player2: "Free AI powered by the Player2 app. No API key required — just keep the Player2 application running."
 
 
 # ──────────────────────────────────────────────────────────
@@ -193,6 +203,8 @@ var_editor_del_btn: "Del"
 create_character_button_3: "Create Character"
 total_tokens_label: "Total Tokens: 0"
 search_placeholder: "Search"
+var_editor_save_preset_btn: "Save Preset"
+var_editor_delete_preset_btn: "Delete Preset"
 
 navigation_lbl: "NAVIGATION"
 
@@ -385,6 +397,7 @@ chat_template_auto: "Auto"
 stop_strings_label: "Stop Strings"
 stop_strings_placeholder: "\\nUser:, </s>, <|eot_id|>, <|im_end|>"
 reasoning_mode_checkbox: "Thinking/Reasoning Mode"
+no_mmap_checkbox: "No MMAP"
 gpu_layers_text: "GPU Layers"
 context_size_text: "Context Size"
 max_tokens_text: "Max Tokens"
@@ -401,10 +414,12 @@ dry_mult_text: "DRY Multiplier"
 dry_base_text: "DRY Base"
 dry_length_text: "DRY Allowed Length"
 enable_adv_sampling_text: "Enable Advanced Sampling"
+enable_adv_sampling_tooltip: "When disabled, standard generation settings from Card 1 are used. Advanced settings are ignored."
 
 kv_cache_label: "KV Cache Type"
 batch_size_text: "Prompt Batch Size"
 cpu_threads_text: "CPU Threads"
+custom_args_label: "Custom Arguments"
 
 section_hw_tuning: "PERFORMANCE & MEMORY TUNING"
 section_response_control: "RESPONSE CONTROL"
@@ -478,7 +493,7 @@ mcp_url_placeholder: "e.g., http://127.0.0.1:8000"
 sow_system_tab: "Soul of Waifu Modules"
 sow_system_title: "Soul of Waifu System"
 enable_sow_system_checkbox: "Soul of Waifu System Module"
-enable_ambient_checkbox: "Ambient Sound Module"
+enable_ambient_checkbox: "Ambient Module"
 enable_soul_memory: "Soul Memory Module"
 enable_summary_checkbox: "Auto-Summarization Module"
 settings_summary_interval: "Interval (messages):"
@@ -498,6 +513,8 @@ web_server_status_stopped: "Status: Stopped"
 web_server_start_btn: "Start Server"
 web_server_stop_btn: "Stop Server"
 web_browser_open_btn: "Open in Browser"
+web_browser_copy_mobile_btn: "Copy Mobile Link"
+web_browser_copied_btn: "Copied! 📋"
 web_server_starting_lbl: "Status: Starting..."
 web_server_starting_lbl_2: "Status: Running on http://127.0.0.1:8000"
 web_server_error: "Status: Port 8000 busy or Error"
@@ -909,6 +926,10 @@ tts_selector_qwen3_lbl_3: "CHOOSE PRESET VOICE"
 tts_selector_qwen3_lbl_4: "DESCRIBE VOICE IN ENGLISH (PROMPT)"
 tts_selector_qwen3_lbl_5: "REFERENCE AUDIO FILE (.WAV)"
 tts_selector_qwen3_lbl_6: "No reference audio selected"
+tts_selector_qwen3_lbl_7: "Style Instruction (optional)"
+
+tts_selector_qwen3_lbl_ref_text: "REFERENCE AUDIO TRANSCRIPT (RECOMMENDED)"
+tts_selector_qwen3_lbl_ref_placeholder_text: "Exact words spoken in the reference audio (improves cloning quality)..."
 
 
 # ──────────────────────────────────────────────────────────
@@ -1326,6 +1347,9 @@ tab_scene: "Scene"
 tab_facts: "Key Facts"
 tab_inventory: "Inventory"
 tab_status: "Status"
+tab_resources: "Resources"
+tab_lore: "Lore Cards"
+tab_campaign: "Campaign Board"
 tab_npcs: "Active NPCs"
 section_environment: "Environment Setup"
 section_memory: "World Memory"
@@ -1334,7 +1358,7 @@ section_player_conditions: "Player Conditions"
 section_npcs: "Characters in Scene"
 field_location: "Location"
 field_time: "Time of day"
-field_atmosphere: "Atmosphere"
+field_atmosphere: "Context of the World"
 field_facts_hint: 'Format: "key: value" (one per line)'
 field_inventory_hint: "One item per line"
 field_status_hint: "One condition per line"
@@ -1352,6 +1376,17 @@ tooltip_soul_memory: "Soul Memory"
 tooltip_world_state: "World State"
 tooltip_continue_plot: "Continue Plot"
 tooltip_intervene: "Intervene (stop AI turn)"
+
+ss_menu_copy: "Copy"
+ss_menu_edit: "Edit Message"
+ss_menu_translate_ru: "Translate → Russian"
+ss_menu_translate_en: "Translate → English"
+ss_menu_regenerate: "Regenerate Turn"
+ss_menu_delete: "Delete Message"
+ss_edit_msg_dialog_title: "Edit Message — Soul Stage"
+ss_edit_msg_title: "EDIT PLAYER MESSAGE"
+ss_edit_msg_sub: "Saving will update your text, rewind world state, and rerun the story turn."
+ss_edit_msg_save_btn: "Save & Rewind Turn"
 
 
 # ──────────────────────────────────────────────────────────
@@ -1419,7 +1454,7 @@ model_loading_step_6: "MODEL ONLINE"
 update_available_title: "Update Available"
 update_available_body: "A new version is available: "
 update_available_info: "Would you like to update the program?"
-update_current_version: "Current version: v2.4.0"
+update_current_version: "Current version: v2.4.5"
 update_available_close: "Close"
 update_available_link: "Go to GitHub"
 language_changed_title: "Restart Required"
@@ -1434,11 +1469,11 @@ language_changed_no: "No"
 # ──────────────────────────────────────────────────────────
 about_program: "About Soul of Waifu"
 about_program_title: "About Soul of Waifu"
-about_program_description: "<b>Soul of Waifu</b> is an advanced AI-powered role-playing game platform. Build unique characters from scratch, or instantly drag-and-drop standard V2 character cards. Run models with complete privacy on your own hardware via GGUF (optimized for CPU, CUDA, Vulkan, AMD HIP, and Intel SYCL) or connect seamlessly to leading cloud APIs, including OpenAI, Anthropic, DeepSeek, and Google Gemini.<br><br>Our proprietary cognitive architecture reshapes the boundaries of AI interaction. With <b>Soul Memory</b>, characters form genuine, self-healing long-term memories and private diary entries, moving far beyond static database lookups (RAG). Engage in fluid, real-time conversations featuring reactive Live2D and VRM avatars, synced with ultra-low-latency streaming audio powered by multiple Text-to-Speech engines.<br><br>Shape your journey across multiple modes: guide rich, tabletop-style RPGs in <b>Soul Stage</b> under the control of an AI Game Master, or host a <b>Soul Companion</b> overlay on your desktop. Driven by a dynamic neurohormonal system, the Companion proactively reacts to your active workspace, reads your clipboard, searches the web, and integrates custom MCP tools. Chat your way—directly on your desktop, via Discord, or from your phone using the built-in local web client!"
+about_program_description: "<b>Soul of Waifu</b> is a free, open-source desktop program in which AI characters truly remember, develop, and live both within the program and on your desktop. Create or import a character once and interact with them across three interconnected dimensions:<br><br>• 💬 <b>Interactive text and voice chat:</b> Live 1-on-1 dialogue with animated Live2D/VRM avatars, live voice streaming, an adaptive status HUD, file attachments, and tool usage. <br><br>• 🎲 <b>Soul Stage role-playing engine:</b> Tabletop text-based RPGs run by an AI Game Master with world state tracking, inventory management, and dynamic NPCs.<br><br>• 🖥️ <b>Soul Companion: </b> A standalone character on your desktop with a neurohormonal mood model, vision, buffer reading, and tool invocation.<br><br>All dimensions are unified by the <b>Soul Memory</b> module—a cognitive memory system with emotional evolution, a personal journal, and automatic resolution of contradictions. Runs 100% locally and privately on your PC via GGUF (CUDA, Vulkan, HIP, SYCL) without filters or subscriptions, with support for cloud APIs, Discord, and a local web client."
 support_btn: "Support"
 creator_label: "Developed by"
 simple_version_label: "Version"
-version_label: "Soul of Waifu v2.4.0"
+version_label: "Soul of Waifu v2.4.5"
 nsfw_checkbox: "NSFW"
 value: "Value: "
 
@@ -1456,6 +1491,7 @@ toast_folder_error_title: "Folder Error"
 soul_memory_no_chat: "Please open a chat with a character first."
 soul_memory_empty: "Chat history is empty."
 soul_memory_manual_start: "Manual memory update started..."
+soul_memory_manual_completed: "Manual memory update was successfully completed..."
 toast_voice_settings_title: "Voice Settings"
 toast_search_title: "Voice Search"
 toast_connection_error_title: "Connection Error"
@@ -1590,15 +1626,30 @@ gpu_layers_tooltip: |-
 
 context_size_tooltip: |-
   <b>Context Window</b><br><br>
-  This is the <b>memory capacity</b> the language model uses when generating a response. Choose Max Index for Unlimited (API).
-  It includes your chat history, author's notes, and lorebook entries.<br><br>
-  A larger context window means the character can <b>remember more</b>, but it drastically increases VRAM usage.<br><br>
-  💡 <i>Reduce this on weaker PCs. For long-term memory, keep the 'Soul Memory' module enabled instead of maxing this out.</i>
+  This is the maximum number of tokens the model can process at once (its working memory). It includes chat history, author's notes, and lorebook entries.<br><br>
+  Select the highest value for unlimited context (API) or to automatically detect the largest available context window for your local language model.<br><br>
+  A larger context window allows the character to <b>remember more</b>, but significantly increases VRAM usage.<br><br>
+  💡 <i>Lower this value on weaker PCs. For long-term memory, keep the 'Soul Memory' module enabled instead of maxing out the context size.</i>
 
 mlock_tooltip: |-
   <b>MLock (Memory Lock)</b><br><br>
-  This feature <b>prevents the language model from being unloaded</b> from RAM into the swap file.<br><br>
-  When enabled, the model stays fully loaded, ensuring the <b>fastest possible response time</b> without micro-stutters.
+  This feature <b>prevents the language model from being unloaded</b> from your system's RAM into the swap file on your storage drive.<br><br>
+  When enabled, the model stays fully loaded in memory, ensuring the <b>fastest possible response time</b> without micro-stutters during message generation.<br><br>
+  💡 <i>Recommended only if you have plenty of system RAM, as it permanently reserves that memory. Disable it on low-RAM systems.</i>
+
+no_mmap_tooltip: |-
+  <b>No MMAP Mode (Direct RAM Load)</b><br><br>
+  By default, models are loaded using memory mapping (<b>mmap</b>), which means parts of the model are read from your storage drive on-demand during generation.<br><br>
+  Enabling this option forces the system to <b>load the entire model into RAM</b> upfront.<br>
+  This slightly increases initial load time and RAM usage, but prevents micro-stutters and delays during text generation.<br><br>
+  💡 <i>Highly recommended if you have enough system RAM. Keep it disabled on low-RAM systems to avoid out-of-memory crashes.</i>
+
+reasoning_mode_tooltip: |-
+  <b>Thinking / Reasoning Mode (&lt;think&gt;)</b><br><br>
+  When enabled, the AI model will output its internal thought process inside <b>&lt;think&gt;</b> tags before providing the final response.<br><br>
+  This dramatically improves the model's logic, math, and problem-solving abilities by allowing it to "reason" step-by-step.<br>
+  However, it consumes more tokens and increases response time, as the model generates its hidden thoughts first.<br><br>
+  💡 <i>Enable this for complex tasks, puzzles, or deep roleplay logic. Disable it for simple, fast chatting.</i>
 
 flashattention_tooltip: |-
   <b>Flash Attention</b><br><br>
@@ -1611,6 +1662,12 @@ max_tokens_tooltip: |-
   Controls <b>how long the character's reply can be</b>.<br><br>
   💡 <i>Very long responses eat up context space. Recommended: 300–500 tokens.</i>
 
+custom_args_tooltip: |-
+  <b>Custom Backend Arguments</b><br><br>
+  Allows you to pass additional command-line arguments directly to the local LLM server (llama.cpp).<br><br>
+  This is intended for advanced users who want to fine-tune specific engine parameters (like RoPE scaling or cache settings) that are not exposed in the UI.<br><br>
+  💡 <i>Use with caution. Incorrect flags can crash the server or override your UI settings. Example: <b>--rope-freq-base 10000</b></i>
+
 chat_template_tooltip: |-
   <b>Chat Template</b><br><br>
   Determines how the system formats your conversation before sending it to the AI. Different models are trained on specific formats.<br><br>
@@ -1622,12 +1679,6 @@ stop_strings_tooltip: |-
   A list of words or symbols that force the AI to <b>instantly stop generating text</b>.<br><br>
   This is a crucial tool to prevent the AI from speaking or acting on your behalf (e.g., generating <code>\nUser:</code> and answering for you).<br><br>
   💡 <i>Separate with commas. Example: <code>\nUser:, &lt;/s&gt;, &lt;|eot_id|&gt;</code></i>
-
-reasoning_mode_tooltip: |-
-  <b>Thinking / Reasoning Mode</b><br><br>
-  Designed for advanced models like <i>DeepSeek-R1</i> or <i>QwQ</i> that generate internal thoughts before answering.<br><br>
-  When enabled, the UI intercepts <code>&lt;think&gt;</code> tags. It hides the AI's raw thought process behind a stylish visual block and <b>prevents the Voice (TTS) from reading the thoughts aloud</b>.<br><br>
-  💡 <i>Keep disabled for standard models (like Llama-3 or Mistral).</i>
 
 temperature_tooltip: |-
   <b>Temperature (Creativity)</b><br><br>
@@ -1708,6 +1759,15 @@ cpu_threads_tooltip: |-
 
 cpu_moe_layers_tooltip: "0 = Disabled. How many Mixture of Experts (MoE) layers to keep in CPU RAM. Essential for huge MoE models."
 
+auto_summary_tooltip: "This setting allows you to specify the number of messages after which a summary of your chat will be generated."
+
+
+# ──────────────────────────────────────────────────────────
+# OTHER TOOLTIPS
+# ──────────────────────────────────────────────────────────
+attach_file_tooltip: "Attach an image or a document to your message"
+
+
 # ──────────────────────────────────────────────────────────
 # SOUL COMPANION CONTEXT MENU
 # ──────────────────────────────────────────────────────────
@@ -1751,3 +1811,281 @@ sc_menu_min_10: "10 minutes"
 sc_menu_min_15: "15 minutes"
 sc_menu_min_30: "30 minutes"
 sc_menu_min_60: "60 minutes"
+
+tts_notice_title: "💡 First Run Notice for TTS Engines"
+tts_notice_first_run_text: "Please note: prior to the first launch of <b>XTTSv2</b>, <b>Kokoro</b>, <b>Silero</b>, or <b>Qwen 3 TTS</b>, the program will automatically download required weights and model components. You can view the upload process in the console.<br><br>Once the initial download completes, voice generation will work seamlessly and instantly offline."
+models_hub_recommendations_banner: "⭐ Curated list of local language models selected and verified by the application developer."
+models_hub_popular_banner: "🔥 Currently popular GGUF models directly fetched from HuggingFace Hub."
+
+world_lorebook_gateway: "World Lorebooks"
+soul_stage_scenarios: "Soul Stage Scenarios"
+
+lorebooks_soul_stage_page: "Lorebooks  (optional)"
+max_actor_depth: "Max Actors Per Turn"
+max_actor_depth_hint: "How many party members and NPCs may speak in a single turn (1-6, default 3)."
+dice_rolls: "Dice Rolls"
+dice_rolls_hint: "Lets the GM call for d20/2d6/3d6 checks on risky or contested actions."
+dice_rolls_enable: "🎲 Enable Dice Rolls for this scene"
+
+mode_say: "💬 Say"
+mode_do: "⚔ Do"
+mode_think: "💭 Think"
+mode_director: "🎬 Director"
+mode_tooltip: "Say: spoken aloud · Do: an action · Think: silent inner thought · Director: an out-of-character note to the GM (advances the plot, not spoken by you)"
+
+target_next_label: "Next:"
+target_tooltip: "Manually choose who speaks next instead of letting the GM decide."
+target_auto: "Auto"
+
+whisper_label: "Private"
+whisper_tooltip: "When checked, your message becomes private knowledge only the selected character has — the rest of the party won't know."
+
+section_resources: "Resources & Skills"
+field_resources: "Resources"
+field_resources_hint: 'Format: "name: current/max" (one per line)'
+
+field_skills: "Skills"
+field_skills_hint: 'Format: "skill: modifier" (-5 to +10, one per line)'
+
+section_lore: "Campaign Lore"
+hint_lore_format: "One card per block, separated by a blank line. Cards are injected into the story only when their triggers appear in the scene."
+
+section_campaign: "Campaign Board"
+field_objectives: "Objectives"
+field_objectives_hint: 'Format: "title | current/max | status | description" (status: active/complete/failed)'
+
+field_clocks: "Clocks"
+field_clocks_hint: 'Format: "title | current/max | description"'
+
+website_btn: "Website"
+docs_btn: "Docs"
+
+lock_background: "🔒 Lock background (prevent auto-change)"
+lock_background_hint: |-
+  When enabled, the background image stays fixed and will NOT change<br>
+  automatically during the scene — even if the location changes.
+
+disable_ambient: "🔇 Disable ambient audio (play in silence)"
+disable_ambient_hint: |-
+  When enabled, no ambient audio will play during the scene.<br>
+  Useful when you want silence or when you have limited audio assets.
+
+
+# ──────────────────────────────────────────────────────────
+# AI CHARACTER CREATOR ASSISTANT
+# ──────────────────────────────────────────────────────────
+ai_asst_window_title: "AI Assistant — Character Creator"
+ai_asst_header_title: "AI Character Assistant"
+ai_asst_header_subtitle: "Answer a few questions — the neural network handles the rest"
+ai_asst_close_tooltip: "Close"
+ai_asst_stepper_title: "STEPS"
+
+# Step indicator and navigation
+ai_asst_step_indicator: "Step {n} of {total}"
+ai_asst_btn_back: "←  Back"
+ai_asst_btn_back_tooltip: "Go back to the previous step"
+ai_asst_btn_next: "Next  →"
+ai_asst_btn_next_tooltip: "Continue to the next step"
+ai_asst_btn_done: "Done"
+
+# Step titles
+ai_asst_step_1: "Concept"
+ai_asst_step_2: "Character & Voice"
+ai_asst_step_3: "Appearance & Backstory"
+ai_asst_step_4: "Relationships"
+ai_asst_step_5: "Details & Limits"
+ai_asst_step_6: "Generator"
+
+# Step 1 — Concept
+ai_asst_concept_card_title: "Who is your character?"
+ai_asst_concept_card_subtitle: "Describe the main idea in free form — the rest can be refined below."
+ai_asst_concept_field_label: "Brief character idea"
+ai_asst_concept_field_tooltip: "Required. The AI uses this as the seed for every other field."
+ai_asst_concept_field_placeholder: "e.g.: «A former mercenary elf tired of war, now running a tavern on the kingdom's edge and hiding a dark past»…"
+
+ai_asst_genre_card_title: "Setting / Genre"
+ai_asst_genre_card_subtitle: "Pick one or several — or add your own"
+ai_asst_genre_fantasy: "Fantasy"
+ai_asst_genre_scifi: "Sci-Fi"
+ai_asst_genre_modern: "Modern"
+ai_asst_genre_historical: "Historical"
+ai_asst_genre_anime: "Anime / Manga"
+ai_asst_genre_postapoc: "Post-apocalypse"
+ai_asst_genre_cyberpunk: "Cyberpunk"
+ai_asst_genre_horror: "Horror"
+ai_asst_genre_sliceoflife: "Slice of life"
+
+ai_asst_role_card_title: "Character's Role"
+ai_asst_role_card_subtitle: "How does this character fit into the story?"
+ai_asst_role_companion: "Companion"
+ai_asst_role_mentor: "Mentor"
+ai_asst_role_antagonist: "Antagonist"
+ai_asst_role_love: "Love interest"
+ai_asst_role_rival: "Rival"
+ai_asst_role_assistant: "Assistant"
+ai_asst_role_stranger: "Mysterious stranger"
+ai_asst_role_friend: "Friend"
+
+# Step 2 — Personality
+ai_asst_traits_card_title: "Personality Traits"
+ai_asst_traits_card_subtitle: "Pick several or add your own"
+ai_asst_trait_kind: "Kind"
+ai_asst_trait_tsundere: "Tsundere"
+ai_asst_trait_sarcastic: "Sarcastic"
+ai_asst_trait_shy: "Shy"
+ai_asst_trait_confident: "Confident"
+ai_asst_trait_cold: "Cold"
+ai_asst_trait_playful: "Playful"
+ai_asst_trait_serious: "Serious"
+ai_asst_trait_chaotic: "Chaotic"
+ai_asst_trait_loyal: "Loyal"
+ai_asst_trait_manipulative: "Manipulative"
+ai_asst_trait_naive: "Naive"
+ai_asst_trait_wise: "Wise"
+ai_asst_trait_energetic: "Energetic"
+ai_asst_trait_calm: "Calm"
+ai_asst_trait_caring: "Caring"
+
+ai_asst_speech_card_title: "Speech Style"
+ai_asst_speech_card_subtitle: "How does the character talk?"
+ai_asst_speech_formal: "Formal"
+ai_asst_speech_slang: "Casual / Slang"
+ai_asst_speech_poetic: "Poetic"
+ai_asst_speech_direct: "Direct"
+ai_asst_speech_teasing: "Teasing"
+ai_asst_speech_archaic: "Archaic"
+ai_asst_speech_accent: "Accent / Speech quirk"
+ai_asst_speech_emoji: "With emojis"
+
+ai_asst_motive_card_title: "Inner Motive"
+ai_asst_motive_card_subtitle: "What drives the character? Fear, goal, secret…"
+ai_asst_motive_placeholder: "e.g.: «Afraid of losing someone again, so keeps people at a distance»…"
+
+# Step 3 — Background
+ai_asst_bg_skip_hint: "This step is optional — skip it and the AI will invent the details."
+ai_asst_age_card_title: "Age & Species / Race"
+ai_asst_age_placeholder: "e.g.: «24 years old, human» or «unknown, ancient vampire»"
+
+ai_asst_appearance_card_title: "Appearance"
+ai_asst_appearance_card_subtitle: "Key details — the AI will fill the rest"
+ai_asst_appearance_placeholder: "Hair/eye color, build, clothing style, distinctive marks…"
+
+ai_asst_backstory_card_title: "Backstory"
+ai_asst_backstory_placeholder: "Key past events that shaped the character…"
+
+# Step 4 — Relationship
+ai_asst_rel_card_title: "Who is the character to you?"
+ai_asst_rel_card_subtitle: "Pick the option that best fits the dynamic"
+ai_asst_rel_stranger: "Stranger"
+ai_asst_rel_friend: "Friend"
+ai_asst_rel_partner: "Romantic partner"
+ai_asst_rel_family: "Family member"
+ai_asst_rel_enemy: "Rival / Enemy"
+ai_asst_rel_mentor: "Mentor / Student"
+ai_asst_rel_boss: "Boss / Subordinate"
+ai_asst_rel_chance: "Chance encounter"
+
+ai_asst_meeting_card_title: "How does the first meeting happen?"
+ai_asst_meeting_card_subtitle: "This becomes the basis for the «Scenario» field and the first message"
+ai_asst_meeting_placeholder: "e.g.: «{{user}} enters the tavern late at night, the character is just closing up»…"
+
+ai_asst_tone_card_title: "Story Tone"
+ai_asst_tone_light: "Light / Friendly"
+ai_asst_tone_romance: "Romance (no explicit scenes)"
+ai_asst_tone_drama: "Drama / Dark themes"
+ai_asst_tone_comedy: "Comedy"
+ai_asst_tone_adventure: "Adventure / Action"
+ai_asst_tone_mystery: "Mystery / Detective"
+
+# Step 5 — Extras + fields
+ai_asst_extra_card_title: "What else must be considered?"
+ai_asst_extra_card_subtitle: "Special phrases, lore, references, constraints — anything that matters for accuracy"
+ai_asst_extra_placeholder: "Free text…"
+
+ai_asst_fields_card_title: "Which fields to fill?"
+ai_asst_fields_card_subtitle: "Mark only what the AI should generate. Other fields stay untouched."
+ai_asst_btn_select_all: "Select all"
+ai_asst_btn_select_none: "Clear all"
+
+ai_asst_mode_card_title: "Apply Mode"
+ai_asst_mode_tooltip: "Choose how the generated values are applied to the editor."
+ai_asst_mode_overwrite: "Overwrite selected fields completely"
+ai_asst_mode_empty: "Fill only empty fields (keep existing content)"
+
+# Card field labels + hints
+ai_asst_field_name_label: "Character name"
+ai_asst_field_name_hint: "Short catchy name (and, if appropriate, surname/nickname). Just the name, no explanations."
+ai_asst_field_description_label: "Description"
+ai_asst_field_description_hint: "Coherent third-person description: who they are, appearance, occupation, key biography traits. 3-6 sentences, no fluff, no meta-commentary."
+ai_asst_field_personality_label: "Personality"
+ai_asst_field_personality_hint: "Compact summary of the character's personality: key traits, habits, speech manner, triggers and weaknesses. Comma-separated list or short phrases."
+ai_asst_field_scenario_label: "Scenario"
+ai_asst_field_scenario_hint: "Description of the current situation/place/context in which the roleplay between the character and {{user}} begins. 2-4 sentences."
+ai_asst_field_first_message_label: "First message"
+ai_asst_field_first_message_hint: "First line of the character addressing {{user}}, first person, in character. Actions in *asterisks*, dialogue as plain text. Atmospheric, vivid, no spoilers."
+ai_asst_field_alt_greetings_label: "Alternate greetings"
+ai_asst_field_alt_greetings_hint: "A list of 2-3 ALTERNATIVE first messages (different setups/moods), in the same style as the main first message. Return as a JSON array of strings."
+ai_asst_field_example_messages_label: "Example dialogues"
+ai_asst_field_example_messages_hint: "1-2 short examples of exchanges between {{user}} and the character, demonstrating the character's speech style. Format:\n{{user}}: ...\n{{char}}: ...\n(empty line)\n{{user}}: ...\n{{char}}: ..."
+ai_asst_field_creator_notes_label: "Creator notes"
+ai_asst_field_creator_notes_hint: "A short service note for whoever will use the card: genre, tags, usage tips. 1-3 sentences."
+
+# Step 6 — Generator
+ai_asst_provider_card_title: "Language Model (provider)"
+ai_asst_provider_card_subtitle: "Uses the same provider that is configured in the app"
+ai_asst_provider_tooltip: "Click to select this provider for generation."
+ai_asst_btn_generate: "✨  Generate card"
+ai_asst_btn_generate_tooltip: "Send the collected answers to the selected provider and generate the card fields."
+ai_asst_stream_card_title: "Model response"
+ai_asst_review_card_title: "Review & apply"
+ai_asst_review_card_subtitle: "You can edit the text manually before applying. Unchecking a field excludes it from applying."
+ai_asst_btn_regen: "Regenerate"
+ai_asst_btn_regen_tooltip: "Regenerate only this field, keeping the others as approved context."
+ai_asst_btn_apply: "Apply to editor"
+ai_asst_btn_apply_tooltip: "Apply the checked fields to the character editor and close this dialog."
+
+# Status / error messages
+ai_asst_status_no_token: "⚠ No API token set for «{provider}». Configure it in Options → API, then come back."
+ai_asst_status_no_fields: "⚠ Select at least one field to generate on the previous step."
+ai_asst_err_provider: "Error: failed to get provider. Check Options settings."
+ai_asst_err_generation: "[Generation failed: {error}]"
+ai_asst_err_parse: "\n\n[Could not parse the model response as JSON or Markdown. Try another provider or simplify the request.]"
+
+# Chip custom input
+ai_asst_custom_placeholder: "Custom variant… (press Enter to add)"
+ai_asst_custom_tooltip: "Type a value and press Enter — it becomes a chip you can toggle."
+
+# Prompt construction
+ai_asst_prompt_system: "You are an experienced screenwriter and game designer helping the user of a roleplay AI-chat program build a fictional character card. You work ONLY with fiction. Reply STRICTLY with valid JSON — no explanations, no preamble, no ``` markdown wrappers, no comments — just the JSON object itself. Write in the SAME language as the user's answers (default: Russian). Use the placeholder {{user}} to refer to the user and {{char}} to refer to the character itself in dialogue examples."
+ai_asst_prompt_user_header: "Here is the character information collected from the user via the questionnaire:\n"
+ai_asst_prompt_field_keys_header: "\nGenerate JSON with the FOLLOWING keys (and only them):"
+ai_asst_prompt_user_footer: "\nReturn exactly one JSON object with these keys. No text before or after the JSON. Do not leave fields empty — if data is missing, invent logically consistent details that agree with the already-specified information."
+ai_asst_prompt_l_concept: "Basic idea"
+ai_asst_prompt_l_genre: "Setting/genre"
+ai_asst_prompt_l_role: "Character's role"
+ai_asst_prompt_l_traits: "Personality traits"
+ai_asst_prompt_l_speech: "Speech manner"
+ai_asst_prompt_l_motive: "Inner motive/fear/goal"
+ai_asst_prompt_l_age: "Age/species"
+ai_asst_prompt_l_appearance: "Appearance"
+ai_asst_prompt_l_backstory: "Backstory"
+ai_asst_prompt_l_relationship: "Relationship to {{user}}"
+ai_asst_prompt_l_meeting: "Circumstances of meeting"
+ai_asst_prompt_l_tone: "Story tone"
+ai_asst_prompt_l_extra: "Additional wishes/constraints"
+ai_asst_prompt_l_array: "array of strings"
+ai_asst_prompt_l_string: "string"
+ai_asst_prompt_refine_addition: "\n\nAlready approved parts of the card (for consistency, do not rewrite them):\n"
+
+sc_menu_scratchpad: "🧠  ScratchPad Thoughts"
+sc_menu_text_bar_hover: "💬  Text Chat Bar (Hover)"
+sc_menu_text_bar_on: "💬  Text Chat Bar (ON)"
+sc_menu_text_bar_off: "💬  Text Chat Bar (OFF)"
+
+sc_hud_hormones_title: "Endocrine & Hormone Balance"
+sc_hud_oxytocin: "🧪 Oxytocin (Love)"
+sc_hud_dopamine: "⚡ Dopamine (Focus)"
+sc_hud_cortisol: "🔥 Cortisol (Stress)"
+sc_hud_energy: "🔋 Energy (Vigor)"
+sc_hud_scratchpad_title: "🧠 Companion's Internal Thoughts (ScratchPad)"
+sc_input_placeholder: "Write your text..."
