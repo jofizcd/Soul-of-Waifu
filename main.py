@@ -68,6 +68,29 @@ sys.excepthook = global_exception_handler
 
 from app.utils.discord_manager import DiscordBotManager
 
+RESIZE_GRIP_SIZE = 8
+
+class _EdgeResizeGrip(QtWidgets.QWidget):
+    def __init__(self, window: QtWidgets.QMainWindow, edges: QtCore.Qt.Edge,
+                 cursor: QtCore.Qt.CursorShape, parent=None):
+        super().__init__(parent)
+        self._window = window
+        self._edges = edges
+        self.setCursor(cursor)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+
+    def mousePressEvent(self, event):
+        if (event.button() == QtCore.Qt.MouseButton.LeftButton
+                and not self._window.isMaximized()
+                and not self._window.isFullScreen()):
+            handle = self._window.windowHandle()
+            if handle is not None and handle.startSystemResize(self._edges):
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+
 class MainWindow(QMainWindow):
     """
     Main application window for 'Soul of Waifu'.
@@ -210,7 +233,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_rp_editors.setText(self.translations.get("rp_editors_button", " RP Editors"))
         self.ui.pushButton_soul_stage.setText(self.translations.get("soul_stage_button", " Soul Stage"))
         self.ui.pushButton_options.setText(self.translations.get("options_button", " Options"))
-        self.ui.version_label.setText(self.translations.get("version_label", "v2.4.0"))
+        self.ui.version_label.setText(self.translations.get("version_label", "v2.4.5"))
         
         # Main Tab Without Characters
         self.ui.main_no_characters_advice_label.setText(self.translations.get("no_characters_advice", "You haven\'t added any characters. Click on the button and create it"))
@@ -323,8 +346,6 @@ class MainWindow(QMainWindow):
         # Chat
         self.ui.character_name_chat.setText(self.translations.get("character_name_chat", "Character name"))
         self.ui.textEdit_write_user_message.setPlaceholderText(self.translations.get("write_user_message_placeholder", "Write your message to character..."))
-        self.ui.pushButton_send_message.setToolTip(self.translations.get("send_message_tooltip", "Send message"))
-        self.ui.pushButton_stop_generation.setToolTip(self.translations.get("stop_generation_tooltip", "Stop generation"))
         
         # LLM Options
         self.ui.label_live2d_mode.setText(self.translations.get("live2d_mode_label", "Mode:"))
@@ -335,10 +356,14 @@ class MainWindow(QMainWindow):
 
         # Tooltips
         self.ui.checkBox_enable_mlock.setToolTip(self.translations.get("mlock_tooltip", ""))
+        self.ui.checkBox_enable_no_mmap.setToolTip(self.translations.get("no_mmap_tooltip", ""))
+        self.ui.checkBox_reasoning_mode.setToolTip(self.translations.get("reasoning_mode_tooltip", ""))
         self.ui.checkBox_enable_flash_attention.setToolTip(self.translations.get("flashattention_tooltip", ""))
         self.ui.checkBox_enable_ambient.setToolTip(self.translations.get("ambient_sound_tooltip", "Enable Ambient Sound Module"))
         self.ui.checkBox_enable_soul_memory.setToolTip(self.translations.get("soul_memory_tooltip", "Enable Soul Memory Module"))
         self.ui.checkBox_enable_sow_system.setToolTip(self.translations.get("sow_system_tooltip", "Enable Soul of Waifu System Module"))
+        self.ui.chat_template_label.setToolTip(self.translations.get("chat_template_tooltip", ""))
+        self.ui.lineEdit_stop_strings.setToolTip(self.translations.get("stop_strings_tooltip", ""))
 
     def on_comboBox_program_language_changed(self, index):
         self.configuration.update_main_setting("program_language", index)
@@ -413,7 +438,9 @@ class MainWindow(QMainWindow):
         self.ui.provider_group.buttonClicked.connect(self.interface_signals._on_provider_card_clicked)
         self.ui.btn_create_character_menu.clicked.connect(self.interface_signals._prepare_blank_character_and_open_editor)
         self.ui.pushButton_toggle_web_server.clicked.connect(self.interface_signals.on_toggle_web_server)
+        self.ui.pushButton_copy_mobile_link.clicked.connect(self.interface_signals.on_copy_mobile_link)
         self.ui.pushButton_open_web_browser.clicked.connect(self.interface_signals.on_open_web_browser)
+        self.ui.pushButton_ai_assistant.clicked.connect(self.interface_signals.open_ai_character_assistant)
 
         # ComboBoxes
         self.ui.comboBox_conversation_method.currentTextChanged.connect(self.interface_signals.on_comboBox_conversation_method_changed)
@@ -498,6 +525,7 @@ class MainWindow(QMainWindow):
         # CheckBox
         self.ui.checkBox_enable_mlock.stateChanged.connect(self.interface_signals.on_checkBox_enable_mlock_stateChanged)
         self.ui.checkBox_enable_flash_attention.stateChanged.connect(self.interface_signals.on_checkBox_enable_flash_attention_stateChanged)
+        self.ui.checkBox_enable_no_mmap.stateChanged.connect(self.interface_signals.on_checkBox_enable_no_mmap_stateChanged)
         self.ui.checkBox_enable_advanced_sampling.stateChanged.connect(self.interface_signals.on_checkBox_enable_advanced_sampling_stateChanged)
         self.ui.stackedWidget.currentChanged.connect(self.interface_signals.on_stacked_widget_changed)
         self.ui.checkBox_enable_nsfw.stateChanged.connect(self.interface_signals.on_checkBox_enable_nsfw_stateChanged)
@@ -726,54 +754,53 @@ class MainWindow(QMainWindow):
     
     def create_size_grips(self):
         mw = self.ui.main_widget
+        Edge = QtCore.Qt.Edge
+        Cursor = QtCore.Qt.CursorShape
 
-        self.top_left_grip = QtWidgets.QSizeGrip(mw)
-        self.top_right_grip = QtWidgets.QSizeGrip(mw)
-        self.bottom_left_grip = QtWidgets.QSizeGrip(mw)
-        self.bottom_right_grip = QtWidgets.QSizeGrip(mw)
+        def make(edges, cursor):
+            grip = _EdgeResizeGrip(self, edges, cursor, parent=mw)
+            grip.show()
+            grip.raise_()
+            return grip
 
-        self.top_edge_grip = QtWidgets.QSizeGrip(mw)
-        self.bottom_edge_grip = QtWidgets.QSizeGrip(mw)
-        self.left_edge_grip = QtWidgets.QSizeGrip(mw)
-        self.right_edge_grip = QtWidgets.QSizeGrip(mw)
+        self.top_left_grip = make(Edge.TopEdge | Edge.LeftEdge, Cursor.SizeFDiagCursor)
+        self.top_right_grip = make(Edge.TopEdge | Edge.RightEdge, Cursor.SizeBDiagCursor)
+        self.bottom_left_grip = make(Edge.BottomEdge | Edge.LeftEdge, Cursor.SizeBDiagCursor)
+        self.bottom_right_grip = make(Edge.BottomEdge | Edge.RightEdge, Cursor.SizeFDiagCursor)
 
-        grips = [
+        self.top_edge_grip = make(Edge.TopEdge, Cursor.SizeVerCursor)
+        self.bottom_edge_grip = make(Edge.BottomEdge, Cursor.SizeVerCursor)
+        self.left_edge_grip = make(Edge.LeftEdge, Cursor.SizeHorCursor)
+        self.right_edge_grip = make(Edge.RightEdge, Cursor.SizeHorCursor)
+
+        self._all_grips = [
             self.top_left_grip, self.top_right_grip,
             self.bottom_left_grip, self.bottom_right_grip,
             self.top_edge_grip, self.bottom_edge_grip,
-            self.left_edge_grip, self.right_edge_grip
+            self.left_edge_grip, self.right_edge_grip,
         ]
-
-        for grip in grips:
-            grip.resize(8, 8)
-            grip.setStyleSheet("background-color: rgba(255, 255, 255, 0);")
-            grip.show()
-            grip.raise_()
-
-        self.top_left_grip.setCursor(QtCore.Qt.CursorShape.SizeFDiagCursor)
-        self.top_right_grip.setCursor(QtCore.Qt.CursorShape.SizeBDiagCursor)
-        self.bottom_left_grip.setCursor(QtCore.Qt.CursorShape.SizeBDiagCursor)
-        self.bottom_right_grip.setCursor(QtCore.Qt.CursorShape.SizeFDiagCursor)
-
-        self.top_edge_grip.setCursor(QtCore.Qt.CursorShape.SizeVerCursor)
-        self.bottom_edge_grip.setCursor(QtCore.Qt.CursorShape.SizeVerCursor)
-        self.left_edge_grip.setCursor(QtCore.Qt.CursorShape.SizeHorCursor)
-        self.right_edge_grip.setCursor(QtCore.Qt.CursorShape.SizeHorCursor)
 
     def update_size_grip_positions(self):
         mw = self.ui.main_widget
         w, h = mw.width(), mw.height()
-        size = 8
+        g = RESIZE_GRIP_SIZE
 
-        self.top_left_grip.move(0, 0)
-        self.bottom_left_grip.move(0, h - size)
-        self.top_right_grip.move(w - size, 0)
-        self.bottom_right_grip.move(w - size, h - size)
+        self.top_left_grip.setGeometry(0, 0, g, g)
+        self.top_right_grip.setGeometry(w - g, 0, g, g)
+        self.bottom_left_grip.setGeometry(0, h - g, g, g)
+        self.bottom_right_grip.setGeometry(w - g, h - g, g, g)
 
-        self.top_edge_grip.move(w // 2 - size // 2, 0)
-        self.bottom_edge_grip.move(w // 2 - size // 2, h - size)
-        self.left_edge_grip.move(0, h // 2 - size // 2)
-        self.right_edge_grip.move(w - size, h // 2 - size // 2)
+        self.top_edge_grip.setGeometry(g, 0, max(0, w - 2 * g), g)
+        self.bottom_edge_grip.setGeometry(g, h - g, max(0, w - 2 * g), g)
+        self.left_edge_grip.setGeometry(0, g, g, max(0, h - 2 * g))
+        self.right_edge_grip.setGeometry(w - g, g, g, max(0, h - 2 * g))
+
+        self._update_grips_visibility()
+
+    def _update_grips_visibility(self):
+        visible = not (self.isMaximized() or self.isFullScreen())
+        for grip in getattr(self, "_all_grips", []):
+            grip.setVisible(visible)
 
     def resizeEvent(self, event):
         current_widget = self.ui.stackedWidget.currentWidget()
@@ -833,7 +860,7 @@ if __name__ == "__main__":
 
     main_window.show()    
 
-    current_version = "v2.4.0"
+    current_version = "v2.4.5"
 
     def deferred_update_check():
         latest_version, github_url = main_window.check_for_updates(current_version)
