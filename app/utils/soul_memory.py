@@ -6,6 +6,7 @@ import logging
 import datetime
 import asyncio
 import shutil
+import threading
 from pathlib import Path
 from typing import Callable, Awaitable, Optional
 from sentence_transformers import SentenceTransformer
@@ -15,7 +16,11 @@ from app.configuration import configuration
 logger = logging.getLogger("SoulMemory")
 
 _EMBEDDER = None
+_EMBEDDER_FAILED: bool = False
 _EMBEDDER_AVAILABLE: Optional[bool] = None
+_EMBEDDER_LOCK = threading.Lock()
+
+LOCAL_MODEL_PATH = Path("app/utils/all-MiniLM-L6-v2")
 
 
 def _check_embedder_available() -> bool:
@@ -35,15 +40,28 @@ def _check_embedder_available() -> bool:
 
 
 def _get_embedder():
-    global _EMBEDDER
-    if _EMBEDDER is None and _check_embedder_available():
-        try:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            _EMBEDDER = SentenceTransformer("all-MiniLM-L6-v2", device=device)
-            logger.info(f"[Soul Memory] Embedding model loaded: all-MiniLM-L6-v2 on {device.upper()}")
-        except Exception as e:
-            logger.warning(f"[Soul Memory] Failed to load embedding model: {e}")
-            _EMBEDDER = None
+    global _EMBEDDER, _EMBEDDER_FAILED
+
+    if _EMBEDDER is not None or _EMBEDDER_FAILED or not _check_embedder_available():
+        return _EMBEDDER
+
+    with _EMBEDDER_LOCK:
+        if _EMBEDDER is None and not _EMBEDDER_FAILED:
+            try:
+                abs_path = LOCAL_MODEL_PATH.resolve()
+                model_target = str(abs_path) if abs_path.exists() else "all-MiniLM-L6-v2"
+
+                device = "cpu"
+
+                logger.info(f"[Soul Memory] Loading embedding model on {device.upper()} from '{model_target}'...")
+                _EMBEDDER = SentenceTransformer(model_target, device=device)
+                logger.info(f"[Soul Memory] Embedding model successfully loaded on {device.upper()}")
+
+            except Exception as e:
+                logger.error(f"[Soul Memory] Failed to load embedding model: {e}", exc_info=True)
+                _EMBEDDER = None
+                _EMBEDDER_FAILED = True
+
     return _EMBEDDER
 
 
@@ -59,7 +77,16 @@ class TopicRAG:
         result = {}
         if not self.topics_dir.exists():
             return result
-        for p in self.topics_dir.glob("*.md"):
+        
+        try:
+            paths = sorted(
+                self.topics_dir.glob("*.md"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+        except Exception:
+            paths = list(self.topics_dir.glob("*.md"))
+        for p in paths:
             try:
                 result[p.name] = p.read_text(encoding="utf-8")
             except Exception:
@@ -105,6 +132,43 @@ class TopicRAG:
             items = list(all_topics.items())[:max_topics]
             return {k: v[:self.PASS_CHARS] for k, v in items}
 
+    DEDUP_THRESHOLD = 0.82
+
+    def find_similar_topic(self, query_text: str, threshold: float = None) -> Optional[str]:
+        threshold = self.DEDUP_THRESHOLD if threshold is None else threshold
+
+        all_topics = self._load_all_topics()
+        if not all_topics:
+            return None
+
+        embedder = _get_embedder()
+        if not embedder:
+            return None
+
+        try:
+            names    = list(all_topics.keys())
+            snippets = [v[:self.EMBED_CHARS] for v in all_topics.values()]
+
+            query_vec  = embedder.encode(query_text, convert_to_numpy=True)
+            topic_vecs = embedder.encode(snippets, convert_to_numpy=True)
+
+            q_norm = query_vec / (np.linalg.norm(query_vec) + 1e-9)
+            t_norm = topic_vecs / (np.linalg.norm(topic_vecs, axis=1, keepdims=True) + 1e-9)
+            scores = t_norm @ q_norm
+
+            best_idx = int(np.argmax(scores))
+            if scores[best_idx] >= threshold:
+                logger.info(
+                    f"[Soul Memory] Dedup match: '{names[best_idx]}' "
+                    f"(similarity={scores[best_idx]:.3f} >= {threshold})"
+                )
+                return names[best_idx]
+
+        except Exception as e:
+            logger.warning(f"[Soul Memory] Dedup similarity check failed: {e}")
+
+        return None
+
 
 _ROUTER_SYSTEM = """\
 [SOUL MEMORY — ROUTER AGENT]
@@ -126,8 +190,11 @@ CRITICAL INSTRUCTIONS:
 - USER.md focuses entirely on factual user attributes, preferences, habits, relationship dynamics (trust levels), and shared milestones/promises.
 - EMOTIONAL DECAY: If an emotion in the current character memory is no longer active or referenced in recent turns, increment "emotional_decay_counter". At 3, soften/transition the emotion. If active, reset counter to 0.
 - CONFLICT RESOLUTION: Resolve any direct contradictions between user action and previous beliefs, and document this in the "healing_log".
+- NO-OP DETECTION: If the RECENT MESSAGES contain nothing psychologically or factually significant (small talk, filler, a repeated greeting, an interrupted/empty exchange), do NOT fabricate change. Instead output ONLY:
+  {"no_significant_change": true, "healing_log": ["No conflicts detected."]}
+  and nothing else. Only do this when you are confident nothing in the batch is worth recording.
 
-You MUST output exactly this JSON structure:
+You MUST otherwise output exactly this JSON structure:
 {
   "character_memory": {
     "core_identity": [
@@ -182,7 +249,11 @@ You operate strictly as an analytical engine. Output must be a single, well-form
 
 We do not track long-term topic plans in LITE mode. Only output the character_memory, user_memory, and healing_log.
 
-You MUST output exactly this JSON structure:
+NO-OP DETECTION: If the RECENT MESSAGES contain nothing psychologically or factually significant (small talk, filler, a repeated greeting), do NOT fabricate change. Instead output ONLY:
+  {"no_significant_change": true, "healing_log": ["No conflicts detected."]}
+  and nothing else.
+
+You MUST otherwise output exactly this JSON structure:
 {
   "character_memory": {
     "core_identity": [
@@ -264,10 +335,10 @@ Output strictly the diary text. Do not add any greetings or explanations.
 
 
 class SoulMemoryAgent:
-    """Central memory system for AI companions.
+    """Central memory system for AI characters.
 
     Manages a structured MEMORY.md index, USER.md, per-topic lore files, a daily diary,
-    and rolling backups — all scoped per character and per chat session.
+    and rolling backups - all scoped per character and per chat session.
 
     Three sub-agents handle different responsibilities:
       - Router Agent:    rewrites the psychological state index after each batch
@@ -286,6 +357,7 @@ class SoulMemoryAgent:
     MSG_OVERLAP      = 2
     MAX_BACKUP_COUNT = 5
     MIN_INDEX_CHARS  = 100
+    MAX_MSG_CHARS    = 2000
 
     _BAD_TOPIC_NAMES = frozenset({
         "example.md", "topic_name.md", "name_of_important_subject.md",
@@ -306,6 +378,17 @@ class SoulMemoryAgent:
     @staticmethod
     def _sanitize(name: str) -> str:
         return "".join(c if c.isalnum() or c in " _-" else "_" for c in name).strip()
+
+    @classmethod
+    def _cap_message_lengths(cls, messages: list) -> list:
+        capped = []
+        for m in messages:
+            if isinstance(m, dict):
+                content = str(m.get("content", ""))
+                if len(content) > cls.MAX_MSG_CHARS:
+                    m = {**m, "content": content[:cls.MAX_MSG_CHARS] + " …[truncated]"}
+            capped.append(m)
+        return capped
 
     def get_memory_paths(self, character_name: str, chat_id: str = None) -> tuple:
         safe_name = self._sanitize(character_name)
@@ -354,21 +437,21 @@ class SoulMemoryAgent:
     def get_memory_index(self, character_name: str, chat_id: str = None) -> str:
         return self._read_index(character_name, chat_id)
 
-    def _backup_index(self, idx_path: Path, backup_dir: Path):
+    def _backup_file(self, src_path: Path, backup_dir: Path, prefix: str):
         try:
             ts          = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"MEMORY_{ts}.md"
-            shutil.copy2(idx_path, backup_path)
+            backup_path = backup_dir / f"{prefix}_{ts}.md"
+            shutil.copy2(src_path, backup_path)
 
             all_backups = sorted(
-                backup_dir.glob("MEMORY_*.md"),
+                backup_dir.glob(f"{prefix}_*.md"),
                 key=lambda p: p.stat().st_mtime
             )
             while len(all_backups) > self.MAX_BACKUP_COUNT:
                 all_backups[0].unlink(missing_ok=True)
                 all_backups = all_backups[1:]
         except Exception as e:
-            logger.warning(f"[Soul Memory] Backup creation failed: {e}")
+            logger.warning(f"[Soul Memory] Backup creation failed for {prefix}: {e}")
 
     def _safe_write_index(self, idx_path: Path, backup_dir: Path, content: str) -> bool:
         stripped = content.strip() if content else ""
@@ -380,7 +463,7 @@ class SoulMemoryAgent:
             return False
 
         if idx_path.exists():
-            self._backup_index(idx_path, backup_dir)
+            self._backup_file(idx_path, backup_dir, "MEMORY")
 
         tmp_path = idx_path.with_suffix(".tmp")
         try:
@@ -422,11 +505,14 @@ class SoulMemoryAgent:
     def get_user_profile(self, character_name: str, chat_id: str = None) -> str:
         return self._read_user_profile(character_name, chat_id)
 
-    def _safe_write_user_profile(self, usr_path: Path, content: str) -> bool:
+    def _safe_write_user_profile(self, usr_path: Path, backup_dir: Path, content: str) -> bool:
         stripped = content.strip() if content else ""
         if len(stripped) < 50:
             logger.warning(f"[Soul Memory] User profile write rejected — too short ({len(stripped)} chars).")
             return False
+
+        if usr_path.exists():
+            self._backup_file(usr_path, backup_dir, "USER")
 
         tmp_path = usr_path.with_suffix(".tmp")
         try:
@@ -485,21 +571,60 @@ class SoulMemoryAgent:
             logger.error(f"[Soul Memory] Router Agent error: {e}", exc_info=True)
             return {}
 
+    @staticmethod
+    def _extract_json_object(text: str) -> Optional[dict]:
+        if not text:
+            return None
+
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            stripped = re.sub(r'^```(json)?\s*|```$', '', stripped, flags=re.MULTILINE).strip()
+
+        candidates = [stripped]
+
+        first, last = stripped.find("{"), stripped.rfind("}")
+        if first != -1 and last != -1 and last > first:
+            candidates.append(stripped[first:last + 1])
+
+        for candidate in list(candidates):
+            repaired = re.sub(r',\s*([\]}])', r'\1', candidate)
+            if repaired != candidate:
+                candidates.append(repaired)
+
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                continue
+
+        return None
+
     def _parse_router_response(self, text: str, character_name: str, user_name: str) -> dict:
         result = {
             "updated_index": "",
             "updated_user_profile": "",
             "topic_plan":    [],
             "healing_log":   "No logs.",
+            "no_significant_change": False,
+            "parse_failed": False,
         }
 
-        clean_text = text.strip()
-        if clean_text.startswith("```"):
-            clean_text = re.sub(r'^```(json)?\s*|```$', '', clean_text, flags=re.MULTILINE).strip()
+        data = self._extract_json_object(text)
+        if data is None:
+            logger.warning(f"[Soul Memory] JSON parse error from router. Raw text: {text[:300]}...")
+            result["parse_failed"] = True
+            return result
+
+        if data.get("no_significant_change") is True:
+            result["no_significant_change"] = True
+            healing = data.get("healing_log", [])
+            result["healing_log"] = "\n".join(healing) if isinstance(healing, list) else str(healing)
+            logger.info("[Soul Memory] Router reported no significant change for this batch.")
+            return result
 
         try:
-            data = json.loads(clean_text)
-
             char_data = data.get("character_memory", {})
             markdown_char = [
                 f"# SOUL CACHE: {character_name.upper()}",
@@ -584,11 +709,9 @@ class SoulMemoryAgent:
             result["healing_log"] = "\n".join(healing) if isinstance(healing, list) else str(healing)
 
         except Exception as e:
-            logger.warning(f"[Soul Memory] JSON parse error from router: {e}. Raw text: {text[:300]}...")
-            m_idx = re.search(r'\[UPDATE_INDEX_START\](.*?)\[UPDATE_INDEX_END\]', text, re.DOTALL)
-            if m_idx:
-                result["updated_index"] = m_idx.group(1).strip()
-                
+            logger.warning(f"[Soul Memory] Router JSON payload malformed ({e}). Raw text: {text[:300]}...")
+            result["parse_failed"] = True
+
         return result
 
     async def _call_archivist_agent(
@@ -778,6 +901,14 @@ class SoulMemoryAgent:
 
         diff = msg_count - last_count
 
+        if diff < 0:
+            logger.warning(
+                f"[Soul Memory] Message count went backwards (last_count={last_count} > "
+                f"msg_count={msg_count}); history was likely edited. Resetting tracker."
+            )
+            last_count = 0
+            diff = msg_count
+
         if not force and diff < soul_memory_batch:
             logger.info(
                 f"[Soul Memory] Accumulating batch: {diff}/{soul_memory_batch} new turns. Skipping."
@@ -788,11 +919,11 @@ class SoulMemoryAgent:
             f"[Soul Memory] Pipeline start | char={character_name} | delta={diff} msgs | mode={soul_memory_mode}"
         )
 
-        tracker_file.write_text(str(msg_count), encoding="utf-8")
-
         start_idx      = max(0, last_count - self.MSG_OVERLAP)
         delta_messages = new_messages[start_idx:]
         delta_messages = delta_messages[-self.MAX_DELTA_MSGS:]
+
+        delta_messages = self._cap_message_lengths(delta_messages)
 
         lore_lines = []
         if activated_lorebook:
@@ -812,12 +943,16 @@ class SoulMemoryAgent:
         current_index = self._read_index(character_name, chat_id)
         current_user  = self._read_user_profile(character_name, chat_id)
 
-        topic_rag       = TopicRAG(topics_dir)
-        relevant_topics = topic_rag.get_relevant_topics(rag_query, max_topics=3)
+        topic_rag = TopicRAG(topics_dir)
+
+        relevant_topics = await asyncio.to_thread(
+            topic_rag.get_relevant_topics, rag_query, max_topics=3
+        )
 
         router_result = None
         topic_plan    = []
         safe_index    = current_index
+        timestamp     = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if soul_memory_mode in [0, 1, 2]:
             router_result = await self._call_router_agent(
@@ -831,33 +966,43 @@ class SoulMemoryAgent:
                 mode            = soul_memory_mode,
             )
 
-            if not router_result:
-                logger.error("[Soul Memory] Router returned empty result. Pipeline aborted.")
+            if not router_result or router_result.get("parse_failed"):
+                logger.error(
+                    "[Soul Memory] Router call failed or returned unparsable output. "
+                    "Pipeline aborted WITHOUT advancing the batch tracker — will retry next time."
+                )
                 return
 
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            updated_index = router_result.get("updated_index", "")
-            if updated_index:
-                written = self._safe_write_index(idx_path, backup_dir, updated_index)
-                healing = router_result.get("healing_log", "No logs.")
-                status  = "OK" if written else "SKIPPED (safety check)"
-                logger.info(f"[Soul Memory] Index update: {status} | Conflicts: {healing}")
-                self._append_log(log_path, timestamp, f"INDEX_UPDATE | status={status} | healing: {healing}")
-            
-            updated_user = router_result.get("updated_user_profile", "")
-            if updated_user:
-                written_usr = self._safe_write_user_profile(usr_path, updated_user)
-                usr_status = "OK" if written_usr else "SKIPPED (safety check)"
-                logger.info(f"[Soul Memory] User profile update: {usr_status}")
-                self._append_log(log_path, timestamp, f"USER_PROFILE_UPDATE | status={usr_status}")
-
-            safe_index = updated_index if updated_index else current_index
-
-            if soul_memory_mode == 0:
-                topic_plan = router_result.get("topic_plan", [])
+            if router_result.get("no_significant_change"):
+                logger.info(
+                    "[Soul Memory] Router judged this batch insignificant — "
+                    "skipping index/user/topic writes, batch still marked processed."
+                )
+                self._append_log(log_path, timestamp, "NO_SIGNIFICANT_CHANGE")
             else:
-                topic_plan = []
+                updated_index = router_result.get("updated_index", "")
+                if updated_index:
+                    written = self._safe_write_index(idx_path, backup_dir, updated_index)
+                    healing = router_result.get("healing_log", "No logs.")
+                    status  = "OK" if written else "SKIPPED (safety check)"
+                    logger.info(f"[Soul Memory] Index update: {status} | Conflicts: {healing}")
+                    self._append_log(log_path, timestamp, f"INDEX_UPDATE | status={status} | healing: {healing}")
+
+                updated_user = router_result.get("updated_user_profile", "")
+                if updated_user:
+                    written_usr = self._safe_write_user_profile(usr_path, backup_dir, updated_user)
+                    usr_status = "OK" if written_usr else "SKIPPED (safety check)"
+                    logger.info(f"[Soul Memory] User profile update: {usr_status}")
+                    self._append_log(log_path, timestamp, f"USER_PROFILE_UPDATE | status={usr_status}")
+
+                safe_index = updated_index if updated_index else current_index
+
+                if soul_memory_mode == 0:
+                    topic_plan = router_result.get("topic_plan", [])
+                else:
+                    topic_plan = []
+
+        tracker_file.write_text(str(msg_count), encoding="utf-8")
 
         diary_task = None
         if soul_memory_mode in [0, 1, 3]:
@@ -900,6 +1045,18 @@ class SoulMemoryAgent:
                 logger.debug(f"[Soul Memory] Protecting diary file from Archivist: {safe_fname}")
                 continue
 
+            action_type = str(action.get("action", "update")).strip().lower()
+
+            if action_type == "create":
+                dedup_query  = f"{filename} {action.get('summary', '')}".strip()
+                dedup_target = await asyncio.to_thread(topic_rag.find_similar_topic, dedup_query)
+                if dedup_target and dedup_target != safe_fname:
+                    logger.info(
+                        f"[Soul Memory] Dedup: redirecting CREATE '{safe_fname}' onto "
+                        f"existing similar topic '{dedup_target}'."
+                    )
+                    safe_fname = dedup_target
+
             topic_path       = topics_dir / safe_fname
             existing_content = ""
             if topic_path.exists():
@@ -941,92 +1098,3 @@ class SoulMemoryAgent:
                 f.write(f"[{timestamp}] {message}\n")
         except Exception as e:
             logger.warning(f"[Soul Memory] Log write failed: {e}")
-
-    def get_full_memory_context(self, character_name: str, chat_id: str = None) -> str:
-        _, idx_path, *_ = self.get_memory_paths(character_name, chat_id)
-
-        index_text = ""
-        if idx_path.exists():
-            try:
-                index_text = idx_path.read_text(encoding="utf-8")
-            except Exception:
-                pass
-
-        return index_text
-
-    def get_memory_stats(self, character_name: str, chat_id: str = None) -> dict:
-        mem_dir, idx_path, usr_path, topics_dir, _, backup_dir = \
-            self.get_memory_paths(character_name, chat_id)
-
-        topic_count  = len(list(topics_dir.glob("*.md"))) if topics_dir.exists() else 0
-        backup_count = len(list(backup_dir.glob("MEMORY_*.md"))) if backup_dir.exists() else 0
-        index_size   = idx_path.stat().st_size if idx_path.exists() else 0
-        user_size    = usr_path.stat().st_size if usr_path.exists() else 0
-
-        tracker_file = mem_dir / "last_mem_update.txt"
-        last_msg_idx = 0
-        if tracker_file.exists():
-            try:
-                last_msg_idx = int(tracker_file.read_text().strip())
-            except Exception:
-                pass
-
-        return {
-            "character":          character_name,
-            "chat_id":            chat_id,
-            "index_size_bytes":   index_size,
-            "user_size_bytes":    user_size,
-            "topic_count":        topic_count,
-            "backup_count":       backup_count,
-            "last_update_at_msg": last_msg_idx,
-            "embedder_available": _check_embedder_available(),
-        }
-
-    def list_topic_files(self, character_name: str, chat_id: str = None) -> list[dict]:
-        _, _, _, topics_dir, *_ = self.get_memory_paths(character_name, chat_id)
-        result = []
-        if not topics_dir.exists():
-            return result
-        for p in sorted(topics_dir.glob("*.md")):
-            try:
-                stat = p.stat()
-                result.append({
-                    "filename":    p.name,
-                    "size_bytes":  stat.st_size,
-                    "modified_at": datetime.datetime.fromtimestamp(
-                        stat.st_mtime
-                    ).strftime("%Y-%m-%d %H:%M"),
-                    "preview":     p.read_text(encoding="utf-8")[:150].strip(),
-                })
-            except Exception:
-                pass
-        return result
-
-    def restore_backup(
-        self,
-        character_name: str,
-        backup_filename: str,
-        chat_id: str = None,
-    ) -> bool:
-        _, idx_path, _, _, _, backup_dir = self.get_memory_paths(character_name, chat_id)
-        backup_path = backup_dir / backup_filename
-        if not backup_path.exists():
-            logger.error(f"[Soul Memory] Backup not found: {backup_filename}")
-            return False
-        try:
-            self._backup_index(idx_path, backup_dir)
-            shutil.copy2(backup_path, idx_path)
-            logger.info(f"[Soul Memory] Restored from backup: {backup_filename}")
-            return True
-        except Exception as e:
-            logger.error(f"[Soul Memory] Backup restore error: {e}")
-            return False
-
-    def list_backups(self, character_name: str, chat_id: str = None) -> list[str]:
-        _, _, _, _, _, backup_dir = self.get_memory_paths(character_name, chat_id)
-        if not backup_dir.exists():
-            return []
-        return sorted(
-            [p.name for p in backup_dir.glob("MEMORY_*.md")],
-            reverse=True,
-        )
