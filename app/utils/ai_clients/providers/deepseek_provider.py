@@ -19,24 +19,26 @@ class DeepSeekProvider(BaseAIProvider):
         )
 
     async def generate_stream(self, messages: list[dict], **kwargs):
+        is_thinking_model = "pro" in self.model.lower()
+
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": True,
             "max_tokens": kwargs.get("max_tokens", 1000),
-            "temperature": kwargs.get("temperature", 0.7),
-            "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"])
+            **({"stop": kwargs["stop"]} if kwargs.get("stop") else {})
         }
 
-        if "pro" in self.model.lower():
-            payload["reasoning_effort"] = "high"
+        if is_thinking_model:
+            payload["reasoning_effort"] = kwargs.get("reasoning_effort", "high")
             payload["extra_body"] = {"thinking": {"type": "enabled"}}
-
-        if "frequency_penalty" in kwargs:
-            payload["frequency_penalty"] = kwargs["frequency_penalty"]
-        if "presence_penalty" in kwargs:
-            payload["presence_penalty"] = kwargs["presence_penalty"]
+        else:
+            payload["temperature"] = kwargs.get("temperature", 0.7)
+            payload["top_p"] = kwargs.get("top_p", 0.9)
+            if "frequency_penalty" in kwargs:
+                payload["frequency_penalty"] = kwargs["frequency_penalty"]
+            if "presence_penalty" in kwargs:
+                payload["presence_penalty"] = kwargs["presence_penalty"]
 
         thinking_active = False
 
@@ -74,10 +76,14 @@ class DeepSeekProvider(BaseAIProvider):
             "messages": messages,
             "stream": True,
             "max_tokens": kwargs.get("max_tokens", 1000),
-            "temperature": kwargs.get("temperature", 0.5),
-            "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"])
+            **({"stop": kwargs["stop"]} if kwargs.get("stop") else {})
         }
+
+        if "pro" in self.model.lower():
+            payload["extra_body"] = {"thinking": {"type": "enabled"}}
+        else:
+            payload["temperature"] = kwargs.get("temperature", 0.5)
+            payload["top_p"] = kwargs.get("top_p", 0.9)
 
         try:
             completion = await self.client.chat.completions.create(**payload)
@@ -94,10 +100,14 @@ class DeepSeekProvider(BaseAIProvider):
             "messages": messages,
             "stream": False,
             "max_tokens": kwargs.get("max_tokens", 1000),
-            "temperature": kwargs.get("temperature", 0.7),
-            "top_p": kwargs.get("top_p", 0.9),
-            "stop": kwargs.get("stop", ["<|im_end|>"])
+            **({"stop": kwargs["stop"]} if kwargs.get("stop") else {})
         }
+
+        if "pro" in self.model.lower():
+            payload["extra_body"] = {"thinking": {"type": "enabled"}}
+        else:
+            payload["temperature"] = kwargs.get("temperature", 0.7)
+            payload["top_p"] = kwargs.get("top_p", 0.9)
 
         if tools:
             payload["tools"] = tools
