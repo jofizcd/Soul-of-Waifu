@@ -1,9 +1,12 @@
 import os
+import secrets
 import asyncio
 import logging
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, FileResponse
+import ipaddress
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, Security, Depends
+from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import APIKeyHeader, APIKeyQuery
 from faster_whisper import WhisperModel
 import uvicorn
 
@@ -36,28 +39,63 @@ class ConnectionManager:
             self.disconnect(connection)
 
 class WebBridge:
-    def __init__(self, interface_signals):
-        self.app = FastAPI()
+    def __init__(self, interface_signals, auth_token: str = None):
+        self.app = FastAPI(docs_url=None, redoc_url=None)
         self.signals = interface_signals
         self.manager = ConnectionManager()
+        
+        self.auth_token = auth_token or secrets.token_urlsafe(16)
+        logger.info(f"WebBridge Auth Token initialized: {self.auth_token}")
         
         self.app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.project_dir = os.path.dirname(self.app_dir)
         
+        self.setup_middleware()
         self.setup_routes()
         self.hook_interface_signals()
 
     def hook_interface_signals(self):
         self.signals.web_bridge = self
 
+    def setup_middleware(self):
+        @self.app.middleware("http")
+        async def validate_host_header(request: Request, call_next):
+            host_header = (request.headers.get("host") or "").split(":")[0]
+            if host_header in ("localhost", "127.0.0.1", ""):
+                return await call_next(request)
+            try:
+                ipaddress.ip_address(host_header)
+            except ValueError:
+                return PlainTextResponse("Forbidden: Invalid Host Header", status_code=400)
+            return await call_next(request)
+
+        @self.app.middleware("http")
+        async def check_auth_token(request: Request, call_next):
+            path = request.url.path
+            if path in ["/", "/favicon.ico"] or path.startswith("/static") or path.startswith("/vrm") or path.startswith("/assets"):
+                return await call_next(request)
+
+            token_header = request.headers.get("X-SOW-Token")
+            token_query = request.query_params.get("token")
+            
+            if (token_header and secrets.compare_digest(token_header, self.auth_token)) or \
+               (token_query and secrets.compare_digest(token_query, self.auth_token)):
+                return await call_next(request)
+
+            return PlainTextResponse("Unauthorized: Invalid Token", status_code=401)
+
     def setup_routes(self):
         web_client_dir = os.path.join(self.app_dir, "web_client")
+        vrm_dir = os.path.join(self.app_dir, "utils", "emotions", "vrm")
+        
         if not os.path.exists(web_client_dir):
             os.makedirs(web_client_dir, exist_ok=True)
             
         self.app.mount("/static", StaticFiles(directory=web_client_dir), name="static")
         self.app.mount("/assets", StaticFiles(directory=os.path.join(self.project_dir, "assets")), name="assets")
-        self.app.mount("/app", StaticFiles(directory=self.app_dir), name="app")
+        
+        if os.path.exists(vrm_dir):
+            self.app.mount("/vrm", StaticFiles(directory=vrm_dir), name="vrm")
 
         @self.app.get("/", response_class=HTMLResponse)
         async def index():
@@ -303,6 +341,11 @@ class WebBridge:
 
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
+            token = websocket.query_params.get("token")
+            if not token or not secrets.compare_digest(token, self.auth_token):
+                await websocket.close(code=1008)
+                return
+
             await self.manager.connect(websocket)
             try:
                 while True:
@@ -334,35 +377,22 @@ class WebBridge:
                 self.manager.disconnect(websocket)
 
     async def broadcast_chunk(self, chunk: str):
-        await self.manager.broadcast({
-            "type": "chunk",
-            "text": chunk
-        })
+        await self.manager.broadcast({"type": "chunk", "text": chunk})
         
     async def broadcast_message_start(self):
-        await self.manager.broadcast({
-            "type": "message_start"
-        })
+        await self.manager.broadcast({"type": "message_start"})
         
     async def broadcast_message_end(self):
-        await self.manager.broadcast({
-            "type": "message_end"
-        })
+        await self.manager.broadcast({"type": "message_end"})
 
     async def broadcast_character_change(self, new_char: str):
-        await self.manager.broadcast({
-            "type": "character_changed",
-            "character": new_char
-        })
+        await self.manager.broadcast({"type": "character_changed", "character": new_char})
 
     async def broadcast_audio(self, b64_audio: str):
-        await self.manager.broadcast({
-            "type": "audio",
-            "data": b64_audio
-        })
+        await self.manager.broadcast({"type": "audio", "data": b64_audio})
 
-async def run_web_server(interface_signals):
-    bridge = WebBridge(interface_signals)
-    config = uvicorn.Config(bridge.app, host="0.0.0.0", port=8000, log_level="warning")
+async def run_web_server(interface_signals, host="127.0.0.1", port=8000, auth_token=None):
+    bridge = WebBridge(interface_signals, auth_token=auth_token)
+    config = uvicorn.Config(bridge.app, host=host, port=port, log_level="warning")
     server = uvicorn.Server(config)
     await server.serve()
