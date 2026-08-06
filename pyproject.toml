@@ -1,0 +1,167 @@
+
+
+[project]
+name = "soul-of-waifu"
+version = "2.5.0"
+description = "Soul of Waifu desktop companion app"
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    # Kept in sync with Pixi's PyPI dependencies for Version Lens.
+    "aiohttp>=3.11.13",
+    "antlr4-python3-runtime==4.9.3",
+    "av>=12.0.0",
+    "beautifulsoup4>=4.12.3",
+    "coqui-tts[codec]>=0.27.5",
+    "curl-cffi>=0.15.0",
+    "davey>=0.1.6",
+    "ddgs>=7.3.0",
+    "discord.py>=2.4.0",
+    "edge-tts>=7.2.7",
+    "elevenlabs>=1.52.0",
+    "fastapi>=0.115.8",
+    "faster-whisper>=1.0.3",
+    "gputil>=1.4.0",
+    "hf-transfer>=0.1.9",
+    "httpx>=0.28.1",
+    "huggingface-hub>=0.36.0",
+    "kokoro>=0.9.4",
+    "live2d-py>=0.5.4",
+    "mistralai>=1.5.0",
+    "mss>=9.0.1",
+    "numpy==1.26.4",
+    "omegaconf==2.3.0",
+    "openai>=1.70.0",
+    "pillow>=11.3.0",
+    "playwright>=1.52.0",
+    "portalocker==3.2.0",
+    "praat-parselmouth>=0.4.7",
+    "psutil>=7.0.0",
+    "pyaudio>=0.2.14",
+    "pydub>=0.25.1",
+    "pynacl>=1.5.0",
+    "pyopengl>=3.1.9",
+    "pypdf>=6.14.2",
+    "pyqt6>=6.9.0",
+    "pyqt6-webengine>=6.9.0",
+    "python-docx>=1.2.0",
+    "python-multipart>=0.0.22",
+    "pyworld==0.3.5",
+    "pyyaml>=6.0.2",
+    "qasync>=0.27.1",
+    "qwen-tts>=0.1.1",
+    "requests>=2.32.3",
+    "rvc-python @ git+https://github.com/JarodMica/rvc-python@9a67ac77743d749e9f2cbbb02798957d5343fd19",
+    "scikit-learn>=1.4.2",
+    "scipy>=1.13.1",
+    "sentence-transformers==5.1.0",
+    "sounddevice>=0.5.1",
+    "soundfile>=0.13.1",
+    "tensorboardx>=2.6.5",
+    "tiktoken>=0.11.0",
+    "torch==2.10.0",
+    "torchaudio==2.10.0",
+    "torchcodec==0.10.0",
+    "torchcrepe>=0.0.24",
+    "torchvision==0.25.0",
+    "transformers>=4.57.3",
+    "translators>=6.0.1",
+    "uvicorn>=0.41.0",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl#sha256=86cc141f63942d4b2c5fcee06630fd6f904788d2f0ab005cce45aadb8fb73889",
+]
+
+[build-system]
+requires = ["setuptools>=83.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pixi.workspace]
+name = "soul-of-waifu"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.10,<3.11"
+pip = "*"
+
+[tool.pixi.pypi-dependencies]
+aiohttp = ">=3.11.13"
+beautifulsoup4 = ">=4.12.3"
+"antlr4-python3-runtime" = "==4.9.3"
+av = ">=12.0.0"
+ddgs = ">=7.3.0"
+"coqui-tts" = { version = ">=0.27.5", extras = ["codec"] }
+"curl-cffi" = ">=0.15.0"
+davey = ">=0.1.6"
+"discord.py" = ">=2.4.0"
+"edge-tts" = ">=7.2.7"
+fastapi = ">=0.115.8"
+elevenlabs = ">=1.52.0"
+faster-whisper = ">=1.0.3"
+gputil = ">=1.4.0"
+httpx = ">=0.28.1"
+"hf-transfer" = ">=0.1.9"
+"huggingface-hub" = ">=0.36.0"
+"live2d-py" = ">=0.5.4"
+kokoro = ">=0.9.4"
+mistralai = ">=1.5.0"
+mss = ">=9.0.1"
+numpy = "==1.26.4"
+omegaconf = "==2.3.0"
+openai = ">=1.70.0"
+pillow = ">=11.3.0"
+playwright = ">=1.52.0"
+psutil = ">=7.0.0"
+portalocker = "==3.2.0"
+"praat-parselmouth" = ">=0.4.7"
+pyaudio = ">=0.2.14"
+pydub = ">=0.25.1"
+pynacl = ">=1.5.0"
+pyopengl = ">=3.1.9"
+pyqt6 = ">=6.9.0"
+pypdf = ">=6.14.2"
+"pyqt6-webengine" = ">=6.9.0"
+python-multipart = ">=0.0.22"
+"python-docx" = ">=1.2.0"
+pyworld = "==0.3.5"
+pyyaml = ">=6.0.2"
+qasync = ">=0.27.1"
+requests = ">=2.32.3"
+"qwen-tts" = ">=0.1.1"
+"scikit-learn" = ">=1.4.2"
+"rvc-python" = { git = "https://github.com/JarodMica/rvc-python", rev = "9a67ac77743d749e9f2cbbb02798957d5343fd19" }
+sounddevice = ">=0.5.1"
+soundfile = ">=0.13.1"
+"sentence-transformers" = "==5.1.0"
+tiktoken = ">=0.11.0"
+transformers = ">=4.57.3"
+tensorboardx = ">=2.6.5"
+translators = ">=6.0.1"
+torch = "==2.10.0"
+torchaudio = "==2.10.0"
+torchcodec = "==0.10.0"
+torchcrepe = ">=0.0.24"
+torchvision = "==0.25.0"
+uvicorn = ">=0.41.0"
+
+"en-core-web-sm" = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl#sha256=86cc141f63942d4b2c5fcee06630fd6f904788d2f0ab005cce45aadb8fb73889" }
+
+[tool.pixi.pypi-options.dependency-overrides]
+# rvc-python's metadata still pins numpy<=1.23.5; override so it doesn't conflict with numpy==1.26.4.
+numpy = "==1.26.4"
+
+[tool.pixi.environments]
+build = { features = ["build"] }
+
+[tool.pixi.feature.build.dependencies]
+# Windows compiler toolchains and other build-only packages belong here.
+
+
+[tool.pixi.tasks]
+run = "python main.py"
+install = "cmd /c installer.bat"
