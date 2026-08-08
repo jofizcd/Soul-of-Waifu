@@ -25,8 +25,9 @@ if %errorlevel% neq 0 (
         set "PIXI_ARCH=x86_64"
         if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "PIXI_ARCH=aarch64"
         set "PIXI_URL=https://github.com/prefix-dev/pixi/releases/latest/download/pixi-!PIXI_ARCH!-pc-windows-msvc.exe"
+        echo "Downloading Pixi from !PIXI_URL!..."
         powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri '!PIXI_URL!' -OutFile '%PIXI_EXE%'"
-        if %errorlevel% neq 0 (
+        if !errorlevel! neq 0 (
             echo INSTALLATION ERROR: Failed to download Pixi from GitHub.
             pause
             exit /b 1
