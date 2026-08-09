@@ -14,6 +14,7 @@ import contextlib
 import numpy as np
 import soundfile as sf
 import sounddevice as sd
+import scipy.signal
 from typing import Optional
 
 from TTS.api import TTS
@@ -43,6 +44,59 @@ os.environ["HF_HOME"] = CACHE_DIR
 os.environ["HUGGINGFACE_HUB_CACHE"] = CACHE_DIR
 
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+def _resolve_output_device(device_index):
+    """
+    Validates that the given output device index can actually be opened.
+    Falls back to the system default output device (None) if the stored
+    index is stale, invalid, or fails to open - e.g. after migrating
+    settings from another OS/machine, or when a previously selected audio
+    device has been unplugged - otherwise PortAudio/ALSA raises errors like:
+      "Expression 'AlsaOpen(...)' failed in 'pa_linux_alsa.c'"
+    """
+    if device_index is None:
+        return None
+    try:
+        info = sd.query_devices(device_index)
+        if info.get('max_output_channels', 0) <= 0:
+            raise ValueError("device has no output channels")
+        sd.check_output_settings(device=device_index)
+        return device_index
+    except Exception as e:
+        logger.warning(f"Configured output device (index {device_index}) is unavailable ({e}); using the system default output device instead.")
+        return None
+
+def _ensure_playable_samplerate(data, samplerate, device=None):
+    """
+    Some output devices/backends (commonly ALSA/PipeWire hardware devices on Linux)
+    only support a fixed sample rate and reject others with
+    "Invalid sample rate [PaErrorCode -9997]". If the requested rate isn't
+    supported by the target device, resample the audio to a rate the device
+    accepts instead of letting playback fail.
+    """
+    try:
+        sd.check_output_settings(device=device, samplerate=samplerate)
+        return data, samplerate
+    except Exception:
+        pass
+
+    try:
+        resolved_device = device if device is not None else sd.default.device[1]
+        device_info = sd.query_devices(resolved_device, 'output')
+        target_rate = int(device_info.get('default_samplerate') or 0)
+    except Exception:
+        target_rate = 0
+
+    if not target_rate or target_rate == samplerate:
+        return data, samplerate
+
+    try:
+        num_samples = max(1, int(round(len(data) * target_rate / samplerate)))
+        resampled = scipy.signal.resample(data, num_samples, axis=0)
+        return resampled.astype(data.dtype, copy=False), target_rate
+    except Exception as e:
+        logger.warning(f"Failed to resample audio from {samplerate}Hz to {target_rate}Hz: {e}")
+        return data, samplerate
 
 class ElevenLabs:
     def __init__(self):
@@ -107,8 +161,8 @@ class ElevenLabs:
         try:
             samples = np.array(audio.get_array_of_samples())
             sample_rate = audio.frame_rate
-            sd.default.device = self.device_index
-            await asyncio.to_thread(sd.play, samples, samplerate=sample_rate)
+            device = _resolve_output_device(self.device_index)
+            await asyncio.to_thread(sd.play, samples, samplerate=sample_rate, device=device)
             await asyncio.to_thread(sd.wait)
         except Exception as e:
             logger.error(f"Error: {e}")
@@ -302,8 +356,9 @@ class EdgeTTS:
         def _play():
             try:
                 data, samplerate = sf.read(file_path, dtype='float32')
-                sd.default.device = self.device_index
-                sd.play(data, samplerate)
+                device = _resolve_output_device(self.device_index)
+                data, samplerate = _ensure_playable_samplerate(data, samplerate, device=device)
+                sd.play(data, samplerate, device=device)
                 sd.wait()
             except Exception as e:
                 logger.error(f"Error: {e}")
@@ -777,8 +832,9 @@ class AudioPlaybackWorker(QThread):
 
                 try:
                     data, samplerate = sf.read(file_path, dtype='float32')
-                    sd.default.device = self.device_index
-                    sd.play(data, samplerate)
+                    device = _resolve_output_device(self.device_index)
+                    data, samplerate = _ensure_playable_samplerate(data, samplerate, device=device)
+                    sd.play(data, samplerate, device=device)
 
                     duration = len(data) / samplerate
                     chunk_size = int(samplerate * 0.05)
@@ -1408,7 +1464,9 @@ class PipelinedTTSWorker(QThread):
             return
 
         try:
-            sd.play(data, samplerate, device=self.device_index)
+            device = _resolve_output_device(self.device_index)
+            data, samplerate = _ensure_playable_samplerate(data, samplerate, device=device)
+            sd.play(data, samplerate, device=device)
         except Exception as e:
             logger.error(f"[PipelinedTTS] sd.play error: {e}")
             try:

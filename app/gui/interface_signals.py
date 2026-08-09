@@ -5273,7 +5273,7 @@ class InterfaceSignals():
         """
         Prepares a blank character editor sheet, populates options dropdowns, and switches UI.
         """
-        self.ui.pushButton_rp_editors.click()
+        self.ui.pushButton_rp_editors.setChecked(True)
         self.prepare_new_character_editor()
         self.populate_editor_character_list()
 
@@ -7629,7 +7629,7 @@ class InterfaceSignals():
         )
         
         if file_path:
-            self.ui.pushButton_rp_editors.click()
+            self.ui.pushButton_rp_editors.setChecked(True)
             self.prepare_new_character_editor()
             self.import_character_card(file_path)
             QtCore.QTimer.singleShot(0, lambda: self.ui.stackedWidget.setCurrentWidget(self.ui.create_character_page))
