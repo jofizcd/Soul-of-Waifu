@@ -45,6 +45,8 @@ os.environ["HUGGINGFACE_HUB_CACHE"] = CACHE_DIR
 
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+_bad_output_devices = set()
+
 def _resolve_output_device(device_index):
     """
     Validates that the given output device index can actually be opened.
@@ -53,8 +55,12 @@ def _resolve_output_device(device_index):
     settings from another OS/machine, or when a previously selected audio
     device has been unplugged - otherwise PortAudio/ALSA raises errors like:
       "Expression 'AlsaOpen(...)' failed in 'pa_linux_alsa.c'"
+
+    Devices found to be unusable are cached for the lifetime of the process
+    (and the setting is corrected on disk) so every single TTS utterance
+    doesn't re-probe (and re-fail against) the same broken hardware device.
     """
-    if device_index is None:
+    if device_index is None or device_index in _bad_output_devices:
         return None
     try:
         info = sd.query_devices(device_index)
@@ -64,6 +70,11 @@ def _resolve_output_device(device_index):
         return device_index
     except Exception as e:
         logger.warning(f"Configured output device (index {device_index}) is unavailable ({e}); using the system default output device instead.")
+        _bad_output_devices.add(device_index)
+        try:
+            configuration.ConfigurationSettings().update_main_setting("output_device_real_index", None)
+        except Exception:
+            pass
         return None
 
 def _ensure_playable_samplerate(data, samplerate, device=None):
