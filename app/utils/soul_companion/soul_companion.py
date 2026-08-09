@@ -816,7 +816,12 @@ class AppControlTool(BaseTool):
             subprocess.Popen([target], shell=False)
         except OSError as first_error:
             try:
-                os.startfile(target)
+                if os.name == "nt":
+                    os.startfile(target)
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", target])
+                else:
+                    subprocess.Popen(["xdg-open", target])
             except OSError as second_error:
                 return {
                     "success": False,

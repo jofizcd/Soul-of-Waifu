@@ -21,7 +21,9 @@ dependencies = [
     "discord.py>=2.4.0",
     "edge-tts>=7.2.7",
     "elevenlabs>=1.52.0",
-    "fairseq==0.12.2",
+    # fairseq==0.12.2 from PyPI is broken on Python 3.11 (mutable dataclass
+    # defaults raise ValueError). Actual install source is platform-specific;
+    # see [tool.pixi.target.*.pypi-dependencies] below.
     "fastapi>=0.115.8",
     "faster-whisper>=1.0.3",
     "gputil>=1.4.0",
@@ -93,11 +95,8 @@ include = ["app*"]
 
 [tool.pixi.workspace]
 name = "soul-of-waifu"
-platforms = ["win-64"]
-channels = [
-    "conda-forge",
-    "https://prefix.dev/pixi-build-backends",
-]
+platforms = ["win-64", "linux-64"]
+channels = ["conda-forge", "https://prefix.dev/pixi-build-backends"]
 # Required until the build feature becomes stable
 preview = ["pixi-build"]
 
@@ -106,6 +105,8 @@ preview = ["pixi-build"]
 [tool.pixi.dependencies]
 python = ">=3.11,<3.12"
 pip = "*"
+setuptools = ">=80,<81"
+sox = "*"
 
 [tool.pixi.pypi-dependencies]
 aiohttp = ">=3.11.13"
@@ -119,13 +120,16 @@ ddgs = ">=7.3.0"
 "discord.py" = ">=2.4.0"
 "edge-tts" = ">=7.2.7"
 elevenlabs = ">=1.52.0"
-fairseq = "==0.12.2"
+# fairseq is installed per-platform below: PyPI's 0.12.2 build fails to import
+# on Python 3.11 (mutable dataclass defaults raise ValueError). Windows uses
+# Jmica's community-patched wheel; Linux uses a locally patched build.
 fastapi = ">=0.115.8"
 faster-whisper = ">=1.0.3"
 gputil = ">=1.4.0"
 "hf-transfer" = ">=0.1.9"
 httpx = ">=0.28.1"
 "huggingface-hub" = ">=0.36.0"
+hf_xet = ">=0.1.2"
 kokoro = ">=0.9.4"
 "live2d-py" = ">=0.5.4"
 # Pinned <2.0.0: mistralai 2.x restructured into a namespace package (Mistral
@@ -179,22 +183,47 @@ numpy = "==1.26.4"
 # override both so they don't conflict with the versions omegaconf==2.3.0 actually needs.
 omegaconf = "==2.3.0"
 "antlr4-python3-runtime" = "==4.9.3"
+# fairseq also pins hydra-core<1.1, but that version's internals (e.g.
+# hydra._internal.utils importing omegaconf._utils.get_ref_type) are
+# incompatible with omegaconf==2.3.0. hydra-core>=1.3.2 supports omegaconf~=2.2.
+hydra-core = ">=1.3.2"
+
+[tool.pixi.target.linux-64.dependencies]
+# live2d-py's Linux source build requires OpenGL development headers (GL/gl.h).
+libgl-devel = "*"
+
+[tool.pixi.target.linux-64.pypi-dependencies]
+# PyPI's fairseq==0.12.2 fails to import on Python 3.11 (mutable dataclass
+# defaults in fairseq/dataclass/configs.py and
+# fairseq/models/transformer/transformer_config.py raise
+# "ValueError: mutable default ... use default_factory"). No fixed release
+# exists upstream (repo is archived; latest tag is v0.12.3 and still broken).
+# This is a prebuilt wheel from the same source patched with
+# field(default_factory=...), mirroring the fix in the community wheel used on
+# Windows below. See vendor/fairseq-linux-patched for the patched source used
+# to build it.
+fairseq = { path = "vendor/fairseq-0.12.4-cp311-cp311-linux_x86_64.whl" }
+
+[tool.pixi.target.win-64.pypi-dependencies]
+# Community-patched cp311 build of fairseq fixing the same Python 3.11
+# mutable-dataclass-default bug (see linux-64 target above for details).
+# Source: https://github.com/JarodMica/rvc-python
+fairseq = { url = "https://huggingface.co/Jmica/rvc/resolve/main/fairseq-0.12.4-cp311-cp311-win_amd64.whl" }
 
 ### Environments and features
 
 [tool.pixi.environments]
-default = { features = [
-    "build",
-    "dev",
-  ], solve-group = "default" }
+default = { features = ["build", "dev"], solve-group = "default" }
 build = { features = ["build"] }
 dev = { features = ["dev"] }
 
 [tool.pixi.feature.build.dependencies]
 # Windows compiler toolchains and other build-only packages belong here.
-# Needed to build fairseq==0.12.2 from source (no cp311 Windows wheel is published).
+# Needed to build fairseq from source on Linux (vendor/fairseq-linux-patched)
+# and other packages lacking prebuilt wheels for this platform/Python version.
 c-compiler = "*"
 cxx-compiler = "*"
+cmake = "*"
 
 [tool.pixi.feature.dev.dependencies]
 ruff = "*"
@@ -215,7 +244,7 @@ line-length = 120
 exclude = ["notebooks/**", "**/*.ipynb", "scripts/**", "tests/data/**"]
 
 [tool.ruff.lint]
-select = ["A", "ARG","ASYNC","BLE", "E", "F", "FURB", "I", "N", "UP", "W",]
+select = ["A", "ARG", "ASYNC", "BLE", "E", "F", "FURB", "I", "N", "UP", "W"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["lr_reduction"]
