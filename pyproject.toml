@@ -9,73 +9,7 @@ description = "Soul of Waifu desktop companion app"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
-    # Kept in sync with Pixi's PyPI dependencies for Version Lens.
-    "aiohttp>=3.11.13",
-    "antlr4-python3-runtime==4.9.3",
-    "av>=12.0.0",
-    "beautifulsoup4>=4.12.3",
-    "coqui-tts[codec]>=0.27.5",
-    "curl-cffi>=0.15.0",
-    "davey>=0.1.6",
-    "ddgs>=7.3.0",
-    "discord.py>=2.4.0",
-    "edge-tts>=7.2.7",
-    "elevenlabs>=1.52.0",
-    # fairseq==0.12.2 from PyPI is broken on Python 3.11 (mutable dataclass
-    # defaults raise ValueError). Actual install source is platform-specific;
-    # see [tool.pixi.target.*.pypi-dependencies] below.
-    "fastapi>=0.115.8",
-    "faster-whisper>=1.0.3",
-    "gputil>=1.4.0",
-    "hf-transfer>=0.1.9",
-    "httpx>=0.28.1",
-    "huggingface-hub>=0.36.0",
-    "kokoro>=0.9.4",
-    "live2d-py>=0.5.4",
-    "mistralai>=1.5.0,<2.0.0",
-    "mss>=9.0.1",
-    "numpy==1.26.4",
-    "omegaconf==2.3.0",
-    "openai>=1.70.0",
-    "pillow>=11.3.0",
-    "playwright>=1.52.0",
-    "portalocker==3.2.0",
-    "praat-parselmouth>=0.4.7",
-    "psutil>=7.0.0",
-    "pyaudio>=0.2.14",
-    "pydub>=0.25.1",
-    "pynacl>=1.5.0",
-    "pyopengl>=3.1.9",
-    "pypdf>=6.14.2",
-    # Capped below 6.10: PyQt6-Qt6 6.11.x ships Windows Qt6Core.dll builds that
-    # fail with "DLL load failed: The specified procedure could not be found"
-    # on some systems due to a CRT/runtime mismatch.
-    "pyqt6>=6.9.0,<6.10.0",
-    "pyqt6-webengine>=6.9.0,<6.10.0",
-    "python-docx>=1.2.0",
-    "python-multipart>=0.0.22",
-    "pyworld==0.3.5",
-    "pyyaml>=6.0.2",
-    "qasync>=0.27.1",
-    "qwen-tts>=0.1.1",
-    "requests>=2.32.3",
-    "rvc-python @ git+https://github.com/JarodMica/rvc-python@9a67ac77743d749e9f2cbbb02798957d5343fd19",
-    "scikit-learn>=1.4.2",
-    "scipy>=1.13.1",
-    "sentence-transformers==5.1.0",
-    "sounddevice>=0.5.1",
-    "soundfile>=0.13.1",
-    "tensorboardx>=2.6.5",
-    "tiktoken>=0.11.0",
-    "torch==2.10.0",
-    "torchaudio==2.10.0",
-    "torchcodec==0.10.0",
-    "torchcrepe>=0.0.24",
-    "torchvision==0.25.0",
-    "transformers>=4.57.3",
-    "translators>=6.0.1",
-    "uvicorn>=0.41.0",
-    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl#sha256=86cc141f63942d4b2c5fcee06630fd6f904788d2f0ab005cce45aadb8fb73889",
+    # Dependencies are managed via Pixi; this list is only for metadata purposes.
 ]
 
 ####################
