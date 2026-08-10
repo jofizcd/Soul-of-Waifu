@@ -1,4 +1,5 @@
-.archive
+app/configuration/api.json
+app/configuration/settings.json
 app/configuration/characters.json
 
 # Soul Stage runtime data (scenes, NPC memory) - user/session state, not source
