@@ -47,8 +47,11 @@ dependencies = [
     "pynacl>=1.5.0",
     "pyopengl>=3.1.9",
     "pypdf>=6.14.2",
-    "pyqt6>=6.9.0",
-    "pyqt6-webengine>=6.9.0",
+    # Capped below 6.10: PyQt6-Qt6 6.11.x ships Windows Qt6Core.dll builds that
+    # fail with "DLL load failed: The specified procedure could not be found"
+    # on some systems due to a CRT/runtime mismatch.
+    "pyqt6>=6.9.0,<6.10.0",
+    "pyqt6-webengine>=6.9.0,<6.10.0",
     "python-docx>=1.2.0",
     "python-multipart>=0.0.22",
     "pyworld==0.3.5",
@@ -149,8 +152,8 @@ pydub = ">=0.25.1"
 pynacl = ">=1.5.0"
 pyopengl = ">=3.1.9"
 pypdf = ">=6.14.2"
-pyqt6 = ">=6.9.0"
-"pyqt6-webengine" = ">=6.9.0"
+pyqt6 = ">=6.9.0,<6.10.0"
+"pyqt6-webengine" = ">=6.9.0,<6.10.0"
 "python-docx" = ">=1.2.0"
 python-multipart = ">=0.0.22"
 pyworld = "==0.3.5"
