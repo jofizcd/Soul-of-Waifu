@@ -224,8 +224,12 @@ class ConfigurationCharacters():
         """
         if not os.path.exists(self.characters_path):
             return {}
-        with open(self.characters_path, 'r', encoding='utf-8') as file:
-            return json.load(file)
+        try:
+            with open(self.characters_path, 'r', encoding='utf-8') as file:
+                return json.load(file)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON configuration file '{self.characters_path}': {e}")
+            return {}
 
     def save_configuration_edit(self, data):
         """

@@ -895,10 +895,11 @@ class InterfaceSignals():
             return
             
         config = self.configuration_characters.load_configuration()
-        if self.current_active_character not in config["character_list"]:
+        character_list = config.get("character_list", {})
+        if self.current_active_character not in character_list:
             return
             
-        mode = config["character_list"][self.current_active_character]["current_sow_system_mode"]
+        mode = character_list[self.current_active_character]["current_sow_system_mode"]
 
         if mode == "Live2D Model":
             if hasattr(self, 'live2d_widget') and self.live2d_widget and self.live2d_widget.isVisible():
@@ -17138,8 +17139,17 @@ Image prompt:"""
         if self.tokenizer is None or self.model is None:
             def _load_model():
                 tokenizer_path = os.path.join("app", "utils", "emotions", "detector")
-                tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-                model = AutoModelForSequenceClassification.from_pretrained(tokenizer_path)
+                model_name = "SamLowe/roberta-base-go_emotions"
+                if os.path.isdir(tokenizer_path) and os.listdir(tokenizer_path):
+                    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+                    model = AutoModelForSequenceClassification.from_pretrained(tokenizer_path)
+                else:
+                    logger.warning(f"Emotion detector not found at '{tokenizer_path}', downloading '{model_name}' from Hugging Face Hub.")
+                    os.makedirs(tokenizer_path, exist_ok=True)
+                    tokenizer = AutoTokenizer.from_pretrained(model_name)
+                    model = AutoModelForSequenceClassification.from_pretrained(model_name)
+                    tokenizer.save_pretrained(tokenizer_path)
+                    model.save_pretrained(tokenizer_path)
                 return tokenizer, model
             self.tokenizer, self.model = await asyncio.to_thread(_load_model)
 
