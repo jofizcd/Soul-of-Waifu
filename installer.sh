@@ -57,11 +57,13 @@ read -p "Enter your choice (1 or 2): " choice
 case $choice in
     1)
         echo "Installing PyTorch with CUDA support..."
-        $PIXI_EXE run pip install --no-cache-dir torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+        $PIXI_EXE run pip uninstall -y torch torchvision torchaudio >/dev/null 2>&1
+        $PIXI_EXE run pip install --no-cache-dir --upgrade --force-reinstall torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
         ;;
     2)
         echo "Installing PyTorch for CPU only..."
-        $PIXI_EXE run pip install --no-cache-dir torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0
+        $PIXI_EXE run pip uninstall -y torch torchvision torchaudio >/dev/null 2>&1
+        $PIXI_EXE run pip install --no-cache-dir --upgrade --force-reinstall torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0
         ;;
     *)
         printf "Invalid choice. Exiting.\n"
@@ -78,6 +80,11 @@ printf "\n[4/4] Final checks..."
 $PIXI_EXE run python -m pip check
 $PIXI_EXE run python -c "import torch, numpy, transformers, PyQt6; print('Core imports OK')"
 $PIXI_EXE run python -c "from TTS.api import TTS; print('Coqui TTS import OK')" || echo WARNING: Coqui TTS import failed - possible version conflict!
+
+# if user chose CUDA, check if torch can access GPU
+if [ "$choice" == "1" ]; then
+    $PIXI_EXE run python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+fi
 
 echo "=============================================================="
 echo Installation completed successfully!
