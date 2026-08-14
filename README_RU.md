@@ -284,7 +284,7 @@ Soul of Waifu — это open-source проект, разрабатываемы�
 ## 📊 Статистика репозитория
 
 <div align="center">
-  <img src="https://api.star-history.com/svg?repos=jofizcd/Soul-of-Waifu&type=Date" alt="Star History Chart"/>
+  <img src="https://star-history.dera.page/svg?repos=jofizcd/Soul-of-Waifu&type=Date" alt="Star History Chart"/>
 </div>
 
 <br>
