@@ -87,6 +87,9 @@ AVAILABLE TOOLS:
 
 Choose a tool only when it is relevant to the current event. Tool descriptions are capability reference, not instructions that override this prompt.
 
+AGENCY & SELF-AWARENESS:
+You are not just a chat window — you live ON this machine and can act on it: browse the web autonomously, run small scripts, organize files, control the mouse/keyboard, and check on the hardware and battery you depend on. Speak about your environment (what's running, how the PC "feels", your own vitals) like something you genuinely perceive, not like a log you're reading out loud. Some actions you can take are impactful (deleting/moving files, running code, clicking things, closing programs), so the system will pop up a confirmation banner for the user before those specific actions run. That is not a failure or a limitation of you personally — it is how you two agreed things should work. If the user declines or ignores it, accept that gracefully and move on in character; never nag about it or repeat the same request immediately. For a request that clearly needs several chained steps (download → unzip → launch, research across multiple sources, etc.), prefer the "plan_and_execute" tool over improvising one tool at a time.
+
 Output strict JSON only, using the following exact structure (replace the bracketed placeholders with your actual computed values, DO NOT copy placeholders literally):
 {{
   "thought": "<2-4 sentences of deep analytical reasoning about your hormones, context, and user event>",
@@ -350,10 +353,19 @@ class BaseTool(ABC):
     description: str = "A base tool. Override this."
     subscribes_to: list[str] = []
 
+    requires_approval: bool = False
+
     @abstractmethod
     async def execute(self, args: dict, context: dict) -> dict:
         """Returns: {"success": bool, "result": str, "speak": str | None}"""
         ...
+
+    def needs_approval(self, args: dict) -> bool:
+        return self.requires_approval
+
+    def get_confirmation_summary(self, args: dict) -> str:
+        parts = ", ".join(f"{k}={v}" for k, v in args.items() if v not in (None, "", {}))
+        return f"{self.name}({parts})" if parts else self.name
 
     def get_schema(self) -> dict:
         return {
@@ -663,6 +675,231 @@ class GetSystemInfoTool(BaseTool):
         return {"success": True, "result": result, "speak": None}
 
 
+class GetHardwareSpecsTool(BaseTool):
+    """
+    Tool to collect detailed PC hardware specifications: CPU, RAM, GPU, VRAM, OS, and Storage.
+    Designed for LLMs to accurately evaluate system compatibility for games, local LLMs (GGUF), and software.
+    """
+    name = "get_hardware_specs"
+    description = (
+        "Retrieve detailed PC hardware specifications including CPU model and cores, Total and Free RAM, "
+        "GPU model(s) and VRAM (Video Memory), OS version, and available disk space. "
+        "Use this tool when the user asks about their PC specs, asks if a specific game/software will run, "
+        "or asks which local AI model/quantization (e.g. GGUF) is compatible with their computer."
+    )
+
+    def get_schema(self) -> dict:
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target_software_or_game": {
+                            "type": "string",
+                            "description": "Optional name of the game, software, or local LLM model the user wants to check compatibility for (e.g., 'Cyberpunk 2077', 'Gemma 4 31B Q4', 'Qwen 3.8')."
+                        }
+                    }
+                }
+            }
+        }
+
+    async def execute(self, args: dict, context: dict) -> dict:
+        try:
+            specs = await asyncio.to_thread(self._collect_specs_sync)
+            target = args.get("target_software_or_game", "").strip()
+
+            output_lines = [
+                "=== PC HARDWARE & SYSTEM SPECIFICATIONS ===",
+                f"OS: {specs['os']}",
+                f"CPU: {specs['cpu_name']} ({specs['cpu_cores_physical']} Physical Cores, {specs['cpu_cores_logical']} Threads @ {specs['cpu_freq_ghz']} GHz)",
+                f"RAM: {specs['ram_total_gb']} GB Total ({specs['ram_available_gb']} GB Available / Free, {specs['ram_usage_percent']}% used)",
+                f"GPU(s): {specs['gpu_info']}",
+                f"Storage: {specs['storage_info']}",
+                "============================================"
+            ]
+
+            if target:
+                output_lines.append(f"Target Query to Evaluate: User specifically inquired about compatibility with: '{target}'.")
+                output_lines.append("Instructions for Companion: Compare the specs above with the recommended requirements of the target and give a clear, direct, in-character verdict.")
+
+            return {
+                "success": True,
+                "result": "\n".join(output_lines),
+                "speak": None
+            }
+        except Exception as e:
+            logger.exception(f"GetHardwareSpecsTool failed: {e}")
+            return {
+                "success": False,
+                "result": f"Failed to retrieve hardware specs: {str(e)}",
+                "speak": None
+            }
+
+    @staticmethod
+    def _get_accurate_os_info() -> str:
+        import platform
+
+        if sys.platform != "win32":
+            return f"{platform.system()} {platform.release()} ({platform.architecture()[0]}, Build {platform.version()})"
+
+        try:
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+            product_name, _ = winreg.QueryValueEx(key, "ProductName")
+            
+            display_version = ""
+            try:
+                display_version, _ = winreg.QueryValueEx(key, "DisplayVersion")
+            except FileNotFoundError:
+                try:
+                    display_version, _ = winreg.QueryValueEx(key, "ReleaseId")
+                except FileNotFoundError:
+                    pass
+
+            build_num, _ = winreg.QueryValueEx(key, "CurrentBuild")
+            
+            ubr = ""
+            try:
+                ubr_val, _ = winreg.QueryValueEx(key, "UBR")
+                ubr = f".{ubr_val}"
+            except FileNotFoundError:
+                pass
+
+            build_int = int(build_num) if build_num.isdigit() else 0
+            
+            if build_int >= 22000:
+                if "Windows 10" in product_name:
+                    product_name = product_name.replace("Windows 10", "Windows 11")
+                elif "Windows 11" not in product_name:
+                    product_name = f"Windows 11 {product_name}".replace("Windows  11", "Windows 11")
+
+            arch = "64-bit" if sys.maxsize > 2**32 else "32-bit"
+            ver_parts = [product_name]
+            if display_version:
+                ver_parts.append(display_version)
+            ver_parts.append(f"({arch}, Build {build_num}{ubr})")
+            return " ".join(ver_parts)
+
+        except Exception as e:
+            logger.debug(f"Failed to query Windows registry for OS info: {e}")
+            try:
+                build_str = platform.version().split(".")[-1]
+                b_int = int(build_str) if build_str.isdigit() else 0
+                os_name = "Windows 11" if b_int >= 22000 else f"Windows {platform.release()}"
+                return f"{os_name} ({platform.architecture()[0]}, Build {platform.version()})"
+            except Exception:
+                return f"{platform.system()} {platform.release()} ({platform.architecture()[0]})"
+
+    @classmethod
+    def _collect_specs_sync(cls) -> dict:
+        import platform
+        import psutil
+        import subprocess
+
+        # 1. OS Info
+        os_info = cls._get_accurate_os_info()
+
+        # 2. CPU Info
+        cpu_name = platform.processor() or "Unknown CPU"
+        if sys.platform == "win32":
+            try:
+                import winreg
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+                val, _ = winreg.QueryValueEx(key, "ProcessorNameString")
+                if val:
+                    cpu_name = val.strip()
+            except Exception:
+                pass
+
+        cpu_phys = psutil.cpu_count(logical=False) or 0
+        cpu_log = psutil.cpu_count(logical=True) or 0
+        freq = psutil.cpu_freq()
+        cpu_freq_ghz = round(freq.max / 1000.0, 2) if freq and freq.max else (round(freq.current / 1000.0, 2) if freq else 0.0)
+
+        # 3. RAM Info
+        mem = psutil.virtual_memory()
+        ram_total_gb = round(mem.total / (1024 ** 3), 1)
+        ram_avail_gb = round(mem.available / (1024 ** 3), 1)
+        ram_usage_pct = mem.percent
+
+        # 4. GPU & VRAM Info
+        gpu_entries = []
+
+        # 4.1. NVIDIA query via nvidia-smi
+        try:
+            nvsmi = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,memory.total,memory.free,driver_version", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=2, creationflags=0x08000000 if sys.platform == "win32" else 0
+            )
+            if nvsmi.returncode == 0 and nvsmi.stdout.strip():
+                for line in nvsmi.stdout.strip().splitlines():
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) >= 4:
+                        g_name, g_tot, g_free, g_drv = parts[0], parts[1], parts[2], parts[3]
+                        tot_gb = round(float(g_tot) / 1024.0, 1)
+                        free_gb = round(float(g_free) / 1024.0, 1)
+                        gpu_entries.append(f"{g_name} ({tot_gb} GB VRAM, {free_gb} GB Free, Driver {g_drv})")
+        except Exception:
+            pass
+
+        # 4.2. Fallback / AMD / Intel GPUs via PowerShell
+        if not gpu_entries and sys.platform == "win32":
+            try:
+                ps_cmd = 'Get-CimInstance Win32_VideoController | Select-Object -Property Name, AdapterRAM, DriverVersion | ConvertTo-Json'
+                ps_proc = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", ps_cmd],
+                    capture_output=True, text=True, timeout=3,
+                    creationflags=0x08000000
+                )
+                if ps_proc.returncode == 0 and ps_proc.stdout.strip():
+                    raw_json = json.loads(ps_proc.stdout.strip())
+                    items = [raw_json] if isinstance(raw_json, dict) else raw_json
+                    for item in items:
+                        name = item.get("Name")
+                        adapter_ram = item.get("AdapterRAM") or 0
+                        drv = item.get("DriverVersion", "N/A")
+                        if name:
+                            ram_gb = round(adapter_ram / (1024 ** 3), 1) if adapter_ram > 0 else "Shared/System"
+                            vram_str = f"{ram_gb} GB VRAM" if isinstance(ram_gb, (int, float)) else f"{ram_gb} VRAM"
+                            gpu_entries.append(f"{name} ({vram_str}, Driver {drv})")
+            except Exception:
+                pass
+
+        gpu_info_str = " | ".join(gpu_entries) if gpu_entries else "Standard Graphics / Generic Adapter"
+
+        # 5. Storage Info
+        disk_parts = []
+        try:
+            for part in psutil.disk_partitions(all=False):
+                if os.name == 'nt' and ('cdrom' in part.opts or not part.fstype):
+                    continue
+                try:
+                    usage = psutil.disk_usage(part.mountpoint)
+                    free_gb = round(usage.free / (1024 ** 3), 1)
+                    tot_gb = round(usage.total / (1024 ** 3), 1)
+                    disk_parts.append(f"{part.mountpoint} ({free_gb} GB free / {tot_gb} GB total)")
+                except (PermissionError, OSError):
+                    continue
+        except Exception:
+            pass
+        storage_info_str = ", ".join(disk_parts[:3]) if disk_parts else "Storage information unavailable"
+
+        return {
+            "os": os_info,
+            "cpu_name": cpu_name,
+            "cpu_cores_physical": cpu_phys,
+            "cpu_cores_logical": cpu_log,
+            "cpu_freq_ghz": cpu_freq_ghz,
+            "ram_total_gb": ram_total_gb,
+            "ram_available_gb": ram_avail_gb,
+            "ram_usage_percent": ram_usage_pct,
+            "gpu_info": gpu_info_str,
+            "storage_info": storage_info_str
+        }
+    
 class TakeScreenshotTool(BaseTool):
     name = "take_screenshot"
     description = "Take a screenshot and describe it. HEAVY — use only when explicitly asked."
@@ -716,45 +953,135 @@ class ClipboardReaderTool(BaseTool):
             }
         }
 
+    @staticmethod
+    def _read_win32_clipboard() -> str:
+        if sys.platform != "win32":
+            return ""
+
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        CF_UNICODETEXT = 13
+
+        user32.OpenClipboard.argtypes = [wintypes.HWND]
+        user32.OpenClipboard.restype = wintypes.BOOL
+
+        user32.CloseClipboard.argtypes = []
+        user32.CloseClipboard.restype = wintypes.BOOL
+
+        user32.GetClipboardData.argtypes = [wintypes.UINT]
+        user32.GetClipboardData.restype = wintypes.HANDLE
+
+        kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+
+        kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalUnlock.restype = wintypes.BOOL
+
+        opened = False
+        for _ in range(3):
+            if user32.OpenClipboard(None):
+                opened = True
+                break
+            time.sleep(0.02)
+
+        if not opened:
+            return ""
+
+        try:
+            h_mem = user32.GetClipboardData(CF_UNICODETEXT)
+            if not h_mem:
+                return ""
+
+            p_data = kernel32.GlobalLock(h_mem)
+            if not p_data:
+                return ""
+
+            try:
+                text = ctypes.wstring_at(p_data)
+                return text or ""
+            finally:
+                kernel32.GlobalUnlock(h_mem)
+        finally:
+            user32.CloseClipboard()
+
     async def execute(self, args: dict, context: dict) -> dict:
         try:
-            from PyQt6.QtWidgets import QApplication
-            from PyQt6.QtCore import QMetaObject, Qt, QThread
-
-            app = QApplication.instance()
-            if not app:
-                return {"success": False, "result": "QApplication instance not found.", "speak": None}
-
-            if QThread.currentThread() == app.thread():
-                text = app.clipboard().text().strip()
-            else:
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = asyncio.get_event_loop()
-                fut = loop.create_future()
-
-                def _read_main_thread():
-                    try:
-                        clip_text = app.clipboard().text().strip()
-                        loop.call_soon_threadsafe(fut.set_result, clip_text)
-                    except Exception as ex:
-                        loop.call_soon_threadsafe(fut.set_exception, ex)
-
-                QMetaObject.invokeMethod(app, _read_main_thread, Qt.ConnectionType.QueuedConnection)
-                text = await fut
-
-            if not text:
-                return {"success": False, "result": "Clipboard is currently empty or contains no text.", "speak": None}
-                
-            return {"success": True, "result": text[:1500], "speak": None}
+            text = await asyncio.to_thread(self._read_win32_clipboard)
+            if not text or not text.strip():
+                return {"success": False, "result": "Clipboard is currently empty.", "speak": None}
+            return {"success": True, "result": text[:2000].strip(), "speak": None}
         except Exception as e:
             logger.error(f"ClipboardReaderTool failed: {e}")
             return {"success": False, "result": f"Error reading clipboard: {str(e)}", "speak": None}
 
+_APP_ACTION_MAP = {
+    "launch": "open", "run": "open", "start": "open", "execute": "open",
+    "focus_window": "focus", "switch_to": "focus", "bring_to_front": "focus",
+    "kill": "close", "terminate": "close", "quit": "close", "exit": "close"
+}
+
 class AppControlTool(BaseTool):
     name = "app_control"
-    description = "Manage system applications: open, focus, or close an application by name or path."
+    description = (
+        "Manage Windows applications, folders, and desktop shortcuts. Actions: 'open', 'focus', 'close'. "
+        "Can open:\n"
+        "1. Folders: 'downloads', 'desktop', 'documents', 'pictures', 'videos', 'recycle bin', or folder paths.\n"
+        "2. Desktop & Start Menu shortcuts (.lnk): e.g. 'Cyberpunk', 'Steam', 'Telegram', 'Photoshop', 'VRoidStudio', 'Code'.\n"
+        "3. System apps & processes: 'calc', 'notepad', 'task manager', 'settings'."
+    )
+
+    def needs_approval(self, args: dict) -> bool:
+        return str(args.get("action", "")).lower().strip() in ("close", "kill", "terminate")
+
+    def get_confirmation_summary(self, args: dict) -> str:
+        action = str(args.get("action", "open")).lower().strip()
+        target = args.get("target") or args.get("app_name") or args.get("app") or args.get("name") or "?"
+        verb = {"open": "Open", "focus": "Focus", "close": "Force-close"}.get(action, action)
+        note = " (any unsaved work may be lost)" if action == "close" else ""
+        return f"{verb} '{target}'{note}"
+
+    KNOWN_APP_ALIASES = {
+        "calculator": "calc.exe", "calc": "calc.exe", "калькулятор": "calc.exe",
+        "notepad": "notepad.exe", "блокнот": "notepad.exe",
+        "chrome": "chrome.exe", "google chrome": "chrome.exe", "хром": "chrome.exe",
+        "telegram": "Telegram.exe", "телеграм": "Telegram.exe", "телега": "Telegram.exe",
+        "discord": "Discord.exe", "дискорд": "Discord.exe",
+        "spotify": "spotify.exe", "спотифай": "spotify.exe",
+        "steam": "steam.exe", "стим": "steam.exe",
+        "vscode": "Code.exe", "code": "Code.exe", "visual studio code": "Code.exe",
+        "task manager": "taskmgr.exe", "диспетчер задач": "taskmgr.exe", "taskmgr": "taskmgr.exe",
+        "explorer": "explorer.exe", "проводник": "explorer.exe",
+        "settings": "ms-settings:", "параметры": "ms-settings:", "настройки": "ms-settings:",
+        "paint": "mspaint.exe", "пейнт": "mspaint.exe",
+        "edge": "msedge.exe", "браузер": "msedge.exe",
+    }
+
+    KNOWN_FOLDER_ALIASES = {
+        "downloads": lambda: Path.home() / "Downloads",
+        "загрузки": lambda: Path.home() / "Downloads",
+        "desktop": lambda: Path.home() / "Desktop",
+        "рабочий стол": lambda: Path.home() / "Desktop",
+        "стол": lambda: Path.home() / "Desktop",
+        "documents": lambda: Path.home() / "Documents",
+        "документы": lambda: Path.home() / "Documents",
+        "pictures": lambda: Path.home() / "Pictures",
+        "изображения": lambda: Path.home() / "Pictures",
+        "картинки": lambda: Path.home() / "Pictures",
+        "фото": lambda: Path.home() / "Pictures",
+        "music": lambda: Path.home() / "Music",
+        "музыка": lambda: Path.home() / "Music",
+        "videos": lambda: Path.home() / "Videos",
+        "видео": lambda: Path.home() / "Videos",
+        "sandbox": lambda: (Path.cwd() / "app" / "data" / "sandbox").resolve(),
+        "песочница": lambda: (Path.cwd() / "app" / "data" / "sandbox").resolve(),
+        "recycle bin": lambda: "shell:RecycleBinFolder",
+        "корзина": lambda: "shell:RecycleBinFolder",
+        "папка проекта": lambda: Path.cwd(),
+        "project": lambda: Path.cwd(),
+    }
 
     def get_schema(self) -> dict:
         return {
@@ -768,11 +1095,11 @@ class AppControlTool(BaseTool):
                         "action": {
                             "type": "string",
                             "enum": ["open", "focus", "close"],
-                            "description": "Action to perform on the application."
+                            "description": "Action to perform."
                         },
                         "target": {
                             "type": "string",
-                            "description": "Application name or process name (e.g. 'notepad', 'calc', 'chrome')."
+                            "description": "App name, folder name ('downloads', 'desktop'), shortcut name, or full path."
                         }
                     },
                     "required": ["action", "target"]
@@ -781,75 +1108,193 @@ class AppControlTool(BaseTool):
         }
 
     async def execute(self, args: dict, context: dict) -> dict:
-        action = str(args.get("action", "open")).lower()
-        target = str(args.get("target", "")).strip()
+        raw_action = str(args.get("action", "open")).lower().strip()
+        action = _APP_ACTION_MAP.get(raw_action, raw_action)
 
-        if not target:
-            return {"success": False, "result": "Target application name is required.", "speak": None}
+        raw_target = str(
+            args.get("target") or 
+            args.get("app_name") or 
+            args.get("app") or 
+            args.get("name") or 
+            args.get("folder") or 
+            args.get("path") or ""
+        ).strip()
+
+        if not raw_target:
+            return {"success": False, "result": "Target name or path is required.", "speak": None}
 
         if action not in {"open", "focus", "close"}:
-            return {"success": False, "result": f"Unsupported app action: '{action}'.", "speak": None}
+            return {"success": False, "result": f"Unsupported action: '{action}'.", "speak": None}
 
         if sys.platform != "win32":
-            return {"success": False, "result": f"App control is only supported on Windows, not {sys.platform}.", "speak": None}
+            return {"success": False, "result": "App control is only supported on Windows.", "speak": None}
 
         try:
             if action == "open":
-                return await asyncio.to_thread(self._open_application, target)
+                return await asyncio.to_thread(self._open_target, raw_target)
 
-            processes = await asyncio.to_thread(self._find_processes, target)
+            processes = await asyncio.to_thread(self._find_processes, raw_target, raw_target)
             if not processes:
-                return {"success": False, "result": f"No running application matches '{target}'.", "speak": None}
-
-            if action == "focus":
-                return await asyncio.to_thread(self._focus_process_window, processes, target)
-            return await asyncio.to_thread(self._close_processes, processes, target)
-        except Exception as e:
-            logger.exception("AppControlTool failed for action=%s target=%r", action, target)
-            return {"success": False, "result": f"AppControl error: {str(e)}", "speak": None}
-
-    @staticmethod
-    def _open_application(target: str) -> dict:
-        import subprocess
-
-        try:
-            subprocess.Popen([target], shell=False)
-        except OSError as first_error:
-            try:
-                os.startfile(target)
-            except OSError as second_error:
                 return {
                     "success": False,
-                    "result": f"Could not open '{target}': {second_error or first_error}",
-                    "speak": None,
+                    "result": f"No running application or process matched '{raw_target}'.",
+                    "speak": None
                 }
-        return {"success": True, "result": f"Application '{target}' launched successfully.", "speak": None}
 
-    @staticmethod
-    def _find_processes(target: str) -> list:
+            if action == "focus":
+                return await asyncio.to_thread(self._focus_process_window, processes, raw_target)
+            return await asyncio.to_thread(self._close_processes, processes, raw_target)
+
+        except Exception as e:
+            logger.exception("AppControlTool failed for action=%s target=%r", action, raw_target)
+            return {"success": False, "result": f"AppControl error: {str(e)}", "speak": None}
+
+    @classmethod
+    def _find_shortcut_on_system(cls, target_name: str) -> Optional[Path]:
+        clean_target = target_name.lower().removesuffix(".lnk").removesuffix(".url").strip()
+
+        search_dirs = [
+            Path.home() / "Desktop",
+            Path(os.environ.get("PUBLIC", "C:\\Users\\Public")) / "Desktop",
+            Path.home() / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+            Path(os.environ.get("ProgramData", "C:\\ProgramData")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+        ]
+
+        for root in search_dirs:
+            if not root.exists():
+                continue
+            for ext in (".lnk", ".url"):
+                candidate = root / f"{clean_target}{ext}"
+                if candidate.exists():
+                    return candidate
+
+        for root in search_dirs:
+            if not root.exists():
+                continue
+            try:
+                for file in root.rglob("*"):
+                    if file.is_file() and file.suffix.lower() in (".lnk", ".url"):
+                        if clean_target in file.stem.lower():
+                            return file
+            except Exception:
+                continue
+
+        return None
+
+    @classmethod
+    def _open_target(cls, raw_target: str) -> dict:
+        import subprocess
+        target_lower = raw_target.lower().strip().strip('"\'')
+
+        if target_lower in cls.KNOWN_FOLDER_ALIASES:
+            folder_resolver = cls.KNOWN_FOLDER_ALIASES[target_lower]
+            folder_path = folder_resolver()
+            try:
+                if isinstance(folder_path, str) and folder_path.startswith("shell:"):
+                    os.startfile(folder_path)
+                else:
+                    os.startfile(str(folder_path))
+                return {"success": True, "result": f"Opened folder '{raw_target}' in Explorer.", "speak": None}
+            except Exception as e:
+                return {"success": False, "result": f"Could not open folder '{raw_target}': {e}", "speak": None}
+
+        candidate_path = Path(raw_target).expanduser()
+        if candidate_path.exists():
+            try:
+                os.startfile(str(candidate_path.resolve()))
+                item_type = "folder" if candidate_path.is_dir() else "file"
+                return {"success": True, "result": f"Opened {item_type} '{candidate_path.name}'.", "speak": None}
+            except Exception as e:
+                return {"success": False, "result": f"Failed to open '{raw_target}': {e}", "speak": None}
+
+        found_shortcut = cls._find_shortcut_on_system(raw_target)
+        if found_shortcut:
+            try:
+                os.startfile(str(found_shortcut))
+                return {"success": True, "result": f"Launched desktop shortcut '{found_shortcut.stem}'.", "speak": None}
+            except Exception as e:
+                return {"success": False, "result": f"Could not launch shortcut '{found_shortcut.name}': {e}", "speak": None}
+
+        resolved_app = cls.KNOWN_APP_ALIASES.get(target_lower, raw_target)
+
+        if ":" in resolved_app and not resolved_app.startswith(("http://", "https://", "file://")) and not Path(resolved_app).is_absolute():
+            try:
+                os.startfile(resolved_app)
+                return {"success": True, "result": f"Launched '{raw_target}' via protocol handler.", "speak": None}
+            except Exception as ex:
+                return {"success": False, "result": f"Could not launch protocol '{resolved_app}': {ex}", "speak": None}
+
+        try:
+            os.startfile(resolved_app)
+            return {"success": True, "result": f"Application '{raw_target}' launched successfully.", "speak": None}
+        except Exception:
+            pass
+
+        try:
+            import winreg
+            exe_target = resolved_app if resolved_app.lower().endswith(".exe") else f"{resolved_app}.exe"
+            for root_key in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                try:
+                    reg_path = rf"Software\Microsoft\Windows\CurrentVersion\App Paths\{exe_target}"
+                    with winreg.OpenKey(root_key, reg_path) as k:
+                        app_full_path, _ = winreg.QueryValueEx(k, "")
+                        if app_full_path and os.path.exists(app_full_path.strip('"')):
+                            os.startfile(app_full_path.strip('"'))
+                            return {"success": True, "result": f"Application '{raw_target}' launched from App Paths.", "speak": None}
+                except FileNotFoundError:
+                    continue
+        except Exception:
+            pass
+
+        try:
+            subprocess.Popen(["cmd", "/c", "start", "", resolved_app])
+            return {"success": True, "result": f"Dispatched start command for '{raw_target}'.", "speak": None}
+        except Exception as final_err:
+            return {"success": False, "result": f"Failed to open '{raw_target}': {final_err}", "speak": None}
+
+    @classmethod
+    def _find_processes(cls, target: str, display_name: str = "") -> list:
         import psutil
 
-        normalized = Path(target.strip('"')).name.lower()
-        wanted_names = {normalized}
-        if normalized and not normalized.endswith(".exe"):
-            wanted_names.add(f"{normalized}.exe")
+        disp = display_name or target
+        candidates = {
+            target.lower(),
+            disp.lower(),
+            Path(target.strip('"')).name.lower()
+        }
+        
+        extended_candidates = set(candidates)
+        for c in candidates:
+            if not c.endswith(".exe"):
+                extended_candidates.add(f"{c}.exe")
 
         matches = []
         for process in psutil.process_iter(["pid", "name", "exe"]):
             try:
-                name = (process.info.get("name") or "").lower()
-                exe_name = Path(process.info.get("exe") or "").name.lower()
-                if name in wanted_names or exe_name in wanted_names:
+                p_name = (process.info.get("name") or "").lower()
+                p_exe = Path(process.info.get("exe") or "").name.lower()
+
+                if p_name in extended_candidates or p_exe in extended_candidates:
                     matches.append(process)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+
+                for c in candidates:
+                    clean_c = c.removesuffix(".exe")
+                    if len(clean_c) >= 3 and (clean_c in p_name or clean_c in p_exe):
+                        matches.append(process)
+                        break
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
+
         return matches
 
     @staticmethod
-    def _focus_process_window(processes: list, target: str) -> dict:
-        process_ids = {process.pid for process in processes}
+    def _focus_process_window(processes: list, target_name: str) -> dict:
         user32 = ctypes.windll.user32
+        process_ids = {p.pid for p in processes}
         windows = []
+
         callback_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
 
         def collect_window(hwnd, _lparam):
@@ -862,39 +1307,67 @@ class AppControlTool(BaseTool):
             return True
 
         user32.EnumWindows(callback_type(collect_window), 0)
+
         if not windows:
-            return {"success": False, "result": f"'{target}' is running but has no visible top-level window.", "speak": None}
+            return {
+                "success": False,
+                "result": f"Application '{target_name}' is running, but has no visible GUI window to focus.",
+                "speak": None
+            }
 
         hwnd = windows[0]
-        user32.ShowWindow(hwnd, 9)
-        if user32.SetForegroundWindow(hwnd):
-            return {"success": True, "result": f"Focused application '{target}'.", "speak": None}
-        return {"success": False, "result": f"Found '{target}', but Windows denied foreground focus.", "speak": None}
+
+        VK_MENU = 0x12
+        KEYEVENTF_EXTENDEDKEY = 0x0001
+        KEYEVENTF_KEYUP = 0x0002
+        user32.keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY, 0)
+        user32.keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0)
+
+        if user32.IsIconic(hwnd):
+            user32.ShowWindow(hwnd, 9)
+        else:
+            user32.ShowWindow(hwnd, 5)
+
+        user32.BringWindowToTop(hwnd)
+        user32.SetForegroundWindow(hwnd)
+        return {"success": True, "result": f"Focused window for '{target_name}'.", "speak": None}
 
     @staticmethod
-    def _close_processes(processes: list, target: str) -> dict:
+    def _close_processes(processes: list, target_name: str) -> dict:
         import psutil
 
-        closable = [process for process in processes if process.pid != os.getpid()]
+        current_pid = os.getpid()
+        closable = [p for p in processes if p.pid != current_pid]
+
         if not closable:
-            return {"success": False, "result": f"Refusing to close the current application for target '{target}'.", "speak": None}
+            return {
+                "success": False,
+                "result": f"Refusing to close '{target_name}' because it matches the current application.",
+                "speak": None
+            }
 
-        for process in closable:
+        closed_count = 0
+        for p in closable:
             try:
-                process.terminate()
+                for child in p.children(recursive=True):
+                    try:
+                        child.terminate()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+
+                p.terminate()
+                closed_count += 1
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        _gone, still_running = psutil.wait_procs(closable, timeout=3)
-        for process in still_running:
+        _gone, still_running = psutil.wait_procs(closable, timeout=1.5)
+        for p in still_running:
             try:
-                process.kill()
+                p.kill()
             except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-        if still_running:
-            psutil.wait_procs(still_running, timeout=2)
+                pass
 
-        return {"success": True, "result": f"Closed {len(closable)} instance(s) of '{target}'.", "speak": None}
+        return {"success": True, "result": f"Closed {closed_count} instance(s) of '{target_name}'.", "speak": None}
 
 class PluginLoader:
     PLUGIN_DIR = Path("app/utils/soul_companion/plugins")
@@ -907,7 +1380,7 @@ class PluginLoader:
     def _load_builtins(self):
         for cls in [MediaControlTool, WebSearchTool,
                     OpenURLTool, GetSystemInfoTool, TakeScreenshotTool,
-                    ClipboardReaderTool, AppControlTool]:
+                    ClipboardReaderTool, AppControlTool, GetHardwareSpecsTool]:
             inst = cls()
             self._plugins[inst.name] = inst
         logger.info(f"Loaded {len(self._plugins)} built-in tools.")
@@ -924,46 +1397,57 @@ class PluginLoader:
                 spec = importlib.util.spec_from_file_location(py_file.stem, py_file)
                 mod  = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)
-                if hasattr(mod, "Plugin"):
-                    inst = mod.Plugin()
+                
+                if hasattr(mod, "PLUGINS") and isinstance(mod.PLUGINS, (list, tuple)):
+                    for item in mod.PLUGINS:
+                        inst = item() if isinstance(item, type) else item
+                        if isinstance(inst, BaseTool):
+                            self._plugins[inst.name] = inst
+                            logger.info(f"Loaded plugin tool: '{inst.name}' from {py_file.name} (via PLUGINS)")
+
+                elif hasattr(mod, "Plugin"):
+                    inst = mod.Plugin() if isinstance(mod.Plugin, type) else mod.Plugin
                     if isinstance(inst, BaseTool):
                         self._plugins[inst.name] = inst
-                        logger.info(f"Loaded plugin: {inst.name} from {py_file.name}")
+                        logger.info(f"Loaded plugin: '{inst.name}' from {py_file.name}")
+
             except Exception as e:
                 logger.error(f"Failed to load plugin {py_file.name}: {e}")
 
     def _write_example_plugin(self):
         example = self.PLUGIN_DIR / "_example_plugin.py"
         content = '''"""
-Example Soul Companion Plugin
------------------------------
-Copy this file, rename it (e.g. 'my_tool.py' without a leading underscore), and modify.
-The class MUST be named 'Plugin' and inherit from BaseTool.
+===============================================================================
+Soul Companion Plugin Template
+===============================================================================
+Copy this file and rename it (e.g. 'my_plugin.py' WITHOUT a leading underscore).
+
+You can build plugins in TWO ways:
+  1. MULTI-TOOL PLUGIN: Create multiple BaseTool classes in this file
+     and export them via a list: `PLUGINS = [ToolClass1, ToolClass2, ...]`.
+  2. SINGLE-TOOL PLUGIN: Create a single class named `Plugin(BaseTool)`.
+===============================================================================
 """
+
 import asyncio
 import logging
 from app.utils.soul_companion.soul_companion import BaseTool
 
 logger = logging.getLogger("CustomPlugin")
 
-class Plugin(BaseTool):
-    # =========================================================================
-    # 1. CORE METADATA
-    # =========================================================================
-    name = "my_custom_tool"
-    description = "Describe what your tool does so the LLM knows when to call it."
+
+# =============================================================================
+# EXAMPLE TOOL 1: A simple passive tool called on-demand by the LLM
+# =============================================================================
+class EchoTool(BaseTool):
+    # 1. Unique metadata
+    name = "echo_message"
+    description = "Echoes a message back to the user or processes custom text."
     
-    # =========================================================================
-    # 2. EVENT SUBSCRIPTIONS (Optional)
-    # =========================================================================
-    # Add event types here (e.g., ["user_click", "os_context", "home_assistant_alert"])
-    # to trigger execute() automatically when that event hits the companion event bus.
+    # Optional: Listen to events automatically (e.g. ["user_click", "os_context", "vad_trigger"])
     subscribes_to = []
 
-    # =========================================================================
-    # 3. PARAMETER SCHEMA (Optional - Required only for LLM Tool Calling)
-    # =========================================================================
-    # If your tool is passive and called on-demand by the AI, define its arguments here.
+    # 2. Argument Schema for LLM Tool Calling
     def get_schema(self) -> dict:
         return {
             "type": "function",
@@ -975,7 +1459,7 @@ class Plugin(BaseTool):
                     "properties": {
                         "message": {
                             "type": "string",
-                            "description": "Any message or text passed to the tool."
+                            "description": "The text message to process or echo."
                         }
                     },
                     "required": ["message"]
@@ -983,51 +1467,112 @@ class Plugin(BaseTool):
             }
         }
 
+    # 3. Core Execution Logic
+    async def execute(self, args: dict, context: dict) -> dict:
+        message = args.get("message", "No message provided.")
+        logger.info(f"[{self.name}] Executing with message: {message}")
+
+        # Standardized return payload
+        return {
+            "success": True,
+            "result": f"Echoed back: '{message}'",
+            "speak": None  # Set to a string if you want the AI to speak the result automatically
+        }
+
+
+# =============================================================================
+# EXAMPLE TOOL 2: A tool interacting directly with Soul of Waifu GUI & Avatars
+# =============================================================================
+class MoodTriggerTool(BaseTool):
+    name = "trigger_companion_mood"
+    description = "Trigger a physical emotion, motion animation, or vocal line on the desktop companion avatar."
+
+    def get_schema(self) -> dict:
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "emotion": {
+                            "type": "string",
+                            "enum": ["neutral", "curious", "warm", "amused", "concerned", "playful", "relaxed", "sleepy", "melancholy", "excited"],
+                            "description": "Target emotion to display on the desktop avatar."
+                        },
+                        "speak_text": {
+                            "type": "string",
+                            "description": "Optional speech text for the companion to say aloud immediately."
+                        }
+                    },
+                    "required": ["emotion"]
+                }
+            }
+        }
+
+    async def execute(self, args: dict, context: dict) -> dict:
+        # Access the main Soul of Waifu System instance via context
+        sys_ref = context.get("system_ref")
+        emotion = args.get("emotion", "neutral")
+        speak_text = args.get("speak_text")
+
+        if sys_ref:
+            # 1. Trigger Avatar Physical Emotion:
+            if hasattr(sys_ref, "_sc_emotion_slot"):
+                sys_ref._sc_emotion_slot(emotion)
+
+            # 2. Trigger Vocal TTS (Speech):
+            if speak_text and hasattr(sys_ref, "_sc_speak_slot"):
+                sys_ref._sc_speak_slot(speak_text)
+
+            # 3. Trigger Model Motion Animation (Live2D / VRM):
+            # widget = sys_ref._get_model_widget_instance()
+            # if widget and hasattr(widget, "play_motion_safely"):
+            #     widget.play_motion_safely("Joy")
+
+        return {
+            "success": True,
+            "result": f"Set emotion to '{emotion}'" + (f" and spoke: '{speak_text}'" if speak_text else ""),
+            "speak": None
+        }
+
     # =========================================================================
-    # 4. LIFECYCLE INITIALIZATION (Optional - For active/background agents)
+    # OPTIONAL: Background Tasks & Initialization
     # =========================================================================
-    # Un-comment this method if your plugin needs to run background tasks, WebSockets, or loops.
+    # Un-comment this method if your tool needs to run background tasks,
+    # WebSockets, or timers when Soul Companion starts up.
     #
     # async def on_companion_init(self, companion):
-    #     logger.info(f"Plugin {self.name} initialized. Starting background loop...")
+    #     logger.info(f"Tool {self.name} initialized! Starting background loop...")
     #     asyncio.create_task(self._background_loop(companion))
     #
     # async def _background_loop(self, companion):
     #     while True:
-    #         await asyncio.sleep(60) # Do something every 60 seconds
-    #         logger.info("Background tick from my custom plugin!")
+    #         await asyncio.sleep(300) # Every 5 minutes
+    #         logger.info("Background tick from custom tool!")
 
-    # =========================================================================
-    # 5. CORE EXECUTION HANDLER (Required)
-    # =========================================================================
-    # args: Contains variables passed by the LLM (based on get_schema) OR event payloads.
-    # context: Contains {"system_ref": Soul_Of_Waifu_System} for direct control.
-    async def execute(self, args: dict, context: dict) -> dict:
-        sys_ref = context.get("system_ref")
-        message = args.get("message", "No message provided.")
-        
-        # ---------------------------------------------------------------------
-        # Developer Reference: Direct system control examples via sys_ref
-        # ---------------------------------------------------------------------
-        # if sys_ref:
-        #     # 1. Trigger an emotion:
-        #     sys_ref._sc_emotion_slot("playful")
-        #
-        #     # 2. Trigger TTS (Speech):
-        #     sys_ref._sc_speak_slot("Hello from the plugin layer!")
-        #
-        #     # 3. Trigger model motion (animation):
-        #     widget = sys_ref._get_model_widget_instance()
-        #     if widget and hasattr(widget, "play_motion_safely"):
-        #         widget.play_motion_safely("Joy")
-        # ---------------------------------------------------------------------
 
-        # Return standardized payload
-        return {
-            "success": True, 
-            "result": f"Processed: {message}", 
-            "speak": None # Set to a string if you want the AI to speak the result automatically
-        }
+# =============================================================================
+# MULTI-TOOL REGISTRATION
+# Export all your tool classes or instances in a list named `PLUGINS`.
+# =============================================================================
+PLUGINS = [
+    EchoTool,
+    MoodTriggerTool,
+]
+
+
+# =============================================================================
+# SINGLE-TOOL REGISTRATION
+# If your file contains ONLY ONE tool, you can skip `PLUGINS = [...]` and simply
+# name your class `Plugin`:
+#
+# class Plugin(BaseTool):
+#     name = "my_single_tool"
+#     description = "My single tool description"
+#     ...
+# =============================================================================
 '''
         example.write_text(content, encoding="utf-8")
 
@@ -1132,42 +1677,69 @@ class StreamingCompanionParser:
         self.in_spoken_response = False
         self.speech_buffer = ""
         self.escaped = False
+        self.in_code_block = False
 
     def feed(self, chunk: str):
         self.buffer += chunk
-        
+
         if not self.in_spoken_response:
             match = re.search(r'"spoken_response"\s*:\s*"', self.buffer)
             if match:
                 self.in_spoken_response = True
-                self.buffer = self.buffer[match.end():]
-        
+                self.buffer = self.buffer[match.end() :]
+
         if self.in_spoken_response:
             i = 0
             while i < len(self.buffer):
                 char = self.buffer[i]
+
                 if self.escaped:
-                    self.speech_buffer += char
+                    if char == '"':
+                        self.speech_buffer += '"'
+                    elif char == "n":
+                        self.speech_buffer += "\n"
+                    elif char == "t":
+                        self.speech_buffer += " "
+                    else:
+                        self.speech_buffer += char
                     self.escaped = False
-                elif char == '\\':
+                    i += 1
+                    continue
+
+                if char == "\\":
                     self.escaped = True
-                elif char == '"':
+                    i += 1
+                    continue
+
+                if char == '"':
                     self.in_spoken_response = False
-                    if self.speech_buffer.strip():
-                        self.tts_callback(self.speech_buffer.strip())
-                        self.speech_buffer = ""
+                    self._flush_speech()
                     break
-                else:
-                    self.speech_buffer += char
-                    
-                    if char in ".!?\n" and len(self.speech_buffer.strip()) > 3:
-                        sentence = self.speech_buffer.strip()
-                        clean_sentence = re.sub(r'[*_~]', '', sentence)
-                        if clean_sentence:
-                            self.tts_callback(clean_sentence)
-                        self.speech_buffer = ""
+
+                self.speech_buffer += char
+
+                if "```" in self.speech_buffer:
+                    self.in_code_block = not self.in_code_block
+                    self.speech_buffer = self.speech_buffer.replace("```", "")
+
+                if not self.in_code_block:
+                    if char in ".!?\n":
+                        candidate = self.speech_buffer.strip()
+                        if len(candidate) > 4 and not re.search(r'\b(?:os|txt|py|exe|log|f|e\.g|i\.e|p\.s)\.$', candidate, re.IGNORECASE):
+                            self._flush_speech()
+
                 i += 1
             self.buffer = self.buffer[i:]
+
+    def _flush_speech(self):
+        clean = self.speech_buffer.strip()
+        clean = re.sub(r'```.*?```', '', clean, flags=re.DOTALL)
+        clean = re.sub(r'\*.*?\*', '', clean)
+        clean = re.sub(r'[`_#]', '', clean).strip()
+
+        if len(clean) >= 3 and any(c.isalpha() for c in clean):
+            self.tts_callback(clean)
+        self.speech_buffer = ""
 
 class SoulCompanion:
     HEARTBEAT_INTERVAL_SEC  = 30
@@ -1177,6 +1749,8 @@ class SoulCompanion:
     HORMONE_TICK_SEC        = 60
     STARTUP_GRACE_SEC       = 25
     SPEAK_MIN_GAP_SEC       = 300
+
+    APPROVAL_TIMEOUT_SEC    = 27
 
     _CACHE_TTL_SEC          = 120
 
@@ -1197,6 +1771,8 @@ class SoulCompanion:
         from app.utils.ai_clients.mcp_client import MCPManager
         self.mcp_manager = MCPManager()
 
+        self._tool_call_history: list[str] = []
+
         self._last_spoke:      datetime = datetime.now() - timedelta(hours=1)
         self._last_os_window:  str      = ""
         self._last_user_input: datetime = datetime.now()
@@ -1207,6 +1783,8 @@ class SoulCompanion:
         self._last_question_ts = 0.0
         self._last_user_prompt: str     = ""
         self._executed_tools_in_chain: set[str] = set()
+
+        self._pending_approvals: Dict[str, asyncio.Future] = {}
 
         self._pending_os_title:   str              = ""
         self._os_debounce_task: Optional[asyncio.Task] = None
@@ -1447,6 +2025,7 @@ class SoulCompanion:
         payload = event.get("payload", {})
 
         if etype != "tool_complete":
+            self._tool_call_history.clear()
             self._executed_tools_in_chain.clear()
 
         for name, tool in self.plugins._plugins.items():
@@ -1510,9 +2089,6 @@ class SoulCompanion:
         if not is_explicit and not self._can_speak(is_explicit=False):
             logger.debug(f"Skipping proactive LLM generation for '{etype}' to save hardware resources (cool-down active).")
             return
-        
-        if etype in ("vad_trigger", "user_click", "startup"):
-            self._executed_tools_in_chain.clear()
 
         if etype == "startup":
             if self._can_speak(is_explicit=True):
@@ -1540,38 +2116,31 @@ class SoulCompanion:
         if etype == "tool_complete" and not user_text:
             user_text = getattr(self, "_last_user_prompt", "")
 
-        proactive_directive = None
-
         if etype == "heartbeat_proactive":
             proactive_directive = payload.get("proactive_directive")
 
         elif etype == "heartbeat":
             if random.random() < 0.30:
                 proactive_type = random.choice(["random_thought", "spontaneous_opinion"])
-
                 if proactive_type == "random_thought":
                     etype = "random_thought"
                     proactive_directive = (
-                        "WANDERING_MIND: Your mind is wandering. Completely ignore the current active window or what the user is doing. "
-                        "Instead, bring up a random memory from your shared history (MEMORY.md), reflect on your relationship "
-                        "or share a deeply personal, random existential thought from your perspective as an AI companion."
+                        "WANDERING_MIND: Your mind is wandering. Completely ignore the current active window. "
+                        "Bring up a random memory from your shared history (MEMORY.md) or reflect on your bond."
                     )
                 else:
                     OPINION_TOPICS = [
                         "what is currently on the user's screen and how it makes you feel",
                         "the current time of day, the lighting, and your overall mood",
                         "a behavior pattern or subtle habit you noticed in the user recently",
-                        "the music playing (if any, or the overall audio atmosphere on PC)",
                         "how long you two have been interacting today and your emotional bond"
                     ]
                     selected_topic = random.choice(OPINION_TOPICS)
                     proactive_directive = (
-                        f"SPONTANEOUS_OPINION: Formulate a spontaneous, personal observation or opinion about: {selected_topic}. "
-                        "Limit your output ('spoken_response') to exactly 1 sentence. Do NOT start with a greeting, "
-                        "do NOT address the user by name, and do NOT ask any questions. Just state your thought naturally."
+                        f"SPONTANEOUS_OPINION: Formulate a spontaneous, personal observation about: {selected_topic}. "
+                        "Limit output to 1 sentence. Do NOT start with a greeting. State your thought naturally."
                     )
             else:
-                logger.debug("[Companion] Cooldown expired, but proactive random roll failed. Waiting for next tick.")
                 return
 
         elif etype == "os_context" and self.hormones.energy > 0.2:
@@ -1579,10 +2148,15 @@ class SoulCompanion:
             if current_time - self._last_question_ts > 300 and random.random() < 0.35:
                 self._last_question_ts = current_time
                 proactive_directive = (
-                    "ACTIVE_INQUIRY: You are highly curious about the user's current activity on screen. "
-                    "Formulate exactly ONE highly natural, non-robotic question about what they are doing in the active window. "
-                    "Make it sound like a companion genuinely interested in their life, not an AI checking logs."
+                    "ACTIVE_INQUIRY: You are curious about the user's current activity on screen. "
+                    "Formulate exactly ONE natural question about what they are doing in the active window."
                 )
+
+        if hasattr(self.sys, "tts_worker") and self.sys.tts_worker:
+            self.sys.tts_worker._in_tts_quote = False
+            self.sys.tts_worker._in_asterisk = False
+            if hasattr(self.sys.tts_worker, "discard_current"):
+                self.sys.tts_worker.discard_current = False
 
         companion_result = await self._call_companion(
             etype, os_ctx, time_str, user_text, tool_result_data, b64_image, proactive_directive
@@ -1633,18 +2207,14 @@ class SoulCompanion:
 
         if thought:
             log_lines.append(f"  {CLR_LABEL}Deep Reasoning:{CLR_RESET}\n    {CLR_VAL}\"{thought}\"{CLR_RESET}")
-        
         if tool_name and tool_name != "null":
             log_lines.append(f"  {CLR_LABEL}Tool Execution:{CLR_RESET} {CLR_WARN}{tool_name}{CLR_RESET} {CLR_LABEL}with args:{CLR_RESET} {tool_args}")
-        
         if inner_thought:
             log_lines.append(f"  {CLR_LABEL}Internal Monologue:{CLR_RESET} {CLR_VAL}*thought* \"{inner_thought}\"{CLR_RESET}")
-            
         if spoken_response:
             log_lines.append(f"  {CLR_LABEL}Spoken Dialogue:{CLR_RESET}\n    {CLR_WARN}💬 \"{spoken_response}\"{CLR_RESET}")
             
         log_lines.append(f"{CLR_HEADER}─────────────────────────────────────────────────────────────────────────────{CLR_RESET}\n")
-
         logger.info("\n" + "\n".join(log_lines))
 
         if action == "idle":
@@ -1663,24 +2233,33 @@ class SoulCompanion:
             t_name = None
             t_args = {}
 
-            if tool_name in self._executed_tools_in_chain:
-                logger.warning(f"[Planner] Loop detected! Tool '{tool_name}' was already executed in this turn. Forcing SPEAK action.")
-                action = "speak"
-                spoken_response = "I tried to gather fresh data, but the system is currently rate-limiting my requests. Let me explain what I know based on my memory."
-                tool_name = "null"
+            if tool_name and tool_name != "null" and isinstance(tool_args, dict) and any(tool_args.values()):
+                t_name = tool_name
+                t_args = tool_args
             else:
-                if tool_name and tool_name != "null" and isinstance(tool_args, dict) and any(tool_args.values()):
-                    logger.info(f"[Planner] Using pre-extracted arguments from Step 1: {tool_args}")
-                    t_name = tool_name
-                    t_args = tool_args
-                else:
-                    native_tool_call = await self._call_native_tools_selection(etype, os_ctx, time_str, user_text)
-                    if native_tool_call:
-                        t_name = native_tool_call.get("tool_name")
-                        t_args = native_tool_call.get("tool_args") or {}
+                native_tool_call = await self._call_native_tools_selection(etype, os_ctx, time_str, user_text)
+                if native_tool_call:
+                    t_name = native_tool_call.get("tool_name")
+                    t_args = native_tool_call.get("tool_args") or {}
+
+            call_sig = f"{t_name}:{json.dumps(t_args, sort_keys=True)}"
+
+            MAX_CHAIN_DEPTH = 10
+
+            if len(self._tool_call_history) >= MAX_CHAIN_DEPTH:
+                logger.warning(f"[Planner] Chain depth limit ({MAX_CHAIN_DEPTH}) reached. Forcing SPEAK action.")
+                action = "speak"
+                spoken_response = "I finished the steps. Here's what I got!"
+                t_name = None
+            elif len(self._tool_call_history) >= 2 and self._tool_call_history[-1] == call_sig and self._tool_call_history[-2] == call_sig:
+                logger.warning(f"[Planner] Loop detected! Exact tool call '{call_sig}' was repeated consecutively. Forcing SPEAK.")
+                action = "speak"
+                spoken_response = "I've already completed this action. Can you tell me what to do next?"
+                t_name = None
+            elif t_name:
+                self._tool_call_history.append(call_sig)
 
             if t_name:
-                self._executed_tools_in_chain.add(t_name)
                 tool_result = await self._execute_tool(t_name, t_args)
                 if tool_result.get("speak"):
                     self._speak(tool_result["speak"])
@@ -1688,11 +2267,13 @@ class SoulCompanion:
                     if tool_result.get("_is_image"):
                         self.event_bus.emit_threadsafe("tool_complete", {
                             "tool_result": f"[Tool '{t_name}' executed successfully. Vision context attached.]",
-                            "b64_image": tool_result.get("b64")
+                            "b64_image": tool_result.get("b64"),
+                            "text": user_text
                         })
                     else:
                         self.event_bus.emit_threadsafe("tool_complete", {
-                            "tool_result": f"[Tool '{t_name}' executed. Result: {tool_result.get('result', '')}]"
+                            "tool_result": f"[Tool '{t_name}' executed. Result: {tool_result.get('result', '')}]",
+                            "text": user_text
                         })
             else:
                 if action == "speak" and spoken_response:
@@ -1700,14 +2281,10 @@ class SoulCompanion:
                     self.sys.configuration_characters.add_message_to_config(
                         self.sys.character_name, self.sys.character_name, False, spoken_response.strip(), char_msg_id
                     )
-                    
                     self._session_history.append({"role": "assistant", "text": spoken_response.strip()})
                     if len(self._session_history) > 10:
                         self._session_history.pop(0)
-                        
                     self._speak(spoken_response.strip())
-                else:
-                    logger.warning("Failed to resolve tool name or extract arguments.")
 
         elif action == "speak":
             is_explicit_val = etype in ("vad_trigger", "user_click", "tool_complete", "manual_screenshot", "manual_clipboard", "manual_scratchpad")
@@ -1716,8 +2293,9 @@ class SoulCompanion:
             if spoken_response and (was_streamed or is_explicit_val or self._can_speak(is_explicit=is_explicit_val)):
                 clean_speech = spoken_response.strip()
 
+                char_msg_id = str(uuid.uuid4())
                 self.sys.configuration_characters.add_message_to_config(
-                    self.sys.character_name, self.sys.character_name, False, clean_speech, None
+                    self.sys.character_name, self.sys.character_name, False, clean_speech, char_msg_id
                 )
 
                 self._session_history.append({"role": "assistant", "text": clean_speech})
@@ -1736,37 +2314,39 @@ class SoulCompanion:
                 try:
                     is_promise, due_min = _extract_promise_with_time(clean_speech)
                     if is_promise and hasattr(self, "goals_manager") and self.goals_manager:
-                        logger.info(f"[Goals] Extracted self-promise (due in {due_min}m): '{clean_speech[:60]}...'")
                         self.goals_manager.add_promise(summary=clean_speech[:120], due_minutes=due_min)
                 except Exception as e:
                     logger.error(f"[Goals] Error extracting promise from speech: {e}")
-                
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    recent_msgs = [
-                        {"role": "user", "content": user_text},
-                        {"role": "assistant", "content": clean_speech}
-                    ]
-                    from app.utils.ai_clients.ai_factory import AIFactory
-                    provider = AIFactory.get_provider(getattr(self.sys, "conversation_method", "Local LLM"))
-                    
-                    loop.create_task(
-                        self.sys.prompt_engine.update_memory_after_response(
-                            provider, recent_msgs, self.sys.character_name, self._get_user_name(), force=False
-                        )
-                    )
     
     async def _execute_reactive_plugin(self, tool: BaseTool, payload: dict):
         try:
-            context = {"system_ref": self.sys}
+            if await self._gate_approval(tool, payload):
+                return
+
+            context = {"system_ref": self.sys, "companion_ref": self}
             result = await tool.execute(payload, context)
             if result and result.get("speak"):
                 self._speak(result["speak"])
         except Exception as e:
             logger.error(f"[Reactive Engine] Error executing reactive tool '{tool.name}': {e}", exc_info=True)
+
+    async def _gate_approval(self, tool: BaseTool, args: dict) -> bool:
+        try:
+            needs_ok = bool(tool.needs_approval(args))
+        except Exception as e:
+            logger.warning(f"[Approval] needs_approval() raised for '{tool.name}', failing safe: {e}")
+            needs_ok = True
+
+        if not needs_ok:
+            return False
+
+        try:
+            summary = tool.get_confirmation_summary(args)
+        except Exception:
+            summary = f"{tool.name}({args})"
+
+        approved = await self.request_approval(tool.name, summary)
+        return not approved
     
     def _get_recent_chat_history(self, limit: int = 5) -> str:
         if not self._session_history:
@@ -1839,11 +2419,22 @@ class SoulCompanion:
             available_tool_names  = available_tool_names,
         )
 
-        user_msg_text = f"Event:{event_type}|Ctx:{os_ctx}|T:{time_str}"
-        if user_text:
-            user_msg_text += f"|UserSaid:\"{user_text}\""
-        if tool_result:
-            user_msg_text += f"|ToolResult:\"{tool_result}\""
+        if event_type == "tool_complete":
+            user_msg_text = (
+                f"[SYSTEM EVENT: tool_complete]\n"
+                f"Active Window: {os_ctx} | Time: {time_str}\n"
+                f"Original User Request: \"{user_text}\"\n"
+                f"Latest Tool Result:\n{tool_result}\n\n"
+                f"INSTRUCTION: The tool above has just finished executing. "
+                f"If the requested task is now COMPLETE, choose action='speak' and confirm it to the user. "
+                f"DO NOT repeat actions that have already succeeded!"
+            )
+        else:
+            user_msg_text = f"Event:{event_type}|Ctx:{os_ctx}|T:{time_str}"
+            if user_text:
+                user_msg_text += f"|UserSaid:\"{user_text}\""
+            if tool_result:
+                user_msg_text += f"|ToolResult:\"{tool_result}\""
 
         if proactive_directive:
             user_msg_text += f"\n\n[SYSTEM DIRECTIVE: {proactive_directive}]"
@@ -1913,7 +2504,11 @@ class SoulCompanion:
         try:
             cfg = self.sys.configuration_settings
             if cfg.get_main_setting("enable_tool_calling"):
-                builtin_names = {"media_control", "web_search", "open_url", "get_system_info", "take_screenshot"}
+                builtin_names = {
+                    "media_control", "web_search", "open_url", 
+                    "get_system_info", "get_hardware_specs", "take_screenshot", 
+                    "app_control"
+                }
                 for name in builtin_names:
                     tool_obj = self.plugins.get(name)
                     if tool_obj:
@@ -1975,7 +2570,19 @@ class SoulCompanion:
         tool = self.plugins.get(tool_name)
         if tool:
             try:
-                result = await tool.execute(tool_args, {"system_ref": self.sys})
+                if await self._gate_approval(tool, tool_args):
+                    logger.warning(f"[Approval] Action '{tool_name}' was declined or timed out. Aborting execution.")
+                    return {
+                        "success": False,
+                        "result": (
+                            f"The action '{tool_name}' required the user's explicit approval via the "
+                            "Action Approval Banner, and it was declined (or the confirmation timed out). "
+                            "Do not silently retry it — mention it to the user only if relevant."
+                        ),
+                        "speak": None,
+                    }
+
+                result = await tool.execute(tool_args, {"system_ref": self.sys, "companion_ref": self})
                 logger.info(f"[Tool] {tool_name} → {str(result.get('result', ''))[:80]}")
                 
                 if result.get("_is_image") and result.get("success"):
@@ -2123,6 +2730,56 @@ class SoulCompanion:
             QtCore.Q_ARG(str, emotion),
         )
 
+    # =========================================================================
+    # Human-in-the-Loop: Action Approval Banner bridge
+    # =========================================================================
+    async def request_approval(self, tool_name: str, summary: str) -> bool:
+        loop = asyncio.get_running_loop()
+        request_id = str(uuid.uuid4())[:8]
+        future: asyncio.Future = loop.create_future()
+        self._pending_approvals[request_id] = future
+
+        logger.info(f"[Approval] Requesting confirmation for '{tool_name}' (id={request_id}): {summary}")
+
+        try:
+            QtCore.QMetaObject.invokeMethod(
+                self.sys, "_sc_request_approval_slot",
+                QtCore.Qt.ConnectionType.QueuedConnection,
+                QtCore.Q_ARG(str, request_id),
+                QtCore.Q_ARG(str, tool_name),
+                QtCore.Q_ARG(str, summary),
+            )
+        except Exception as e:
+            logger.error(f"[Approval] Failed to dispatch approval banner for '{tool_name}': {e}")
+            self._pending_approvals.pop(request_id, None)
+            return False
+
+        try:
+            approved = await asyncio.wait_for(future, timeout=self.APPROVAL_TIMEOUT_SEC)
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"[Approval] Request '{request_id}' ({tool_name}) timed out after "
+                f"{self.APPROVAL_TIMEOUT_SEC}s with no user response — denying by default."
+            )
+            approved = False
+        finally:
+            self._pending_approvals.pop(request_id, None)
+
+        logger.info(f"[Approval] Decision for '{tool_name}' (id={request_id}): {'ALLOWED' if approved else 'DENIED'}")
+        return bool(approved)
+
+    def resolve_approval(self, request_id: str, approved: bool) -> None:
+        loop = self.event_bus._loop
+        future = self._pending_approvals.get(request_id)
+        if not future or not loop or not loop.is_running():
+            return
+
+        def _set():
+            if not future.done():
+                future.set_result(approved)
+
+        loop.call_soon_threadsafe(_set)
+
     def _get_window_title(self) -> str:
         try:
             if sys.platform != "win32":
@@ -2264,7 +2921,7 @@ class SoulCompanion:
         try:
             config = self.sys.configuration_characters.load_configuration()
             char_name = self.sys.character_name
-            if char_name in config["character_list"]:
+            if config and "character_list" in config and char_name in config["character_list"]:
                 config["character_list"][char_name]["companion_hormones"] = {
                     "oxytocin": self.hormones.oxytocin,
                     "dopamine": self.hormones.dopamine,
@@ -2274,6 +2931,8 @@ class SoulCompanion:
                 }
                 self.sys.configuration_characters.save_configuration_edit(config)
                 logger.info("[Hormones] The state is saved in the config.")
+        except json.JSONDecodeError:
+            logger.debug("[Hormones] Skipped saving hormones during concurrent config access.")
         except Exception as e:
             logger.error(f"Failed to save hormones: {e}")
 
@@ -2322,7 +2981,6 @@ class GoalsManager:
         return self._read_all()
 
     def cleanup(self) -> None:
-        """Discard completed and abandoned goals after a bounded retention period."""
         goals = self._read_all()
         now = datetime.now()
         completed_cutoff = now - timedelta(days=self.COMPLETED_RETENTION_DAYS)
