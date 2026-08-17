@@ -7,7 +7,6 @@ import random
 import asyncio
 import logging
 import datetime
-import threading
 import uuid
 
 import numpy as np
@@ -333,6 +332,351 @@ class CampaignBoard:
         return "\n".join(lines)
 
 
+@dataclass
+class StoryArc:
+    id: str
+    title: str
+    stage: str
+    trigger_hint: str
+    gm_notes: str
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "title": self.title, "stage": self.stage,
+            "trigger_hint": self.trigger_hint, "gm_notes": self.gm_notes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "StoryArc":
+        title = str(data.get("title", "Untitled arc")).strip()[:120] or "Untitled arc"
+        stage = str(data.get("stage", "locked")).strip().lower()
+        if stage not in ("locked", "available", "active", "resolved"):
+            stage = "locked"
+        return cls(
+            id=str(data.get("id") or uuid.uuid4().hex[:12]),
+            title=title,
+            stage=stage,
+            trigger_hint=str(data.get("trigger_hint", "")).strip()[:300],
+            gm_notes=str(data.get("gm_notes", "")).strip()[:600],
+        )
+
+
+class ArcRegistry:
+    MAX_ARCS = 20
+
+    def __init__(self, arcs: Optional[list] = None):
+        self.arcs: dict[str, StoryArc] = {}
+        for raw in arcs or []:
+            arc = raw if isinstance(raw, StoryArc) else StoryArc.from_dict(raw)
+            self.arcs[arc.id] = arc
+
+    def to_dict(self) -> list[dict]:
+        return [a.to_dict() for a in self.arcs.values()]
+
+    def upsert(self, data: dict) -> StoryArc:
+        arc = StoryArc.from_dict(data)
+        raw_id = str(data.get("id") or "").strip()
+        if not raw_id or raw_id not in self.arcs:
+            for existing_id, existing in self.arcs.items():
+                if existing.title.casefold() == arc.title.casefold():
+                    arc.id = existing_id
+                    break
+        if arc.id not in self.arcs and len(self.arcs) >= self.MAX_ARCS:
+            oldest_id = next(iter(self.arcs))
+            self.arcs.pop(oldest_id, None)
+        self.arcs[arc.id] = arc
+        return arc
+
+    def set_stage(self, ref: str, stage: str, reason: str = "") -> Optional[StoryArc]:
+        stage = (stage or "").strip().lower()
+        if stage not in ("locked", "available", "active", "resolved"):
+            return None
+        target = self.arcs.get(ref)
+        if target is None:
+            ref_cf = (ref or "").strip().casefold()
+            for arc in self.arcs.values():
+                if arc.title.casefold() == ref_cf:
+                    target = arc
+                    break
+        if target is None:
+            return None
+        target.stage = stage
+        if reason:
+            target.gm_notes = str(reason).strip()[:600]
+        return target
+
+    def planner_block(self) -> str:
+        if not self.arcs:
+            return "(no story arcs defined yet)"
+        lines = []
+        for arc in self.arcs.values():
+            lines.append(
+                f"- [id: {arc.id}] \"{arc.title}\" — stage: {arc.stage}. "
+                f"Unlocks when: {arc.trigger_hint or '(no trigger set)'}. "
+                f"Notes: {arc.gm_notes or '(none)'}"
+            )
+        return "\n".join(lines)
+
+
+@dataclass
+class Relationship:
+    subject: str
+    target: str
+    affinity: int = 0
+    tags: Optional[list] = None
+    role_view: str = ""
+    last_shift_reason: str = ""
+
+    def __post_init__(self):
+        if self.tags is None:
+            self.tags = []
+
+    def to_dict(self) -> dict:
+        return {
+            "subject": self.subject, "target": self.target, "affinity": self.affinity,
+            "tags": list(self.tags), "role_view": self.role_view,
+            "last_shift_reason": self.last_shift_reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Relationship":
+        tags = data.get("tags", [])
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(",")]
+        tags = [str(t).strip()[:40] for t in tags if str(t).strip()][:10]
+        try:
+            affinity = max(-100, min(100, int(data.get("affinity", 0))))
+        except (TypeError, ValueError):
+            affinity = 0
+        return cls(
+            subject=str(data.get("subject", "")).strip()[:80],
+            target=str(data.get("target", "")).strip()[:80],
+            affinity=affinity,
+            tags=tags,
+            role_view=str(data.get("role_view", "")).strip()[:80],
+            last_shift_reason=str(data.get("reason", data.get("last_shift_reason", ""))).strip()[:200],
+        )
+
+    def one_liner(self) -> str:
+        warmth = (
+            "hostile" if self.affinity <= -50 else
+            "cold" if self.affinity <= -10 else
+            "neutral" if self.affinity < 10 else
+            "warm" if self.affinity < 50 else
+            "devoted"
+        )
+        parts = [f"affinity {self.affinity}/100 ({warmth})"]
+        if self.role_view:
+            parts.append(f"sees them as: {self.role_view}")
+        if self.tags:
+            parts.append("tags: " + ", ".join(self.tags))
+        return "; ".join(parts)
+
+
+class RelationshipGraph:
+    MAX_RELATIONSHIPS = 120
+    MAX_DELTA = 30
+
+    def __init__(self, relationships: Optional[list] = None):
+        self.relationships: dict[tuple, Relationship] = {}
+        for raw in relationships or []:
+            rel = raw if isinstance(raw, Relationship) else Relationship.from_dict(raw)
+            if rel.subject and rel.target:
+                self.relationships[(rel.subject, rel.target)] = rel
+
+    def to_dict(self) -> list[dict]:
+        return [r.to_dict() for r in self.relationships.values()]
+
+    def get(self, subject: str, target: str) -> Optional[Relationship]:
+        return self.relationships.get((subject, target))
+
+    def set(self, subject: str, target: str, affinity: int = 0, role_view: str = "", tags: Optional[list] = None) -> Optional[Relationship]:
+        subject = str(subject).strip()[:80]
+        target = str(target).strip()[:80]
+        if not subject or not target or subject == target:
+            return None
+        try:
+            affinity = max(-100, min(100, int(affinity)))
+        except (TypeError, ValueError):
+            affinity = 0
+        clean_tags = [str(t).strip()[:40] for t in (tags or []) if str(t).strip()][:10]
+        rel = Relationship(subject=subject, target=target, affinity=affinity,
+                            tags=clean_tags, role_view=str(role_view).strip()[:80])
+        self.relationships[(subject, target)] = rel
+        return rel
+
+    def replace_all(self, relationships: list):
+        self.relationships = {}
+        for data in relationships:
+            if len(self.relationships) >= self.MAX_RELATIONSHIPS:
+                break
+            self.set(
+                data.get("subject", ""), data.get("target", ""),
+                data.get("affinity", 0), data.get("role_view", ""), data.get("tags", []),
+            )
+
+    def upsert(self, data: dict) -> Optional[Relationship]:
+        subject = str(data.get("subject", "")).strip()[:80]
+        target = str(data.get("target", "")).strip()[:80]
+        if not subject or not target or subject == target:
+            return None
+        key = (subject, target)
+        existing = self.relationships.get(key)
+        if existing is None:
+            if len(self.relationships) >= self.MAX_RELATIONSHIPS:
+                oldest_key = next(iter(self.relationships))
+                self.relationships.pop(oldest_key, None)
+            existing = Relationship(subject=subject, target=target)
+            self.relationships[key] = existing
+
+        try:
+            delta = int(data.get("affinity_delta", 0) or 0)
+        except (TypeError, ValueError):
+            delta = 0
+        delta = max(-self.MAX_DELTA, min(self.MAX_DELTA, delta))
+        if delta:
+            existing.affinity = max(-100, min(100, existing.affinity + delta))
+
+        add_tags = data.get("tags_add", [])
+        if isinstance(add_tags, str):
+            add_tags = [add_tags]
+        for t in add_tags:
+            t = str(t).strip()[:40]
+            if t and t not in existing.tags:
+                existing.tags.append(t)
+        existing.tags = existing.tags[:10]
+
+        remove_tags = data.get("tags_remove", [])
+        if isinstance(remove_tags, str):
+            remove_tags = [remove_tags]
+        remove_set = {str(t).strip() for t in remove_tags if str(t).strip()}
+        if remove_set:
+            existing.tags = [t for t in existing.tags if t not in remove_set]
+
+        if data.get("role_view"):
+            existing.role_view = str(data["role_view"]).strip()[:80]
+        if data.get("reason"):
+            existing.last_shift_reason = str(data["reason"]).strip()[:200]
+
+        return existing
+
+    def view_block(self, subject: str, target: str) -> str:
+        rel = self.get(subject, target)
+        if rel is None:
+            return ""
+        return f"[HOW YOU SEE {target.upper()}] {rel.one_liner()}"
+
+
+@dataclass
+class CharacterOverlay:
+    name: str
+    current_role: str = ""
+    arc_stage: str = ""
+    mutable_facts: Optional[dict] = None
+
+    def __post_init__(self):
+        if self.mutable_facts is None:
+            self.mutable_facts = {}
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name, "current_role": self.current_role,
+            "arc_stage": self.arc_stage, "mutable_facts": dict(self.mutable_facts),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CharacterOverlay":
+        facts = data.get("mutable_facts", {})
+        if not isinstance(facts, dict):
+            facts = {}
+        return cls(
+            name=str(data.get("name", "")).strip()[:80],
+            current_role=str(data.get("current_role", "")).strip()[:80],
+            arc_stage=str(data.get("arc_stage", "")).strip()[:80],
+            mutable_facts={
+                WorldState._normalize_fact_key(str(k)): str(v)[:200]
+                for k, v in facts.items() if str(k).strip()
+            },
+        )
+
+    def one_liner(self) -> str:
+        parts = []
+        if self.current_role:
+            parts.append(f"role: {self.current_role}")
+        if self.arc_stage:
+            parts.append(f"arc: {self.arc_stage}")
+        for k, v in list(self.mutable_facts.items())[:6]:
+            parts.append(f"{k.replace('_', ' ')}: {v}")
+        return "; ".join(parts)
+
+
+class OverlayRegistry:
+    MAX_OVERLAYS = 40
+
+    def __init__(self, overlays: Optional[list] = None):
+        self.overlays: dict[str, CharacterOverlay] = {}
+        for raw in overlays or []:
+            ov = raw if isinstance(raw, CharacterOverlay) else CharacterOverlay.from_dict(raw)
+            if ov.name:
+                self.overlays[ov.name] = ov
+
+    def to_dict(self) -> list[dict]:
+        return [o.to_dict() for o in self.overlays.values()]
+
+    def get(self, name: str) -> Optional[CharacterOverlay]:
+        return self.overlays.get(name)
+
+    def replace(self, name: str, current_role: str = "", arc_stage: str = "", mutable_facts: Optional[dict] = None) -> Optional[CharacterOverlay]:
+        name = str(name).strip()[:80]
+        if not name:
+            return None
+        facts = {
+            WorldState._normalize_fact_key(str(k)): str(v)[:200]
+            for k, v in (mutable_facts or {}).items() if str(k).strip()
+        }
+        ov = CharacterOverlay(
+            name=name, current_role=str(current_role).strip()[:80],
+            arc_stage=str(arc_stage).strip()[:80], mutable_facts=facts,
+        )
+        self.overlays[name] = ov
+        return ov
+
+    def upsert(self, data: dict) -> Optional[CharacterOverlay]:
+        name = str(data.get("name", "")).strip()[:80]
+        if not name:
+            return None
+        existing = self.overlays.get(name)
+        if existing is None:
+            if len(self.overlays) >= self.MAX_OVERLAYS:
+                oldest = next(iter(self.overlays))
+                self.overlays.pop(oldest, None)
+            existing = CharacterOverlay(name=name)
+            self.overlays[name] = existing
+
+        if data.get("current_role"):
+            existing.current_role = str(data["current_role"]).strip()[:80]
+        if data.get("arc_stage"):
+            existing.arc_stage = str(data["arc_stage"]).strip()[:80]
+
+        facts = data.get("mutable_facts", {})
+        if isinstance(facts, dict):
+            for k, v in facts.items():
+                key = WorldState._normalize_fact_key(str(k))
+                if key:
+                    existing.mutable_facts[key] = str(v)[:200]
+
+        return existing
+
+    def view_block(self, name: str) -> str:
+        ov = self.overlays.get(name)
+        if ov is None:
+            return ""
+        line = ov.one_liner()
+        if not line:
+            return ""
+        return f"[YOUR CURRENT STATE] {line}"
+
+
 class RPGRules:
     """The deterministic authority for player rolls and resource mutations."""
     DEFAULT_RESOURCES = {
@@ -406,6 +750,9 @@ class WorldState:
         self.status_durations: dict[str, int] = {}
         self.lore_registry = LoreRegistry()
         self.campaign_board = CampaignBoard()
+        self.arc_registry = ArcRegistry()
+        self.relationship_graph = RelationshipGraph()
+        self.overlay_registry = OverlayRegistry()
         self.private_knowledge: dict[str, list[str]] = {}
 
     _STATUS_REMINDERS: dict[str, str] = {
@@ -477,14 +824,10 @@ class WorldState:
         if remove_items:
             self.player_inventory =[i for i in self.player_inventory if i not in remove_items]
 
-        for st in plan.get("status_add",[]):
-            if st and st not in self.player_status:
-                self.player_status.append(st)
-                
-        remove_status = set(plan.get("status_remove",[]))
-        if remove_status:
-            self.player_status = [s for s in self.player_status if s not in remove_status]
-            for status in remove_status:
+        clear_status = set(plan.get("status_clear",[]))
+        if clear_status:
+            self.player_status = [s for s in self.player_status if s not in clear_status]
+            for status in clear_status:
                 self.status_durations.pop(status, None)
 
         for status_data in plan.get("status_effects", []):
@@ -495,11 +838,14 @@ class WorldState:
                 continue
             if name not in self.player_status:
                 self.player_status.append(name)
-            try:
-                duration = max(1, min(99, int(status_data.get("duration", 1))))
-                self.status_durations[name] = duration
-            except (TypeError, ValueError):
-                pass
+            duration = status_data.get("duration", None)
+            if duration is None:
+                self.status_durations.pop(name, None)
+            else:
+                try:
+                    self.status_durations[name] = max(1, min(99, int(duration)))
+                except (TypeError, ValueError):
+                    pass
 
         RPGRules.apply_resource_delta(self, plan.get("resource_delta", {}))
 
@@ -552,6 +898,8 @@ class WorldState:
             "pending_summarization": list(self.pending_summarization),
             "events": [{"actor": e.actor, "action": e.action, "outcome": e.outcome} for e in self.events],
             "lore_cards": self.lore_registry.to_dict(), "campaign_board": self.campaign_board.to_dict(),
+            "story_arcs": self.arc_registry.to_dict(), "relationships": self.relationship_graph.to_dict(),
+            "character_overlays": self.overlay_registry.to_dict(),
             "private_knowledge": copy.deepcopy(self.private_knowledge),
             "dice_rolls_enabled": self.dice_rolls_enabled, "world_context": self.world_context,
             "lock_bg": self.lock_bg, "disable_ambient": self.disable_ambient,
@@ -570,7 +918,7 @@ class WorldState:
             )
             self.pending_summarization.append(compressed)
 
-    def to_prompt(self) -> str:
+    def to_prompt(self, viewer: Optional[str] = None) -> str:
         lines =[f"LOCATION: {self.location}", f"TIME: {self.time_of_day}"]
         
         if self.atmosphere:
@@ -618,7 +966,15 @@ class WorldState:
         campaign = self.campaign_board.prompt_block()
         if campaign:
             lines.append(campaign)
-                
+
+        if viewer:
+            overlay_line = self.overlay_registry.view_block(viewer)
+            if overlay_line:
+                lines.append(overlay_line)
+            rel_line = self.relationship_graph.view_block(viewer, "PLAYER")
+            if rel_line:
+                lines.append(rel_line)
+
         return "\n".join(lines)
 
     def reset(self):
@@ -631,6 +987,9 @@ class WorldState:
         resources = copy.deepcopy(self.resources)
         lore_cards = self.lore_registry.to_dict()
         campaign_board = self.campaign_board.to_dict()
+        story_arcs = self.arc_registry.to_dict()
+        relationships = self.relationship_graph.to_dict()
+        character_overlays = self.overlay_registry.to_dict()
         lock_bg = self.lock_bg
         disable_ambient = self.disable_ambient
 
@@ -645,6 +1004,9 @@ class WorldState:
         self.resources = resources
         self.lore_registry = LoreRegistry(lore_cards)
         self.campaign_board = CampaignBoard(campaign_board)
+        self.arc_registry = ArcRegistry(story_arcs)
+        self.relationship_graph = RelationshipGraph(relationships)
+        self.overlay_registry = OverlayRegistry(character_overlays)
         self.lock_bg = lock_bg
         self.disable_ambient = disable_ambient
 
@@ -759,54 +1121,7 @@ class NPCRegistry:
 # LONG-TERM RAG MEMORY FOR NPCs
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-_EMBEDDER = None
-_EMBEDDER_FAILED: bool = False
-_EMBEDDER_AVAILABLE: Optional[bool] = None
-_EMBEDDER_LOCK = threading.Lock()
-
-def _check_embedder_available() -> bool:
-    global _EMBEDDER_AVAILABLE
-    if _EMBEDDER_AVAILABLE is None:
-        try:
-            import sentence_transformers
-            _EMBEDDER_AVAILABLE = True
-        except ImportError:
-            _EMBEDDER_AVAILABLE = False
-            logger.warning(
-                "[Soul Stage] sentence-transformers not found. "
-                "NPC RAG memory will fall back to standard mode. "
-                "Install with: pip install sentence-transformers"
-            )
-    return _EMBEDDER_AVAILABLE
-
-
-def _get_embedder():
-    global _EMBEDDER, _EMBEDDER_FAILED
-
-    if _EMBEDDER is not None or _EMBEDDER_FAILED or not _check_embedder_available():
-        return _EMBEDDER
-
-    with _EMBEDDER_LOCK:
-        if _EMBEDDER is None and not _EMBEDDER_FAILED:
-            try:
-                from sentence_transformers import SentenceTransformer
-
-                project_root = Path(__file__).resolve().parent.parent.parent
-                local_path = project_root / "app" / "utils" / "all-MiniLM-L6-v2"
-                model_target = str(local_path) if local_path.exists() else "all-MiniLM-L6-v2"
-
-                device = "cpu"
-
-                logger.info(f"[Soul Stage] Loading embedding model on {device.upper()} from '{model_target}'...")
-                _EMBEDDER = SentenceTransformer(model_target, device=device)
-                logger.info(f"[Soul Stage] Embedding model loaded successfully on {device.upper()}")
-
-            except Exception as e:
-                logger.error(f"[Soul Stage] Failed to load embedding model: {e}", exc_info=True)
-                _EMBEDDER = None
-                _EMBEDDER_FAILED = True
-
-    return _EMBEDDER
+from app.utils.embedding_provider import get_embedder as _get_embedder
 
 NPC_MEM_DIR = Path(".soul_stage/npc_memory")
 
@@ -903,7 +1218,9 @@ class NPCMemoryRegistry(NPCRegistry):
         if embedder is None:
             return
         try:
-            emb = embedder.encode(text)
+            safe_text = text[:1000]
+            formatted_text = f"passage: {safe_text.strip()}"
+            emb = embedder.encode(formatted_text)
             if hasattr(emb, "numpy"):
                 emb = emb.numpy()
             emb = np.asarray(emb, dtype=np.float32)
@@ -936,7 +1253,9 @@ class NPCMemoryRegistry(NPCRegistry):
             return []
 
         try:
-            q_emb = embedder.encode(query)
+            safe_query = str(query)[:1000]
+            formatted_query = f"query: {safe_query.strip()}"
+            q_emb = embedder.encode(formatted_query)
             if hasattr(q_emb, "numpy"):
                 q_emb = q_emb.numpy()
             q_emb = np.asarray(q_emb, dtype=np.float32)
@@ -1343,6 +1662,11 @@ CURRENT WORLD STATE
 {world_state}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STORY ARCS  (GM-only — characters never see this section)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{arc_state}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Return ONLY a single valid JSON object. No markdown fences. No preamble. No explanation.
@@ -1363,16 +1687,18 @@ fields you already wrote (location, key_facts, etc). When in doubt, write less.
   "next_actor":       "<PartyCharacterName | NPCName | PLAYER>",
   "inventory_add":    ["<item received or found>"],
   "inventory_remove": ["<item used, lost, consumed, or given away>"],
-  "status_add":       ["<new condition: wounded, poisoned, exhausted, etc.>"],
-  "status_remove":    ["<condition that was healed, resolved, or expired>"],
+  "status_clear":     ["<condition that was healed, resolved, or expired>"],
   "plot_event_type":  "<encounter | discovery | visitor | twist | romance | none>",
   "player_choices":   ["<choice A>", "<choice B>", "<choice C>"],
   {dice_check_field}
   "resource_delta":   {{"health": <int -10..10>, "energy": <int -10..10>, "stress": <int -10..10>}},
-  "status_effects":   [{{"name": "<condition>", "duration": <turns, 1-99>}}],
+  "status_effects":   [{{"name": "<condition>", "duration": <turns 1-99, or null for indefinite>}}],
   "lore_updates":      [{{"id": "<existing id to update, or omit for new>", "title": "...", "category": "npc|location|faction|item|spell|event|rumor", "content": "...", "triggers": ["...", "..."], "visibility": "party|player"}}],
   "campaign_objective_updates": [{{"id": "<existing id to update, or omit>", "title": "...", "description": "...", "current": <int>, "max": <int>, "status": "active|complete|failed"}}],
-  "campaign_clock_updates":     [{{"id": "<existing id to update, or omit>", "title": "...", "description": "...", "current": <int>, "max": <int>}}]
+  "campaign_clock_updates":     [{{"id": "<existing id to update, or omit>", "title": "...", "description": "...", "current": <int>, "max": <int>}}],
+  "arc_stage_updates":  [{{"id": "<existing arc id or exact title>", "stage": "locked|available|active|resolved", "reason": "<why this changed>"}}],
+  "relationship_updates": [{{"subject": "<NPC or party member name>", "target": "PLAYER or another actor name", "affinity_delta": <int -30..30>, "tags_add": ["..."], "tags_remove": ["..."], "role_view": "<how subject now perceives target, e.g. 'captain'>", "reason": "<why>"}}],
+  "character_overlay_updates": [{{"name": "<party member or NPC name>", "current_role": "<updated role/title, only if it changed>", "arc_stage": "<this character's personal arc stage, only if it changed>", "mutable_facts": {{"fact_key": "fact_value"}}}}]
 }}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1382,7 +1708,10 @@ RULES — ROUTING
 - DIRECT ADDRESS: If the PLAYER or anyone explicitly calls someone by name ("Holo, look!" / "hey Vivy"),
   "next_actor" MUST be that person — no exceptions.
 - PROACTIVITY: After narration, prefer routing to a party member or NPC who would naturally react,
-  before returning to PLAYER. Silence from characters is a narrative failure.
+  before returning to PLAYER. Silence from characters is a narrative failure. This is about SCENE
+  LIVELINESS ONLY — characters reacting, bantering, commenting on what just happened. It is NOT
+  permission to push a locked story arc forward. See RULES — STORY ARCS below: being lively and
+  advancing a locked plot are different things, and only the player unlocks the second one.
 - NPC FIRST: If you just spawned an NPC who has something to say, route to them immediately.
 - PLAYER TURN: Only set "next_actor" to "PLAYER" when the scene genuinely waits for player input —
   a decision point, an open question, or a pause in action.
@@ -1402,8 +1731,9 @@ RULES — WORLD STATE
   return 'None'. Do not invent filenames.
 - "inventory_add" / "inventory_remove": Only update if the player explicitly acquired, used,
   lost, sold, consumed, or gave away something tangible in this turn. Leave both empty otherwise.
-- "status_add" / "status_remove": Only update if the player's physical or mental condition
-  meaningfully changed this turn. Leave both empty otherwise.
+- Player conditions are ALWAYS expressed through "status_effects" (add/refresh) and "status_clear"
+  (remove). See RULES — RESOURCES & TIMED EFFECTS below. Only touch these if the player's physical
+  or mental condition meaningfully changed this turn.
 {lock_section}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1412,10 +1742,12 @@ RULES — RESOURCES & TIMED EFFECTS
 - "resource_delta": ONLY include a resource key if it meaningfully changed this turn
   (took damage, rested, exerted themselves, calmed down, panicked). Omit keys that
   didn't change — do not zero-fill. Values are deltas, not absolute totals.
-- "status_effects": use this instead of plain "status_add" when a condition has a
-  clear expiry (e.g. "bleed" for 3 turns, "blessed" for 5 turns). It auto-expires
-  and is removed without you needing to add it to "status_remove" later. Use plain
-  "status_add"/"status_remove" for conditions with no natural timer.
+- "status_effects" is the ONLY way to add or refresh a condition. Give it a "duration"
+  in turns (e.g. 3 for "bleed", 5 for "blessed") when the condition has a natural expiry —
+  it auto-expires and clears itself, no further action needed. Set "duration" to null for
+  a condition with no natural timer (e.g. "one-armed", "branded a traitor").
+- "status_clear" removes a condition immediately regardless of its duration — use it when
+  something is explicitly healed, cured, or resolved in this turn.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RULES — LORE CARDS
@@ -1446,6 +1778,51 @@ RULES — CAMPAIGN BOARD
   "current" only when something in the fiction plausibly moves it forward.
 - Leave both empty on most turns — the board should only change when the story
   actually changes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RULES — STORY ARCS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+An arc has a "stage": locked -> available -> active -> resolved.
+- "locked" means this arc DOES NOT EXIST for any character. No party member or NPC may
+  mention it, hint at it, foreshadow it, or offer to start it — even indirectly. Write
+  every "narration_plan" and route every "next_actor" as if a locked arc's content simply
+  isn't there. This is a hard constraint, not a suggestion.
+- "available" means the arc CAN be brought up, but only if the PLAYER raises the topic
+  first (asks about it, investigates in its direction, mentions a related keyword).
+  Characters may then respond and engage — but still must not volunteer it unprompted.
+- "active" means the arc is underway; "plot_event_type" and "narration_plan" may now
+  freely draw on it.
+- "resolved" means the arc concluded — treat its outcome as settled fact going forward.
+- "arc_stage_updates" is how you change a stage. You may move locked -> available only
+  when the trigger_hint condition is clearly satisfied by what just happened, OR when a
+  key_fact/system event you can see explicitly signals it. When genuinely unsure, leave
+  the arc's stage unchanged — under-triggering is always safer than leaking locked content.
+- You may also use "arc_stage_updates" to register a brand-new arc (omit "id"), but only
+  when the player or scene has clearly seeded something worth tracking as its own arc.
+  Leave "arc_stage_updates" empty on most turns.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RULES — RELATIONSHIPS & CHARACTER STATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- "relationship_updates" records how one character (subject) feels about and perceives
+  another (target — usually PLAYER, but can be another party member or NPC). This is
+  structural memory, not lore text: it is injected directly into that subject's own
+  prompt every turn, so it never gets forgotten or overwritten by stale context.
+- Use "affinity_delta" (small, -30..30) for a genuine emotional shift caused by what just
+  happened — not for routine dialogue. Most turns should not touch affinity at all.
+- Use "role_view" specifically when a subject's understanding of the target's STATUS or
+  TITLE changes (e.g. "soldier" -> "captain"). This is independent of affinity — a subject
+  can update how they see someone's role without their feelings toward them changing, and
+  vice versa. Only the characters who plausibly witnessed or were told about the change
+  should have their "role_view" updated — others keep their old view until they find out,
+  which is intentional and can create interesting friction.
+- "character_overlay_updates" tracks a character's own evolving state — their "current_role"
+  (their own title/status, as they'd describe it) and "arc_stage" (their personal arc, if
+  they have one distinct from the campaign-wide story arcs), plus any other free-form
+  "mutable_facts" slot worth tracking about them specifically (loyalty, a secret, an internal
+  conflict). Update it only when something genuinely changed for that character this turn.
+- Leave both fields empty on most turns — these are for durable, meaningful shifts, not
+  every line of dialogue.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RULES — NPC POPULATION
@@ -1580,6 +1957,8 @@ WHAT YOU NEVER DO
   ✗ Never give characters stage directions ("she turns to look at him" without physical cause).
   ✗ Never summarize what just happened in the conversation — you describe the world, not the plot.
   ✗ Never write in past tense. Present tense only.
+  ✗ Never pad a quiet dialogue beat with invented atmosphere just to hit a word count. If nothing
+    physical changed, say little or nothing — see LENGTH CALIBRATION below.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SENSORY PRECISION
@@ -1618,7 +1997,11 @@ These are placeholders, not writing. Replace them with a concrete image.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LENGTH CALIBRATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Be descriptive, rich, and deeply atmospheric. Always paint every scene with vivid sensory details.
+Match your length to what the NARRATION PLAN actually contains. Look at it before you write:
+if it describes a new physical event, lean into full sensory prose. If it holds no new physical
+event — just a note like "the scene continues" or a one-line beat about the conversation itself —
+that is your signal to write little or nothing. Padding a quiet beat with invented atmosphere to
+hit a word count is exactly the kind of empty writing SENSORY PRECISION above warns against.
 
   Action event or major encounter: 120–250 words.
     → Full sensory immersion. Detailed environment, physical reactions, weather, atmosphere.
@@ -1626,8 +2009,16 @@ Be descriptive, rich, and deeply atmospheric. Always paint every scene with vivi
   Scene transition or mood shift: 80–150 words.
     → Establish the new space with precise visual, auditory, and tactile details.
 
-  Continuation of a calm scene or conversation: 60–120 words.
-    → Never be dry or brief. Ground the moment in lighting, ambient sounds, scents, or subtle physical movements around the characters.
+  A genuine calm moment worth grounding (new detail, changed light, a character's visible
+  action): 60–120 words.
+    → Ground it in lighting, ambient sound, scent, or a subtle physical movement — but only
+      because there is something real there to ground, not by default.
+
+  Pure dialogue continuation — NARRATION PLAN contains no new physical event, the conversation
+  is simply continuing: 0–30 words, or an empty [NARRATION][/NARRATION] block if truly nothing
+  changed. This is correct and often the best choice — let the characters carry the moment
+  instead of the narrator talking over them. Do not treat this tier as a fallback to avoid;
+  it is just as valid a choice as the longer tiers above.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PHYSICAL IMPACT & WORLD RESPONSE (Cause -> Effect)
@@ -1659,9 +2050,13 @@ One strong word is worth three decorative ones.
 OUTPUT FORMAT — MANDATORY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Use exactly these tags. No text before [NARRATION]. No text after [/NARRATION].
+Per LENGTH CALIBRATION, the tags may legitimately wrap a full paragraph, one short
+line, or nothing at all — an empty [NARRATION][/NARRATION] is a valid, complete answer
+when the plan holds no new physical event. Do not fill it with invented atmosphere.
 
 [NARRATION]
-Your prose here. Present tense. Rich and detailed prose.
+Your prose here. Present tense. Rich and detailed prose when there's something to
+ground — otherwise brief, or empty.
 [/NARRATION]
 """
 
@@ -1743,15 +2138,21 @@ ROUTING RULES  (apply in this strict priority order)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BRIDGE NARRATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"bridge_narration" is a micro-transition — a single physical beat that marks the shift between speakers.
-Use it when a moment of world-description would make the scene feel more grounded.
+EMPTY STRING IS THE DEFAULT. Two characters continuing a back-and-forth exchange with each
+other — dialogue answering dialogue — needs NO narrator interjection. Do not comment on tone,
+tension, or reactions between them; that is not the narrator's job and it interrupts the flow
+of the conversation. Only write "bridge_narration" for a genuine, separate physical event in
+the world that neither speaker would naturally describe themselves — and even then, most turns
+still don't need one.
 
-  GOOD: "A log pops in the fire."
-  GOOD: "Rain against the window, briefly louder."
-  GOOD: "The door creaks in the draft."
-  BAD:  "The tension in the room was clear to everyone as the conversation continued to unfold."
+  GOOD (rare, real physical event): "A log pops in the fire."
+  GOOD (rare, real physical event): "Rain against the window, briefly louder."
+  BAD (commentary on the conversation, never do this): "The tension in the room was clear to
+    everyone as the conversation continued to unfold."
+  BAD (unnecessary — two characters are just talking): "A pause hangs between them."
 
-Max 15 words. One image. No dialogue. Present tense. Often better left empty.
+Max 15 words. One concrete image, never a mood statement. No dialogue. Present tense.
+When in doubt, return an empty string.
 """
 
 NPC_SYSTEM_PROMPT = """\
@@ -1831,8 +2232,7 @@ class PlannerParser:
         "next_actor":      "PLAYER",
         "inventory_add":    [],
         "inventory_remove": [],
-        "status_add":       [],
-        "status_remove":    [],
+        "status_clear":     [],
         "plot_event_type":  "none",
         "player_choices":   [],
         "dice_check":       None,
@@ -1841,6 +2241,9 @@ class PlannerParser:
         "lore_updates":           [],
         "campaign_objective_updates": [],
         "campaign_clock_updates":     [],
+        "arc_stage_updates":          [],
+        "relationship_updates":       [],
+        "character_overlay_updates":  [],
     }
 
     @classmethod
@@ -1932,14 +2335,18 @@ class PlannerParser:
         
         for key in ["key_facts", "resource_delta"]:
             if not isinstance(result.get(key), dict): result[key] = {}
-        for key in ["spawns", "despawns", "inventory_add", "inventory_remove", "status_add", "status_remove",
+        for key in ["spawns", "despawns", "inventory_add", "inventory_remove", "status_clear",
                     "player_choices", "status_effects", "lore_updates",
-                    "campaign_objective_updates", "campaign_clock_updates"]:
+                    "campaign_objective_updates", "campaign_clock_updates",
+                    "arc_stage_updates", "relationship_updates", "character_overlay_updates"]:
             if not isinstance(result.get(key), list): result[key] = []
         result["status_effects"] = [s for s in result["status_effects"] if isinstance(s, dict)]
         result["lore_updates"] = [s for s in result["lore_updates"] if isinstance(s, dict)]
         result["campaign_objective_updates"] = [s for s in result["campaign_objective_updates"] if isinstance(s, dict)]
         result["campaign_clock_updates"] = [s for s in result["campaign_clock_updates"] if isinstance(s, dict)]
+        result["arc_stage_updates"] = [s for s in result["arc_stage_updates"] if isinstance(s, dict)]
+        result["relationship_updates"] = [s for s in result["relationship_updates"] if isinstance(s, dict)]
+        result["character_overlay_updates"] = [s for s in result["character_overlay_updates"] if isinstance(s, dict)]
         result["resource_delta"] = {
             str(k): v for k, v in result["resource_delta"].items()
             if isinstance(k, str) and isinstance(v, (int, float))
@@ -2020,6 +2427,14 @@ class SoulStageOrchestrator:
 
         self.configuration_settings = configuration.ConfigurationSettings()
 
+    def _get_gen_max_tokens(self, fallback: int) -> int:
+        val = self.cfg_settings.get_main_setting("max_tokens")
+        try:
+            val = int(val) if val is not None else 0
+        except (TypeError, ValueError):
+            val = 0
+        return max(val, fallback)
+    
     def _get_files(self, folder, exts):
         try:
             return [f for f in sorted(os.listdir(folder)) if any(f.lower().endswith(e) for e in exts)]
@@ -2096,6 +2511,7 @@ class SoulStageOrchestrator:
             bg_list=", ".join(self.bg_list) if self.bg_list else "None",
             ambient_list=", ".join(self.ambient_list) if self.ambient_list else "None",
             world_state=self.world_state.to_prompt(),
+            arc_state=self.world_state.arc_registry.planner_block(),
             all_actor_names=self._all_actor_names(party_names),
             dice_check_field=_DICE_CHECK_FIELD_ENABLED if dice_on else _DICE_CHECK_FIELD_DISABLED,
             dice_rules_section=_DICE_RULES_SECTION_ENABLED if dice_on else _DICE_RULES_SECTION_DISABLED,
@@ -2118,7 +2534,7 @@ class SoulStageOrchestrator:
                 messages.extend(context_messages[-10:])
             messages.append({"role": "user", "content": f"[NEW PLAYER ACTION]: {player_message}\n\nProduce the GM JSON plan."})
         raw = ""
-        async for chunk in self._stream_llm(messages, conversation_method, temperature=0.1, max_tokens=1400):
+        async for chunk in self._stream_llm(messages, conversation_method, temperature=0.1, max_tokens=self._get_service_max_tokens(1400)):
             raw += chunk
         plan = PlannerParser.parse(raw)
         logger.info(f"[Planner] next={plan['next_actor']} spawns={[s['name'] for s in plan['spawns']]}")
@@ -2171,7 +2587,7 @@ class SoulStageOrchestrator:
         temp = min(1.0, temp + self._temp_boost)
 
         async for chunk in self._stream_llm(
-            messages, conversation_method, temperature=temp, max_tokens=900
+            messages, conversation_method, temperature=temp, max_tokens=self._get_service_max_tokens(900)
         ):
             if self._cancel_flag:
                 break
@@ -2202,7 +2618,7 @@ class SoulStageOrchestrator:
     def _executor_extract(self, text: str) -> str:
         clean = re.sub(r"\[/?(NARRATION|NARRATOR)\]:?\s*", "", text, flags=re.IGNORECASE).strip()
         clean = re.split(r'\n\s*(?:\[|\*)[A-Za-z0-9 ]+(?:\]|\*)\s*:', clean)[0].strip()
-        return clean[:1500] if clean else "The scene continues."
+        return clean[:1500]
 
     async def _call_gm_routing(self, party_names, last_speaker, last_text, conversation_method, intra_turn_dialogue, context_messages) -> dict:
         system = GM_ROUTING_SYSTEM.format(
@@ -2226,7 +2642,7 @@ class SoulStageOrchestrator:
                 messages.extend(context_messages[-6:])
             messages.append({"role": "user", "content": f"Who speaks next after {last_speaker}?"})
         raw = ""
-        async for chunk in self._stream_llm(messages, conversation_method, temperature=0.1, max_tokens=200):
+        async for chunk in self._stream_llm(messages, conversation_method, temperature=0.1, max_tokens=self._get_service_max_tokens(200)):
             if self._cancel_flag:
                 break
             raw += chunk
@@ -2363,7 +2779,7 @@ class SoulStageOrchestrator:
             f"{self.world_state.world_context or '(none)'}\n\n"
         )
 
-        world_block = f"[CURRENT WORLD STATE]\n{self.world_state.to_prompt()}\n\n"
+        world_block = f"[CURRENT WORLD STATE]\n{self.world_state.to_prompt(viewer=character_name)}\n\n"
         private_block = self.world_state.private_knowledge_block(character_name)
         if private_block:
             private_block += "\n\n"
@@ -2430,7 +2846,7 @@ class SoulStageOrchestrator:
             npc_personality=npc.personality,
             npc_archetype=npc.archetype,
             world_context=self.world_state.world_context or "(none)",
-            world_state=self.world_state.to_prompt(),
+            world_state=self.world_state.to_prompt(viewer=npc.name),
             party_list=party_list,
             user_name=user_name,
             user_description=user_description
@@ -2461,7 +2877,7 @@ class SoulStageOrchestrator:
             messages.append({"role": "user", "content": user_content})
 
         full_text = ""
-        async for chunk in self._stream_llm(messages, conversation_method, temperature=0.8, max_tokens=300):
+        async for chunk in self._stream_llm(messages, conversation_method, temperature=0.8, max_tokens=self._get_service_max_tokens(300)):
             if self._cancel_flag:
                 break
             full_text += chunk
@@ -2553,6 +2969,26 @@ class SoulStageOrchestrator:
                     self.world_state.campaign_board.upsert_clock(clk_data)
                 except Exception as e:
                     logger.warning(f"[SoulStage] Failed to upsert campaign clock: {e}")
+            for arc_data in plan.get("arc_stage_updates", []):
+                try:
+                    ref = str(arc_data.get("id") or arc_data.get("title") or "").strip()
+                    stage = arc_data.get("stage")
+                    if ref and stage and self.world_state.arc_registry.set_stage(ref, stage, arc_data.get("reason", "")) is None:
+                        self.world_state.arc_registry.upsert(arc_data)
+                    elif not ref and arc_data.get("title"):
+                        self.world_state.arc_registry.upsert(arc_data)
+                except Exception as e:
+                    logger.warning(f"[SoulStage] Failed to update story arc: {e}")
+            for rel_data in plan.get("relationship_updates", []):
+                try:
+                    self.world_state.relationship_graph.upsert(rel_data)
+                except Exception as e:
+                    logger.warning(f"[SoulStage] Failed to upsert relationship: {e}")
+            for ov_data in plan.get("character_overlay_updates", []):
+                try:
+                    self.world_state.overlay_registry.upsert(ov_data)
+                except Exception as e:
+                    logger.warning(f"[SoulStage] Failed to upsert character overlay: {e}")
 
             known_actors = party_names + [n.name for n in self.npc_registry.list_active()]
             if private_recipient and private_recipient in known_actors:
@@ -2640,6 +3076,7 @@ class SoulStageOrchestrator:
 
             next_actor  = plan.get("next_actor", "PLAYER")
             actor_depth = 0
+            bridge_budget = 1
 
             while next_actor != "PLAYER" and actor_depth < max_actor_depth:
                 if self._cancel_flag:
@@ -2735,13 +3172,15 @@ class SoulStageOrchestrator:
                         conversation_method, intra_turn_dialogue, dynamic_context,
                     )
 
+                    candidate_next = routing.get("next_actor", "PLAYER")
                     bridge = routing.get("bridge_narration", "")
-                    if bridge:
+                    if bridge and bridge_budget > 0 and candidate_next != "PLAYER":
                         self.world_state.add_event(actor="NARRATOR", action=bridge)
                         dynamic_context.append({
                             "role": "user",
                             "content": f"[NARRATOR]: {bridge}",
                         })
+                        bridge_budget -= 1
 
                         words = bridge.split()
                         try:
@@ -2760,7 +3199,7 @@ class SoulStageOrchestrator:
                     for dn in routing.get("despawns",[]):
                         self.npc_registry.despawn(dn)
 
-                    next_actor = routing.get("next_actor", "PLAYER")
+                    next_actor = candidate_next
                 else:
                     next_actor = "PLAYER"
 
@@ -2807,7 +3246,7 @@ class SoulStageOrchestrator:
         messages = [{"role": "system", "content": system}]
         raw = ""
         try:
-            async for chunk in self._stream_llm(messages, conversation_method, temperature=0.3, max_tokens=250):
+            async for chunk in self._stream_llm(messages, conversation_method, temperature=0.3, max_tokens=self._get_service_max_tokens(250)):
                 if self._cancel_flag:
                     break
                 raw += chunk
@@ -2860,6 +3299,9 @@ class SoulStageOrchestrator:
             self.world_state.resources[name] = {"current": current, "max": max_value}
         self.world_state.lore_registry = LoreRegistry(ws.get("lore_cards", scene_dict.get("lore_cards", [])))
         self.world_state.campaign_board = CampaignBoard(ws.get("campaign_board", scene_dict.get("campaign_board", {})))
+        self.world_state.arc_registry = ArcRegistry(ws.get("story_arcs", scene_dict.get("story_arcs", [])))
+        self.world_state.relationship_graph = RelationshipGraph(ws.get("relationships", scene_dict.get("relationships", [])))
+        self.world_state.overlay_registry = OverlayRegistry(ws.get("character_overlays", scene_dict.get("character_overlays", [])))
         raw_private = ws.get("private_knowledge", scene_dict.get("private_knowledge", {})) or {}
         self.world_state.private_knowledge = {
             str(actor): [str(note)[:600] for note in notes if str(note).strip()][-30:]
@@ -2995,6 +3437,21 @@ class SoulStageOrchestrator:
             pass
         return None
 
+    def _get_service_max_tokens(self, min_floor: int) -> int:
+        configured = self.configuration_settings.get_main_setting("max_tokens")
+        try:
+            configured = int(configured) if configured is not None else 0
+        except (TypeError, ValueError):
+            configured = 0
+        return max(configured, min_floor)
+
+    def _get_reasoning_kwargs(self, conversation_method: str) -> dict:
+        reasoning_effort = self.configuration_settings.get_main_setting("soul_stage_reasoning_effort")
+        kwargs = {"reasoning_effort": reasoning_effort if reasoning_effort else "none"}
+        if conversation_method == "Local LLM":
+            kwargs["reasoning_mode"] = False
+        return kwargs
+    
     async def _stream_llm(self, messages, conversation_method, temperature=0.7, max_tokens=512) -> AsyncGenerator:
         provider = AIFactory.get_provider(conversation_method)
         if not provider:
@@ -3011,7 +3468,8 @@ class SoulStageOrchestrator:
             if stop_list:
                 stop_sequences = stop_list[:4]
 
-        async for chunk in provider.generate_stream(messages, temperature=temperature, max_tokens=max_tokens, stop=stop_sequences):
+        gen_kwargs = self._get_reasoning_kwargs(conversation_method)
+        async for chunk in provider.generate_stream(messages, temperature=temperature, max_tokens=max_tokens, stop=stop_sequences, **gen_kwargs):
             yield chunk
 
     async def sync_party_memory(self, conversation_method: str, party_names: list, turn_messages: list, user_name: str):
@@ -3067,10 +3525,6 @@ class SoulStageSession:
         self.manual_next_actor: Optional[str] = None
         self.private_recipient: Optional[str] = None
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# MESSAGE MANAGER & REWIND INFRASTRUCTURE
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class SoulStageMessageManager:
     """
     Manager for Soul Stage message operations (Copy, Translate, Edit, Delete, Regenerate).
@@ -3097,7 +3551,7 @@ class SoulStageMessageManager:
         self._save = save_scene
         self._translate_fn = translate_fn
         self._rerun_turn_fn = rerun_turn_fn
-        self._rebuild_ui_fn = rebuild_ui_fn,
+        self._rebuild_ui_fn = rebuild_ui_fn
 
         if translations is not None:
             self.translations = translations
