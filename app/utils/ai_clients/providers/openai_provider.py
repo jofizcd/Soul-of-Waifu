@@ -27,6 +27,9 @@ class OpenAIProvider(BaseAIProvider):
         max_tokens = kwargs.get("max_tokens", default_max_tokens)
         if self._is_reasoning_model():
             payload["max_completion_tokens"] = max_tokens
+            reasoning_effort = kwargs.get("reasoning_effort")
+            if reasoning_effort and reasoning_effort != "none":
+                payload["reasoning_effort"] = reasoning_effort
         else:
             payload["max_tokens"] = max_tokens
             payload["temperature"] = kwargs.get("temperature", 0.7)
