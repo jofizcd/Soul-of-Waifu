@@ -32,7 +32,18 @@ class ConfigurationSettings():
                     "input_device": "0",
                     "output_device": "0",
                     "translator": "0",
-                    "target_language": "0"
+                    "target_language": "0",
+                    "context_size": 8192,
+                    "max_tokens": 4096,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "frequency_penalty": 0.0,
+                    "presence_penalty": 0.0,
+                    "stop_strings": "",
+                    "reasoning_mode": True,
+                    "reasoning_effort": "medium",
+                    "soul_memory_reasoning_effort": "none",
+                    "soul_stage_reasoning_effort": "none"
                 },
                 "user_data": {
                     "default_persona": "None",
@@ -779,6 +790,7 @@ class ConfigurationCharacters():
             "example_messages": new_example_messages,
             "alternate_greetings": new_alternate_greetings,
             "conversation_method": conversation_method,
+            "character_information": system_prompt,
             "system_prompt": system_prompt
         })
 
