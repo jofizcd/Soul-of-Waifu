@@ -1,3 +1,6 @@
+import io
+import base64
+from PIL import Image
 import asyncio
 import logging
 import discord
@@ -77,8 +80,9 @@ class DiscordBotManager:
                     logger.debug(f"on_message: ignored (matched a command: {message.content!r})")
                     return
 
-                logger.info(f"on_message: dispatching to AI pipeline: {message.content!r}")
-                await self.process_ai_response(message, message.content)
+                clean_text = message.clean_content if hasattr(message, "clean_content") else message.content
+                logger.info(f"on_message: dispatching to AI pipeline: {clean_text!r}")
+                await self.process_ai_response(message, clean_text)
 
             except Exception as e:
                 logger.error(f"Unhandled error in on_message: {e}", exc_info=True)
@@ -91,6 +95,61 @@ class DiscordBotManager:
                         exc_info=True,
                     )
 
+    async def process_discord_attachments(self, message: discord.Message) -> list[dict]:
+        encoded_images = []
+        IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif')
+        
+        if not message.attachments:
+            return encoded_images
+
+        for att in message.attachments:
+            if any(att.filename.lower().endswith(ext) for ext in IMAGE_EXTENSIONS):
+                try:
+                    data = await att.read()
+                    with Image.open(io.BytesIO(data)) as img:
+                        img = img.convert("RGB") if img.mode not in ("RGB", "RGBA") else img
+                        width, height = img.size
+                        max_dim = 1536
+                        
+                        if max(width, height) > max_dim:
+                            scale = max_dim / float(max(width, height))
+                            resample_filter = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+                            img = img.resize((max(1, int(width * scale)), max(1, int(height * scale))), resample_filter)
+                        
+                        buffer = io.BytesIO()
+                        img.save(buffer, format="PNG")
+                        b64_data = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                        encoded_images.append({"mime": "image/png", "b64": b64_data})
+                except Exception as e:
+                    logger.error(f"Failed to process Discord image attachment '{att.filename}': {e}")
+        
+        return encoded_images
+    
+    async def fetch_channel_history_context(self, message: discord.Message, limit: int = 20) -> str:
+        if not message.channel:
+            return ""
+
+        history_messages = []
+        try:
+            async for msg in message.channel.history(limit=limit, before=message, oldest_first=False):
+                clean_txt = msg.clean_content.strip() if hasattr(msg, "clean_content") else msg.content.strip()
+                if not clean_txt:
+                    continue
+                
+                author_name = msg.author.display_name
+                history_messages.append(f"[{author_name}]: {clean_txt}")
+
+            history_messages.reverse()
+
+            if history_messages:
+                channel_name = getattr(message.channel, 'name', 'chat')
+                header = f"[RECENT MESSAGES IN #{channel_name} BEFORE THIS MOMENT]:"
+                return header + "\n" + "\n".join(history_messages)
+        except Exception as e:
+            logger.warning(f"Could not fetch channel history context: {e}")
+
+        return ""
+    
     async def process_ai_response(self, message: discord.Message, text_input: str):
         signals = self.main_window.interface_signals
         current_char = getattr(signals, "current_active_character", None)
@@ -107,19 +166,53 @@ class DiscordBotManager:
 
         async with self.chat_lock:
             try:
-                if text_input and self.bot.user:
-                    text_input = text_input.replace(f"<@{self.bot.user.id}>", "").replace(f"<@!{self.bot.user.id}>", "").strip()
+                channel_history = await self.fetch_channel_history_context(message, limit=6)
+
+                raw_clean_text = message.clean_content if hasattr(message, "clean_content") else text_input
+
+                if self.bot.user:
+                    bot_display = f"@{self.bot.user.display_name}"
+                    bot_name = f"@{self.bot.user.name}"
+                    
+                    if raw_clean_text.startswith(bot_display):
+                        raw_clean_text = raw_clean_text[len(bot_display):].strip()
+                    elif raw_clean_text.startswith(bot_name):
+                        raw_clean_text = raw_clean_text[len(bot_name):].strip()
+
+                final_text = raw_clean_text.strip()
 
                 char_info = self._get_char_config(current_char)
                 conv_method = char_info.get("conversation_method", "Local LLM")
                 logger.debug(f"process_ai_response: conversation_method={conv_method!r}")
 
                 async with message.channel.typing():
+                    discord_images = await self.process_discord_attachments(message)
+
+                    channel_history = await self.fetch_channel_history_context(message, limit=20)
+
+                    raw_clean_text = message.clean_content if hasattr(message, "clean_content") else text_input
+
+                    if self.bot.user:
+                        bot_display = f"@{self.bot.user.display_name}"
+                        bot_name = f"@{self.bot.user.name}"
+                        if raw_clean_text.startswith(bot_display):
+                            raw_clean_text = raw_clean_text[len(bot_display):].strip()
+                        elif raw_clean_text.startswith(bot_name):
+                            raw_clean_text = raw_clean_text[len(bot_name):].strip()
+
+                    final_text = raw_clean_text.strip()
+                    if not final_text and discord_images:
+                        final_text = "[Sent an image]"
+
                     await signals.handle_user_message(
                         character_name=current_char,
                         conversation_method=conv_method,
-                        external_text=text_input,
-                        discord_context=message
+                        external_text=final_text,
+                        discord_context=message,
+                        discord_user_name=message.author.display_name,
+                        discord_user_id=str(message.author.id),
+                        discord_channel_history=channel_history,
+                        discord_image_attachments=discord_images
                     )
 
             except Exception as e:
