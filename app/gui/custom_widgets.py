@@ -3,10 +3,12 @@ import re
 import math
 import subprocess
 import logging
+import tiktoken
 import json
 import aiohttp
 import random
 import hashlib
+import functools
 from pathlib import Path
 
 import yaml
@@ -29,6 +31,15 @@ from app.utils.backend_updater import LlamaUpdater
 from app.configuration import configuration
 
 logger = logging.getLogger("Interface Signals")
+
+def safe_paint(method):
+    @functools.wraps(method)
+    def wrapper(self, event):
+        try:
+            return method(self, event)
+        except Exception:
+            logger.exception(f"paintEvent failed in {type(self).__name__}")
+    return wrapper
 
 def _load_translations() -> dict:
     """Loads translation YAML based on program language setting."""
@@ -529,6 +540,7 @@ class CharacterCardCharactersGateway(QtWidgets.QFrame):
         self.shadow_effect.setBlurRadius(15)
         super().leaveEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
@@ -2103,6 +2115,7 @@ class BackgroundCard(QtWidgets.QFrame):
         self.anim_scale.start()
         super().leaveEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -2510,6 +2523,7 @@ class CharacterCardList(QtWidgets.QFrame):
         self.shadow_effect.setBlurRadius(15)
         super().leaveEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
@@ -2621,6 +2635,7 @@ class AnimatedHoverButton(QtWidgets.QPushButton):
         self.anim.start()
         super().leaveEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
@@ -2648,6 +2663,7 @@ class AnimatedDotsWidget(QWidget):
         self.phase += 0.12
         self.update()
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -2883,140 +2899,6 @@ class SmoothMessageFrame(QtWidgets.QFrame):
         self._current_height = -1.0
         self._target_height = -1.0
         self._last_height = -1
-
-class TypewriterEffect(QtCore.QObject):
-    def __init__(self, label, frame, scroll_area, interface, char_name, user_name, interval=16):
-        super().__init__()
-        self.label = label
-        self.frame = frame          
-        self.scroll_area = scroll_area
-        self.interface = interface
-        self.char_name = char_name
-        self.user_name = user_name
-        
-        self.raw_text_buffer = ""
-        self.queue = deque()
-        
-        self.finished_event = asyncio.Event()
-        self.finished_event.set()
-        
-        self.timer = QtCore.QTimer()
-        self.timer.setInterval(interval)
-        self.timer.timeout.connect(self._on_timeout)
-        
-        self.ui_update_timer = QtCore.QTimer()
-        self.ui_update_timer.setInterval(60) 
-        self.ui_update_timer.timeout.connect(self._update_display)
-        
-        self._text_changed_since_last_update = False
-        
-        if hasattr(self.frame, 'scroll_callback'):
-            self.frame.scroll_callback = None
-
-    def _force_scroll_down(self):
-        QtCore.QTimer.singleShot(0, self._do_scroll)
-
-    def _do_scroll(self):
-        scrollbar = self.scroll_area.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
-
-    def write(self, text_chunk):
-        if not text_chunk:
-            return
-        self.finished_event.clear()
-        
-        for char in text_chunk:
-            self.queue.append(char)
-        
-        if not self.timer.isActive():
-            self.timer.start()
-        if not self.ui_update_timer.isActive():
-            self.ui_update_timer.start()
-
-    def _on_timeout(self):
-        if not self.queue:
-            self.timer.stop()
-            return
-
-        q_len = len(self.queue)
-        
-        if q_len > 300:
-            chunk_size = q_len // 3
-        elif q_len > 100:
-            chunk_size = q_len // 5
-        elif q_len > 20:
-            chunk_size = 4
-        else:
-            chunk_size = 1
-
-        for _ in range(chunk_size):
-            if self.queue:
-                self.raw_text_buffer += self.queue.popleft()
-            else:
-                break
-        
-        self._text_changed_since_last_update = True
-
-    def _update_display(self):
-        if not self._text_changed_since_last_update:
-            if not self.queue and not self.timer.isActive():
-                self.ui_update_timer.stop()
-                self._finalize_effect()
-            return
-
-        try:
-            processed_html = self.interface.markdown_to_html(self.raw_text_buffer)
-            processed_html = self.interface.apply_macros(processed_html, self.char_name, self.user_name)
-            self.label.setText(processed_html)
-            self._text_changed_since_last_update = False
-
-            self.frame.setMinimumHeight(0)
-            self.frame.setMaximumHeight(16777215)
-
-            self._force_scroll_down()
-
-        except RuntimeError:
-            self.stop()
-
-    def _finalize_effect(self):
-        try:
-            if hasattr(self.frame, 'finalize_size'):
-                self.frame.finalize_size()
-        except RuntimeError:
-            pass
-        self.finished_event.set()
-
-    async def wait_until_finished(self):
-        if self.queue or self.timer.isActive() or self.ui_update_timer.isActive():
-            await self.finished_event.wait()
-
-    def stop_and_flush(self):
-        self.timer.stop()
-        self.ui_update_timer.stop()
-        while self.queue:
-            self.raw_text_buffer += self.queue.popleft()
-            
-        try:
-            self._text_changed_since_last_update = True
-            self._update_display()
-            if hasattr(self.frame, 'finalize_size'):
-                self.frame.finalize_size()
-        except RuntimeError:
-            pass
-            
-        self.finished_event.set()
-        return self.raw_text_buffer
-
-    def stop(self):
-        self.timer.stop()
-        self.ui_update_timer.stop()
-        self.queue.clear()
-        self.finished_event.set()
-        try:
-            if hasattr(self.frame, 'finalize_size'):
-                self.frame.finalize_size()
-        except RuntimeError:
-            pass
 
 class MethodCard(QFrame):
     clicked = QtCore.pyqtSignal()
@@ -3710,6 +3592,7 @@ class CharacterFolderCard(QtWidgets.QFrame):
             self.main_app._save_groups(groups)
             asyncio.create_task(self.main_app.set_main_tab())
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
@@ -3801,6 +3684,7 @@ class EditorCharacterItemWidget(QWidget):
         layout.addWidget(avatar_label)
 
 class _GlowPanel(QtWidgets.QFrame):
+    @safe_paint
     def paintEvent(self, event):
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
@@ -4065,7 +3949,7 @@ class AboutDialog(QtWidgets.QDialog):
 
         lp.addStretch()
 
-        ver_bottom = QtWidgets.QLabel("v2.4.5")
+        ver_bottom = QtWidgets.QLabel("v2.4.7")
         ver_bottom.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ver_bottom.setStyleSheet(
             "font-size: 8.5pt; color: rgba(255,255,255,0.17);"
@@ -4087,7 +3971,7 @@ class AboutDialog(QtWidgets.QDialog):
         title_lbl = QtWidgets.QLabel("Soul of Waifu")
         title_lbl.setObjectName("title_label")
 
-        version_badge = QtWidgets.QLabel("v2.4.5")
+        version_badge = QtWidgets.QLabel("v2.4.7")
         version_badge.setObjectName("version_badge")
         version_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version_badge.setFixedHeight(22)
@@ -5159,6 +5043,314 @@ def sow_toast(parent=None, title="", text="", msg_type="info", duration=4000):
     """
     SowToastManager.instance().show(parent, title, text, msg_type, duration)
 
+class CallModeDialog(QtWidgets.QDialog):
+    """
+    Small dialog shown from a character card's Call button, letting the user
+    pick which calling mode to launch with (Soul of Waifu System or Soul
+    Companion).
+    """
+    def __init__(self, parent=None, translations=None, current_mode=0):
+        super().__init__(parent)
+        self.setModal(True)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self.translations = translations or {}
+        self._overlay = None
+        self.selected_mode = current_mode
+
+        self._build_ui(current_mode)
+
+    def _build_ui(self, current_mode):
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+
+        self._card = QtWidgets.QFrame()
+        self._card.setObjectName("Card")
+        self._card.setFixedWidth(420)
+        self._card.setStyleSheet("""
+            QFrame#Card {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgb(26, 26, 34), stop:1 rgb(18, 18, 26));
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 16px;
+            }
+        """)
+
+        lay = QtWidgets.QVBoxLayout(self._card)
+        lay.setContentsMargins(28, 26, 28, 24)
+        lay.setSpacing(0)
+
+        f_title = QFont("Inter Tight", 15, QFont.Weight.Bold)
+        f_title.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        lbl_title = QtWidgets.QLabel(self.translations.get("call_mode_dialog_title", "Choose Call Mode"))
+        lbl_title.setFont(f_title)
+        lbl_title.setStyleSheet("color: #E2E8F0; background: transparent;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(lbl_title)
+
+        lay.addSpacing(6)
+
+        f_sub = QFont("Inter", 10)
+        f_sub.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+        lbl_sub = QtWidgets.QLabel(self.translations.get(
+            "call_mode_dialog_subtitle", "You can switch modes any time — this won't change your default Settings."
+        ))
+        lbl_sub.setFont(f_sub)
+        lbl_sub.setWordWrap(True)
+        lbl_sub.setStyleSheet("color: rgba(226,232,240,0.5); background: transparent;")
+        lbl_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(lbl_sub)
+
+        lay.addSpacing(20)
+
+        options_row = QtWidgets.QHBoxLayout()
+        options_row.setSpacing(12)
+
+        self._option_buttons = {}
+
+        def make_option(mode_idx, icon_text, title_text, desc_text, accent):
+            btn = QtWidgets.QFrame()
+            btn.setObjectName("ModeOption")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(170)
+
+            v = QtWidgets.QVBoxLayout(btn)
+            v.setContentsMargins(16, 18, 16, 16)
+            v.setSpacing(6)
+
+            f_icon = QFont("Inter", 22)
+            f_icon.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+            icon_lbl = QtWidgets.QLabel(icon_text)
+            icon_lbl.setFont(f_icon)
+            icon_lbl.setStyleSheet(f"color: {accent}; background: transparent; border: none;")
+            icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v.addWidget(icon_lbl)
+
+            v.addSpacing(4)
+
+            f_opt_title = QFont("Inter Tight", 11, QFont.Weight.DemiBold)
+            f_opt_title.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+            opt_title_lbl = QtWidgets.QLabel(title_text)
+            opt_title_lbl.setFont(f_opt_title)
+            opt_title_lbl.setWordWrap(True)
+            opt_title_lbl.setStyleSheet("color: #E2E8F0; background: transparent; border: none;")
+            opt_title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v.addWidget(opt_title_lbl)
+
+            f_opt_desc = QFont("Inter", 9)
+            f_opt_desc.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+            opt_desc_lbl = QtWidgets.QLabel(desc_text)
+            opt_desc_lbl.setFont(f_opt_desc)
+            opt_desc_lbl.setWordWrap(True)
+            opt_desc_lbl.setStyleSheet("color: rgba(226,232,240,0.5); background: transparent; border: none;")
+            opt_desc_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v.addWidget(opt_desc_lbl, 1)
+
+            def _set_style(selected):
+                border_color = accent if selected else "rgba(255,255,255,0.1)"
+                bg = f"rgba(96,165,250,0.08)" if selected and accent == "#60A5FA" else \
+                     (f"rgba(167,139,250,0.08)" if selected else "rgba(255,255,255,0.03)")
+                btn.setStyleSheet(f"""
+                    QFrame#ModeOption {{
+                        background: {bg};
+                        border: 1.5px solid {border_color};
+                        border-radius: 12px;
+                    }}
+                    QFrame#ModeOption:hover {{
+                        border: 1.5px solid {accent};
+                    }}
+                """)
+
+            _set_style(mode_idx == current_mode)
+            btn._set_selected = _set_style
+
+            def _on_click(event, m=mode_idx):
+                self.selected_mode = m
+                for idx, b in self._option_buttons.items():
+                    b._set_selected(idx == m)
+
+            btn.mousePressEvent = _on_click
+
+            def _on_double_click(event, m=mode_idx):
+                self.selected_mode = m
+                self.accept()
+
+            btn.mouseDoubleClickEvent = _on_double_click
+
+            self._option_buttons[mode_idx] = btn
+            return btn
+
+        sow_btn = make_option(
+            0, "🖥️",
+            self.translations.get("call_mode_sow_title", "Soul of Waifu System"),
+            self.translations.get("call_mode_sow_desc", "Full-screen call window with an interactive model."),
+            "#60A5FA"
+        )
+        companion_btn = make_option(
+            1, "🪄",
+            self.translations.get("call_mode_companion_title", "Soul Companion"),
+            self.translations.get("call_mode_companion_desc", "A frameless desktop companion that stays on top of your other windows."),
+            "#A78BFA"
+        )
+
+        options_row.addWidget(sow_btn)
+        options_row.addWidget(companion_btn)
+        lay.addLayout(options_row)
+
+        lay.addSpacing(22)
+
+        line = QtWidgets.QFrame()
+        line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        line.setStyleSheet("background: rgba(255,255,255,0.07); max-height: 1px; border: none;")
+        lay.addWidget(line)
+        lay.addSpacing(18)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        f_btn = QFont("Inter Tight", 11, QFont.Weight.DemiBold)
+        f_btn.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+
+        btn_cancel = QtWidgets.QPushButton(self.translations.get("call_mode_dialog_cancel", "Cancel"))
+        btn_cancel.setFixedHeight(40)
+        btn_cancel.setFont(f_btn)
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.setStyleSheet("""
+            QPushButton {
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 10px;
+                color: rgba(226,232,240,0.7);
+            }
+            QPushButton:hover {
+                background: rgba(255,255,255,0.1);
+                border-color: rgba(255,255,255,0.2);
+                color: #E2E8F0;
+            }
+        """)
+        btn_cancel.clicked.connect(self.reject)
+
+        btn_confirm = QtWidgets.QPushButton(self.translations.get("call_mode_dialog_confirm", "Start Call"))
+        btn_confirm.setFixedHeight(40)
+        btn_confirm.setFont(f_btn)
+        btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_confirm.setStyleSheet("""
+            QPushButton {
+                background: rgba(96,165,250,0.12);
+                border: 1px solid rgba(96,165,250,0.35);
+                border-radius: 10px;
+                color: #60A5FA;
+            }
+            QPushButton:hover {
+                background: rgba(96,165,250,0.22);
+                border-color: rgba(96,165,250,0.6);
+            }
+        """)
+        btn_confirm.clicked.connect(self.accept)
+
+        btn_row.addWidget(btn_cancel, 2)
+        btn_row.addWidget(btn_confirm, 3)
+        lay.addLayout(btn_row)
+
+        root.addWidget(self._card, 0, Qt.AlignmentFlag.AlignCenter)
+
+    def _show_overlay(self):
+        if not self.parent():
+            return
+
+        self._overlay = QtWidgets.QWidget(self.parent())
+        self._overlay.setGeometry(self.parent().rect())
+        self._overlay.show()
+        self._overlay.raise_()
+        self.raise_()
+
+        self._ov_effect = QGraphicsOpacityEffect(self._overlay)
+        self._ov_effect.setOpacity(0.0)
+        self._overlay.setGraphicsEffect(self._ov_effect)
+        self._overlay.setStyleSheet("background: rgba(0, 0, 0, 180);")
+
+        self._ov_anim_in = QPropertyAnimation(self._ov_effect, b"opacity")
+        self._ov_anim_in.setDuration(200)
+        self._ov_anim_in.setStartValue(0.0)
+        self._ov_anim_in.setEndValue(1.0)
+        self._ov_anim_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._ov_anim_in.start()
+
+        self._overlay.mousePressEvent = lambda e: self.reject()
+
+    def _hide_overlay(self, then=None):
+        if not self._overlay:
+            if then:
+                then()
+            return
+
+        self._ov_anim_out = QPropertyAnimation(self._ov_effect, b"opacity")
+        self._ov_anim_out.setDuration(180)
+        self._ov_anim_out.setStartValue(self._ov_effect.opacity())
+        self._ov_anim_out.setEndValue(0.0)
+        self._ov_anim_out.setEasingCurve(QEasingCurve.Type.InCubic)
+
+        def _cleanup():
+            self._overlay.deleteLater()
+            self._overlay = None
+            if then:
+                then()
+
+        self._ov_anim_out.finished.connect(_cleanup)
+        self._ov_anim_out.start()
+
+    def _animate_in(self):
+        self.setWindowOpacity(0.0)
+        self._dlg_anim_in = QPropertyAnimation(self, b"windowOpacity")
+        self._dlg_anim_in.setDuration(200)
+        self._dlg_anim_in.setStartValue(0.0)
+        self._dlg_anim_in.setEndValue(1.0)
+        self._dlg_anim_in.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._dlg_anim_in.start()
+
+    def _animate_out(self, then=None):
+        self._dlg_anim_out = QPropertyAnimation(self, b"windowOpacity")
+        self._dlg_anim_out.setDuration(160)
+        self._dlg_anim_out.setStartValue(self.windowOpacity())
+        self._dlg_anim_out.setEndValue(0.0)
+        self._dlg_anim_out.setEasingCurve(QEasingCurve.Type.InCubic)
+        if then:
+            self._dlg_anim_out.finished.connect(then)
+        self._dlg_anim_out.start()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self.parent():
+            parent_rect = self.parent().rect()
+            parent_global = self.parent().mapToGlobal(parent_rect.topLeft())
+            x = parent_global.x() + (parent_rect.width() - self.width()) // 2
+            y = parent_global.y() + (parent_rect.height() - self.height()) // 2
+            self.move(x, y)
+        self._show_overlay()
+        self._animate_in()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.reject()
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.accept()
+
+    def reject(self):
+        def _finish():
+            self._overlay = None
+            super(CallModeDialog, self).reject()
+        self._animate_out()
+        self._hide_overlay(then=_finish)
+
+    def accept(self):
+        def _finish():
+            self._overlay = None
+            super(CallModeDialog, self).accept()
+        self._animate_out()
+        self._hide_overlay(then=_finish)
+
+
 class SowConfirmDialog(QtWidgets.QDialog):
     def __init__(self, parent=None, title="", text="",
                  confirm_text="Confirm", cancel_text="Cancel",
@@ -5930,6 +6122,8 @@ class PersonasEditorDialog(QDialog):
         self.current_mode = "add"
         self.original_name = None
         self.current_avatar_path = None
+
+        self.tokenizer = tiktoken.get_encoding("cl100k_base")
         
         self.setWindowTitle(self.translations.get("personas_editor_title", "Personas Editor"))
         self.setWindowIcon(QIcon("app/gui/icons/logotype.ico"))
@@ -6135,7 +6329,13 @@ class PersonasEditorDialog(QDialog):
             f"QPushButton:hover {{ background: rgba(196,154,56,0.27); border-color: rgba(196,154,56,0.52); color: {self._ACC_BRT}; }}"
         )
 
+        self.token_counter_lbl = QLabel("Tokens: 0")
+        self.token_counter_lbl.setFont(self.f_badge)
+        self.token_counter_lbl.setStyleSheet(f"color: {self._TEXT_S}; background: transparent; border: none;")
+
         footer_row.addWidget(self.delete_btn)
+        footer_row.addSpacing(16)
+        footer_row.addWidget(self.token_counter_lbl)
         footer_row.addStretch()
         footer_row.addWidget(self.set_default_btn)
         footer_row.addWidget(self.save_btn)
@@ -6166,6 +6366,8 @@ class PersonasEditorDialog(QDialog):
         self.save_btn.clicked.connect(self._save_action)
         self.delete_btn.clicked.connect(self._delete_action)
         self.set_default_btn.clicked.connect(self._set_default_action)
+        self.name_input.textChanged.connect(self._update_token_count)
+        self.desc_input.textChanged.connect(self._update_token_count)
 
     def _render_avatar(self, path):
         avatar_size = 110
@@ -6272,6 +6474,8 @@ class PersonasEditorDialog(QDialog):
         self._render_avatar(self.current_avatar_path)
         self.editor_area.setVisible(True)
 
+        self._update_token_count()
+
     def _on_add_new_clicked(self):
         self.list_widget.clearSelection()
         self.current_mode = "add"
@@ -6291,6 +6495,8 @@ class PersonasEditorDialog(QDialog):
         
         self.editor_area.setVisible(True)
         self.name_input.setFocus()
+
+        self._update_token_count()
 
     def _set_default_action(self):
         name = self.original_name
@@ -6398,6 +6604,39 @@ class PersonasEditorDialog(QDialog):
             title=self.translations.get("toast_success", "Success"),
             text=self.translations.get("toast_saved_successfully", "Saved successfully"),
             msg_type="success"
+        )
+
+    def _count_tokens(self, text: str) -> int:
+        if not text:
+            return 0
+        try:
+            return len(self.tokenizer.encode(text))
+        except Exception:
+            return len(text) // 4
+
+    def _update_token_count(self):
+        texts = [
+            self.name_input.text().strip(),
+            self.desc_input.toPlainText().strip()
+        ]
+        total_tokens = sum(self._count_tokens(t) for t in texts)
+
+        if total_tokens < 250:
+            color = "#4ADE80"  # Optimal
+            weight_text = "Optimal"
+        elif total_tokens < 600:
+            color = "#82CDFF"  # Normal
+            weight_text = "Normal"
+        elif total_tokens < 1200:
+            color = "#E2B34C"  # Heavy
+            weight_text = "Heavy"
+        else:
+            color = "#C44040"  # Critical
+            weight_text = "Critical"
+
+        self.token_counter_lbl.setText(f"Tokens: {total_tokens} ({weight_text})")
+        self.token_counter_lbl.setStyleSheet(
+            f"color: {color}; font-family: 'Inter Tight SemiBold'; font-size: 11px; background: transparent; border: none;"
         )
 
 class SystemPromptEditorDialog(QDialog):
@@ -7180,6 +7419,8 @@ class LorebookEditorDialog(QDialog):
         self.current_entry_index    = -1
         self.is_programmatic_change = False
 
+        self.tokenizer = tiktoken.get_encoding("cl100k_base")
+
         self._trigger_labels = [
             self.translations.get("lorebook_trig_keyword", "Keywords"),
             self.translations.get("lorebook_trig_semantic", "Semantic"),
@@ -7519,6 +7760,10 @@ class LorebookEditorDialog(QDialog):
         self.depth_combo.setFixedSize(128, 30)
         self.depth_combo.setFont(self.f_input)
         self.depth_combo.setStyleSheet(self._s_combo("LBDepthCombo"))
+
+        self.token_counter_lbl = QLabel("Tokens: 0")
+        self.token_counter_lbl.setFont(self.f_label)
+        self.token_counter_lbl.setStyleSheet(f"color: {self._TEXT_S}; margin-left: 12px; background: transparent; border: none;")
  
         self.btn_import = self._text_icon_btn("app/gui/icons/import.png", self.translations.get("lorebook_editor_import_lorebook", "Import JSON"), "LBBtnImport")
         self.btn_export = self._text_icon_btn("app/gui/icons/export.png", self.translations.get("lorebook_editor_export_lorebook", "Export JSON"), "LBBtnExport")
@@ -7531,6 +7776,7 @@ class LorebookEditorDialog(QDialog):
  
         lay.addWidget(depth_lbl)
         lay.addWidget(self.depth_combo)
+        lay.addWidget(self.token_counter_lbl)
         lay.addStretch()
         lay.addWidget(self.btn_import)
         lay.addWidget(self.btn_export)
@@ -7734,7 +7980,7 @@ class LorebookEditorDialog(QDialog):
             f"QPushButton#{name}:hover{{background:{self._SURF3};"
             f"border-color:rgba(255,255,255,0.16);}}"
         )
- 
+
     def _s_accent_btn(self, name):
         return (
             f"QPushButton#{name}{{background:{self._ACC_MUT};border:1px solid {self._ACC_GLO};"
@@ -7742,7 +7988,7 @@ class LorebookEditorDialog(QDialog):
             f"QPushButton#{name}:hover{{background:rgba(196,154,56,0.27);"
             f"border-color:rgba(196,154,56,0.52);color:{self._ACC_BRT};}}"
         )
- 
+
     def _s_danger_btn(self, name):
         return (
             f"QPushButton#{name}{{background:{self._DNG_MUT};border:1px solid rgba(196,64,64,0.2);"
@@ -7751,7 +7997,6 @@ class LorebookEditorDialog(QDialog):
             f"border-color:rgba(196,64,64,0.45);color:#EE7777;}}"
         )
 
- 
     def load_lorebooks(self):
         self.lorebooks = (
             self.configuration_settings
@@ -7778,6 +8023,8 @@ class LorebookEditorDialog(QDialog):
             self.form_widget.setVisible(False)
             self.empty_state.setVisible(True)
             self.populate_entry_list()
+
+        self._update_token_count()
  
     def populate_entry_list(self):
         self.entry_list.clear()
@@ -7853,6 +8100,8 @@ class LorebookEditorDialog(QDialog):
         self.is_programmatic_change = False
         self.empty_state.setVisible(False)
         self.form_widget.setVisible(True)
+
+        self._update_token_count()
  
     def save_current_entry_changes(self):
         if self.is_programmatic_change or self.current_entry_index < 0:
@@ -7895,6 +8144,8 @@ class LorebookEditorDialog(QDialog):
         if it:
             abbr = _TRIGGER_ABBR.get(_TRIGGER_KEYS[idx], "KW")
             it.setText(f"[{abbr}]  {e['name']}")
+
+        self._update_token_count()
  
     def on_type_changed(self, idx):
         self.stack_triggers.setCurrentIndex(idx)
@@ -7931,6 +8182,8 @@ class LorebookEditorDialog(QDialog):
             self.form_widget.setVisible(False)
             self.empty_state.setVisible(True)
             self.populate_entry_list()
+
+        self._update_token_count()
 
     def _show_name_dialog(self, title: str, label_text: str, default_text: str = "") -> str | None:
         dialog = SowInputDialog(
@@ -8057,6 +8310,58 @@ class LorebookEditorDialog(QDialog):
         except Exception as exc:
             error_title = self.translations.get("lorebook_editor_import_error", "Import Error")
             sow_toast(self.main_window, error_title, str(exc), "error")
+
+    def _count_tokens(self, text: str) -> int:
+        if not text:
+            return 0
+        try:
+            return len(self.tokenizer.encode(text))
+        except Exception:
+            return len(text) // 4
+
+    def _update_token_count(self):
+        if not hasattr(self, 'token_counter_lbl'):
+            return
+
+        if not self.current_lorebook_name or self.current_lorebook_name not in self.lorebooks:
+            self.token_counter_lbl.setText("Tokens: 0")
+            self.token_counter_lbl.setStyleSheet(f"color: {self._TEXT_S}; margin-left: 12px; background: transparent; border: none;")
+            return
+
+        entry_texts = [
+            self.input_name.text().strip(),
+            self.input_content.toPlainText().strip(),
+            self.input_keys.text().strip(),
+            self.input_exclude.text().strip(),
+            self.input_semantic.toPlainText().strip()
+        ]
+        entry_tokens = sum(self._count_tokens(t) for t in entry_texts)
+
+        lb = self.lorebooks[self.current_lorebook_name]
+        total_tokens = 0
+        for e in lb.get("entries", []):
+            total_tokens += self._count_tokens(e.get("name", ""))
+            total_tokens += self._count_tokens(e.get("content", ""))
+            total_tokens += self._count_tokens(" ".join(e.get("key", [])))
+            total_tokens += self._count_tokens(" ".join(e.get("exclude_key", [])))
+            total_tokens += self._count_tokens(e.get("semantic_trigger", ""))
+
+        if entry_tokens < 300:
+            color = "#4ADE80"  # Optimal
+            weight = "Optimal"
+        elif entry_tokens < 800:
+            color = "#E2B34C"  # Heavy
+            weight = "Heavy"
+        else:
+            color = "#C44040"  # Warning
+            weight = "Critical"
+
+        if self.current_entry_index >= 0:
+            self.token_counter_lbl.setText(f"Entry: <b style='color:{color};'>{entry_tokens}</b> ({weight}) · Book Total: <b>{total_tokens}</b>")
+        else:
+            self.token_counter_lbl.setText(f"Book Total: <b>{total_tokens}</b> tokens")
+
+        self.token_counter_lbl.setStyleSheet(f"color: {self._TEXT}; margin-left: 12px; background: transparent; border: none; font-size: 11px;")
 
 class AuthorNotesEditorDialog(QDialog):
     _BG       = "#0C0C10"
@@ -9461,6 +9766,7 @@ class StatusDot(QtWidgets.QWidget):
             self._pulse_anim = None
         self.set_glow(0.22)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
@@ -9565,3 +9871,214 @@ class LocalModelStatusWidget(QtWidgets.QWidget):
             self.status_dot.start_pulse()
         else:
             self.status_dot.stop_pulse()
+
+class SceneFolderCard(QtWidgets.QFrame):
+    def __init__(self, group_name: str, scene_count: int, preview_bgs: list, soul_stage_page, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(210, 270)
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self.group_name = group_name
+        self.scene_count = scene_count
+        self.soul_stage_page = soul_stage_page
+        self.translations = getattr(soul_stage_page, "translations", {}) or _load_translations()
+        
+        self.pixmap = QtGui.QPixmap(210, 270)
+        self.pixmap.fill(QtCore.Qt.GlobalColor.transparent)
+        
+        painter = QtGui.QPainter(self.pixmap)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform)
+        
+        valid_bgs = [bg for bg in preview_bgs if bg and bg != "None" and os.path.exists(bg)]
+        
+        if valid_bgs:
+            positions = [
+                QtCore.QRectF(0, 0, 105, 135), QtCore.QRectF(105, 0, 105, 135),
+                QtCore.QRectF(0, 135, 105, 135), QtCore.QRectF(105, 135, 105, 135)
+            ]
+            for i, path in enumerate(valid_bgs[:4]):
+                px = QtGui.QPixmap(path)
+                if px.isNull(): 
+                    px = QtGui.QPixmap("app/gui/icons/soul_stage.png")
+                
+                scaled = px.scaled(105, 135, QtCore.Qt.AspectRatioMode.KeepAspectRatioByExpanding, QtCore.Qt.TransformationMode.SmoothTransformation)
+                sx = (scaled.width() - 105) // 2
+                sy = (scaled.height() - 135) // 2
+                cropped = scaled.copy(sx, sy, 105, 135)
+                painter.drawPixmap(int(positions[i].x()), int(positions[i].y()), cropped)
+            
+            painter.fillRect(self.pixmap.rect(), QtGui.QColor(0, 0, 0, 110))
+        else:
+            gradient = QtGui.QLinearGradient(0, 0, 210, 270)
+            gradient.setColorAt(0, QtGui.QColor(18, 36, 28))
+            gradient.setColorAt(1, QtGui.QColor(10, 20, 15))
+            painter.fillRect(self.pixmap.rect(), QtGui.QBrush(gradient))
+            
+            stage_icon = QtGui.QPixmap("app/gui/icons/soul_stage.png").scaled(
+                52, 52, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation
+            )
+            painter.drawPixmap(210//2 - 26, 270//2 - 40, stage_icon)
+            
+        painter.end()
+
+        self.shadow_effect = QtWidgets.QGraphicsDropShadowEffect(self)
+        self.shadow_effect.setBlurRadius(18)
+        self.shadow_effect.setColor(QtGui.QColor(0, 230, 118, 40))
+        self.shadow_effect.setOffset(0, 5)
+        self.setGraphicsEffect(self.shadow_effect)
+
+        self._hover_scale = 1.0
+        self.anim_scale = QtCore.QPropertyAnimation(self, b"hover_scale")
+        self.anim_scale.setDuration(300)
+        self.anim_scale.setEasingCurve(QtCore.QEasingCurve.Type.InOutCubic)
+
+        self._darkness_alpha = 100.0
+        self.anim_dark = QtCore.QPropertyAnimation(self, b"darkness_alpha")
+        self.anim_dark.setDuration(300)
+        self.anim_dark.setEasingCurve(QtCore.QEasingCurve.Type.InOutCubic)
+
+        self._info_alpha = 255.0
+        self.anim_info = QtCore.QPropertyAnimation(self, b"info_alpha")
+        self.anim_info.setDuration(250)
+        self.anim_info.setEasingCurve(QtCore.QEasingCurve.Type.InOutCubic)
+
+        self.action_panel = QtWidgets.QFrame(self)
+        self.action_panel.setStyleSheet("background-color: rgba(14, 20, 16, 0.95); border: 1px solid rgba(0, 230, 118, 0.2); border-radius: 15px;")
+        self.action_panel.setGeometry(10, 280, 190, 45)
+        self.action_panel_layout = QtWidgets.QHBoxLayout(self.action_panel)
+        self.action_panel_layout.setContentsMargins(5, 0, 5, 0)
+        self.action_panel_layout.setSpacing(5)
+        
+        self.panel_anim = QtCore.QPropertyAnimation(self.action_panel, b"pos")
+        self.panel_anim.setDuration(300)
+        self.panel_anim.setEasingCurve(QtCore.QEasingCurve.Type.OutCubic)
+        
+        self.edit_btn = AnimatedHoverButton("app/gui/icons/edit.png", "#00E676", self.translations.get("folder_edit_btn", "Edit Folder"))
+        self.delete_btn = AnimatedHoverButton("app/gui/icons/bin.png", "#D32F2F", self.translations.get("folder_delete_btn", "Delete Folder"))
+        
+        self.edit_btn.clicked.connect(self._on_edit_clicked)
+        self.delete_btn.clicked.connect(self._on_delete_clicked)
+        
+        self.action_panel_layout.addWidget(self.edit_btn)
+        self.action_panel_layout.addWidget(self.delete_btn)
+
+    @QtCore.pyqtProperty(float)
+    def hover_scale(self): return self._hover_scale
+    @hover_scale.setter
+    def hover_scale(self, value): self._hover_scale = value; self.update()
+
+    @QtCore.pyqtProperty(float)
+    def darkness_alpha(self): return self._darkness_alpha
+    @darkness_alpha.setter
+    def darkness_alpha(self, value): self._darkness_alpha = value; self.update()
+
+    @QtCore.pyqtProperty(float)
+    def info_alpha(self): return self._info_alpha
+    @info_alpha.setter
+    def info_alpha(self, value): self._info_alpha = value; self.update()
+
+    def enterEvent(self, event):
+        self.anim_scale.setEndValue(1.05)
+        self.anim_dark.setEndValue(0.0)
+        self.anim_info.setEndValue(0.0)
+        self.panel_anim.setEndValue(QtCore.QPoint(10, 215))
+        
+        self.anim_scale.start()
+        self.anim_dark.start()
+        self.anim_info.start()
+        self.panel_anim.start()
+
+        self.shadow_effect.setOffset(0, 8)
+        self.shadow_effect.setBlurRadius(25)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.anim_scale.setEndValue(1.0)
+        self.anim_dark.setEndValue(100.0)
+        self.anim_info.setEndValue(255.0)
+        self.panel_anim.setEndValue(QtCore.QPoint(10, 280))
+        
+        self.anim_scale.start()
+        self.anim_dark.start()
+        self.anim_info.start()
+        self.panel_anim.start()
+
+        self.shadow_effect.setOffset(0, 5)
+        self.shadow_effect.setBlurRadius(18)
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self.soul_stage_page._open_folder_view(self.group_name)
+        super().mousePressEvent(event)
+
+    def _on_edit_clicked(self):
+        self.soul_stage_page._open_folder_editor(self.group_name)
+
+    def _on_delete_clicked(self):
+        title = self.translations.get("folder_delete_confirm_title", "Delete Folder")
+        msg = self.translations.get("folder_delete_confirm_msg", "Delete this folder?")
+        detail = f"'{self.group_name}' · " + self.translations.get("folder_delete_detail_scenes", "Scenes will return to the main lobby.")
+        full_text = f"{msg}<br><span style='color: rgba(255,255,255,0.4); font-size: 9pt;'>{detail}</span>"
+
+        dlg = SowConfirmDialog(
+            parent=self.window(),
+            title=title,
+            text=full_text,
+            confirm_text=self.translations.get("delete", "Delete"),
+            danger=True
+        )
+
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            groups = self.soul_stage_page._get_scene_groups()
+            groups.pop(self.group_name, None)
+            self.soul_stage_page._save_scene_groups(groups)
+            self.soul_stage_page.refresh_lobby()
+
+    @safe_paint
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform)
+
+        rect = self.rect()
+        path = QtGui.QPainterPath()
+        path.addRoundedRect(QtCore.QRectF(rect), 15, 15)
+        painter.setClipPath(path)
+
+        painter.save()
+        scale_factor = max(rect.width() / self.pixmap.width(), rect.height() / self.pixmap.height())
+        final_scale = scale_factor * self._hover_scale
+        painter.translate(rect.center())
+        painter.scale(final_scale, final_scale)
+        painter.drawPixmap(-self.pixmap.width() // 2, -self.pixmap.height() // 2, self.pixmap)
+        painter.restore()
+
+        if self._darkness_alpha > 0:
+            painter.fillRect(rect, QtGui.QColor(0, 0, 0, int(self._darkness_alpha)))
+
+        if self._info_alpha > 0:
+            gradient = QtGui.QLinearGradient(0, rect.height() * 0.4, 0, rect.height())
+            gradient.setColorAt(0, QtGui.QColor(0, 0, 0, 0))
+            gradient.setColorAt(1, QtGui.QColor(0, 0, 0, int(min(225, self._info_alpha))))
+            painter.fillRect(rect, QtGui.QBrush(gradient))
+
+            painter.setPen(QtGui.QColor(255, 255, 255, int(self._info_alpha)))
+            font = QtGui.QFont("Inter Tight SemiBold", 13, QtGui.QFont.Weight.Bold)
+            painter.setFont(font)
+            painter.drawText(QtCore.QRect(15, rect.height() - 75, rect.width() - 30, 30), 
+                             QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter, 
+                             self.group_name)
+            
+            scenes_label = self.translations.get("folder_scenes_label", "scenes")
+            count_font = QtGui.QFont("Inter Tight Medium", 10)
+            painter.setFont(count_font)
+            painter.setPen(QtGui.QColor(0, 230, 118, int(self._info_alpha * 0.85)))
+            count_text = f"🎬 {self.scene_count} {scenes_label}"
+            painter.drawText(QtCore.QRect(15, rect.height() - 45, rect.width() - 30, 20), 
+                             QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter, 
+                             count_text)
+
+        painter.end()
