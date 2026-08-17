@@ -467,16 +467,50 @@ enable_tool_calling_tooltip: "Allows the AI to execute Python functions natively
 # Native Tools
 tool_web_title: "WebSearchTool"
 tool_web_desc: "Search the web using a stealth DuckDuckGo API to retrieve real-time facts, weather, or news when asked."
-tool_media_title: "MediaControlTool"
-tool_media_desc: "Control media playback on your Windows PC (pause, play, next/prev tracks in Spotify, YouTube, or browser players)."
+
+tool_browse_web_title: "BrowserAgentTool [Playwright]"
+tool_browse_web_desc: "Autonomous web browsing and research via Chromium. Reads clean page text, clicks buttons, fills out forms, and downloads files into sandbox."
+
+tool_gui_action_title: "GUIActionTool [Computer Use]"
+tool_gui_action_desc: "Direct OS & GUI control: mouse movements, clicks, text typing, window scrolling, and keyboard hotkeys (Ctrl+S, Enter, Alt+Tab, etc.)."
+
+tool_execute_code_title: "ExecuteCodeTool [Code Interpreter]"
+tool_execute_code_desc: "Write and execute Python and PowerShell scripts inside an isolated local sandbox for calculations, file processing, and batch tasks."
+
+tool_file_organizer_title: "FileOrganizerTool [Workspace Manager]"
+tool_file_organizer_desc: "Inspect desktop/folder contents (.lnk shortcuts, directories, files), search files, and automatically organize loose files into categories."
+
+tool_planner_title: "TaskPlannerTool [Hierarchical Planner]"
+tool_planner_desc: "Deconstructs complex multi-step user requests into sequential tool chains and executes them with per-step safety checks."
+
+tool_app_control_title: "AppControlTool"
+tool_app_control_desc: "Manage Windows applications and shortcuts: launch programs, open folders/Recycle Bin, focus windows, or terminate processes on demand."
+
+tool_env_snapshot_title: "SystemVitalsMonitorTool [Hardware Watchdog]"
+tool_env_snapshot_desc: "Real-time hardware snapshots and background watchdog that proactively alerts on low battery, GPU overheating, or finished downloads."
+
+tool_hardware_specs_title: "GetHardwareSpecsTool"
+tool_hardware_specs_desc: "Retrieve detailed PC hardware specs (CPU, RAM, GPU, VRAM, and Storage) to evaluate system compatibility for games and local AI models."
+
 tool_read_clipboard_title: "ClipboardReaderTool"
-tool_read_clipboard_desc: "Read the current text content copied in the user's clipboard."
+tool_read_clipboard_desc: "Read the current text content copied in the user's clipboard for analysis or questions."
+
 tool_url_title: "OpenURLTool"
 tool_url_desc: "Open links or websites (like YouTube or GitHub) in your default web browser on demand."
+
 tool_sysinfo_title: "GetSystemInfoTool"
 tool_sysinfo_desc: "Retrieve the exact system time and date from your PC to help the AI keep track of the current schedule."
+
+tool_media_title: "MediaControlTool"
+tool_media_desc: "Control media playback on your Windows PC (pause, play, next/prev tracks in Spotify, YouTube, or browser players)."
+
 tool_vision_title: "TakeScreenshotTool [Vision]"
 tool_vision_desc: "Analyze active screen contents. Captures a quick screenshot and sends it to a multimodal AI model. Extremely performance-heavy!"
+
+sc_approval_title: "⚠️ Companion wants to perform an action"
+sc_approval_action: "Action"
+sc_approval_allow: "✓ Allow"
+sc_approval_deny: "✕ Decline"
 
 # MCP Settings
 mcp_title: "Model Context Protocol (MCP)"
@@ -523,8 +557,8 @@ web_server_error: "Status: Port 8000 busy or Error"
 # OPTIONS — VISUALIZATIONS (Live2D / VRM)
 # ──────────────────────────────────────────────────────────
 live2d_mode_label: "Choose mode"
-live2d_mode_with_gui: "With GUI"
-live2d_mode_without_gui: "Without GUI"
+live2d_mode_with_gui: "Soul of Waifu System"
+live2d_mode_without_gui: "Soul Companion"
 choose_model_fps: "Choose model FPS"
 model_fps_30: "30 FPS"
 model_fps_60: "60 FPS"
@@ -1199,6 +1233,9 @@ import_success: "Scene imported successfully!"
 import_error: "Failed to import scene. Invalid file format."
 select_file: "Select Scene File"
 
+folder_select_scenes_label: "Scenes inside this folder:"
+delete_folder: "Delete Folder"
+folder_select_scenes_title: "Edit Folder: "
 
 # ──────────────────────────────────────────────────────────
 # SOUL STAGE — SCENE EDITOR
@@ -1454,7 +1491,7 @@ model_loading_step_6: "MODEL ONLINE"
 update_available_title: "Update Available"
 update_available_body: "A new version is available: "
 update_available_info: "Would you like to update the program?"
-update_current_version: "Current version: v2.4.5"
+update_current_version: "Current version: v2.4.7"
 update_available_close: "Close"
 update_available_link: "Go to GitHub"
 language_changed_title: "Restart Required"
@@ -1473,7 +1510,7 @@ about_program_description: "<b>Soul of Waifu</b> is a free, open-source desktop 
 support_btn: "Support"
 creator_label: "Developed by"
 simple_version_label: "Version"
-version_label: "Soul of Waifu v2.4.5"
+version_label: "Soul of Waifu v2.4.7"
 nsfw_checkbox: "NSFW"
 value: "Value: "
 
@@ -1492,6 +1529,9 @@ soul_memory_no_chat: "Please open a chat with a character first."
 soul_memory_empty: "Chat history is empty."
 soul_memory_manual_start: "Manual memory update started..."
 soul_memory_manual_completed: "Manual memory update was successfully completed..."
+soul_memory_manual_error: "Manual memory update failed."
+soul_memory_manual_cancelled: "Manual memory update was cancelled."
+soul_memory_provider_error: "Provider '{provider}' not found."
 toast_voice_settings_title: "Voice Settings"
 toast_search_title: "Voice Search"
 toast_connection_error_title: "Connection Error"
@@ -1662,6 +1702,11 @@ max_tokens_tooltip: |-
   Controls <b>how long the character's reply can be</b>.<br><br>
   💡 <i>Very long responses eat up context space. Recommended: 300–500 tokens.</i>
 
+reasoning_effort_tooltip: |-
+  <b>Reasoning Effort</b><br><br>
+  Controls how much internal reasoning cloud reasoning models are allowed to do before answering.<br>
+  Applies to OpenAI o-series/GPT-5, Claude extended thinking, Gemini, Grok, DeepSeek, Qwen and GLM reasoning models.
+
 custom_args_tooltip: |-
   <b>Custom Backend Arguments</b><br><br>
   Allows you to pass additional command-line arguments directly to the local LLM server (llama.cpp).<br><br>
@@ -1766,7 +1811,9 @@ auto_summary_tooltip: "This setting allows you to specify the number of messages
 # OTHER TOOLTIPS
 # ──────────────────────────────────────────────────────────
 attach_file_tooltip: "Attach an image or a document to your message"
-
+tooltip_create_character: "Create New Character"
+tooltip_import_character: "Import Character Card"
+tooltip_new_folder: "Create New Folder"
 
 # ──────────────────────────────────────────────────────────
 # SOUL COMPANION CONTEXT MENU
@@ -1814,7 +1861,7 @@ sc_menu_min_60: "60 minutes"
 
 tts_notice_title: "💡 First Run Notice for TTS Engines"
 tts_notice_first_run_text: "Please note: prior to the first launch of <b>XTTSv2</b>, <b>Kokoro</b>, <b>Silero</b>, or <b>Qwen 3 TTS</b>, the program will automatically download required weights and model components. You can view the upload process in the console.<br><br>Once the initial download completes, voice generation will work seamlessly and instantly offline."
-models_hub_recommendations_banner: "⭐ Curated list of local language models selected and verified by the application developer."
+models_hub_recommendations_banner: "⭐ Curated list of local language models selected and verified by the application developer. Compatibility data is based on the Q4 quantization."
 models_hub_popular_banner: "🔥 Currently popular GGUF models directly fetched from HuggingFace Hub."
 
 world_lorebook_gateway: "World Lorebooks"
@@ -2089,3 +2136,162 @@ sc_hud_cortisol: "🔥 Cortisol (Stress)"
 sc_hud_energy: "🔋 Energy (Vigor)"
 sc_hud_scratchpad_title: "🧠 Companion's Internal Thoughts (ScratchPad)"
 sc_input_placeholder: "Write your text..."
+
+no_folders_prompt_scenes: "No folders yet. Create one?"
+create: "Create"
+new_folder: "📁 New Folder"
+lobby_folders_section: "SCENE FOLDERS"
+lobby_scenes_section: "SCENES"
+folder_scenes_label: "scenes"
+folder_create_title_scene: "Create Scene Folder"
+folder_delete_detail_scenes: "Scenes will return to the main lobby."
+party_member_selected: "{n} selected"
+soul_stage_no_party_error: "No party members in the scene! Please add at least one character before launching."
+
+# Soul Stage — World State Tabs & Arcs/Relationships
+tab_arcs: "Story Arcs"
+tab_relationships: "Relationships"
+tab_character_states: "Character States"
+section_arcs: "Story Arcs"
+hint_arcs_format: "This is where you gate your plot. An arc in \"locked\" stage does not exist for any character — nobody will mention it or hint at it. Set it to \"available\" once the player has found the lead that should unlock it, or \"active\" once it's fully underway. \"trigger\" is a note to the GM about what should cause the unlock — it is never shown to characters."
+section_relationships: "Relationships"
+hint_relationships_format: "How one character feels about and perceives another — usually a party member or NPC's view of PLAYER, but it can be between any two actors. This is injected directly into that character's own prompt, so it's never forgotten. Affinity runs -100 (hostile) to 100 (devoted). \"role\" is how the subject currently sees the target's status or title — independent of affinity."
+field_relationships: "Relationships"
+field_relationships_hint: 'Format: "subject -> target | affinity(-100..100) | role_view | tag1, tag2"'
+section_character_states: "Character States"
+hint_overlays_format: "A character's own evolving state — their current role/title and any personal facts worth tracking (loyalty, a secret, an internal conflict). This travels with the character and shows up in their own prompt, separate from the static character card."
+
+# Soul Stage — Markdown Export
+export_md_no_scene: "No active scene to export."
+export_md_failed: "Failed to generate the export."
+export_md_dialog_title: "Export Scene as Markdown"
+export_md_write_failed: "Could not write the file — check the path and permissions."
+export_md_success: "Scene exported to Markdown."
+
+call_mode_dialog_title: "Choose Call Mode"
+call_mode_dialog_subtitle: "You can switch modes any time — this won't change your default Settings."
+call_mode_sow_title: "Soul of Waifu System"
+call_mode_sow_desc: "Full-screen call window with an interactive model and voice chat."
+call_mode_companion_title: "Soul Companion"
+call_mode_companion_desc: "A frameless desktop companion that stays on top of your other windows."
+call_mode_dialog_cancel: "Cancel"
+call_mode_dialog_confirm: "Start Call"
+
+confirm: "Confirm"
+var_preset_empty_title: "Empty"
+var_preset_empty_msg: "No variables to save."
+var_preset_save_title: "Save Preset"
+var_preset_save_label: "Enter preset name:"
+var_preset_save_placeholder: "My Custom Preset"
+var_preset_overwrite_title: "Overwrite Preset"
+var_preset_overwrite_msg: "A preset named '{name}' already exists. Overwrite?"
+var_preset_saved_title: "Saved"
+var_preset_saved_msg: "Preset '{name}' saved successfully."
+var_preset_not_found_title: "Not Found"
+var_preset_not_found_msg: "Can only delete custom presets."
+var_preset_delete_title: "Delete Preset"
+var_preset_delete_msg: "Delete preset '{preset_name}'?"
+var_preset_deleted_title: "Deleted"
+var_preset_deleted_msg: "Preset '{preset_name}' deleted successfully."
+
+# Reasoning Effort
+reasoning_effort_text: "Reasoning Effort"
+reasoning_effort_none: "Off"
+reasoning_effort_low: "Low"
+reasoning_effort_medium: "Medium"
+reasoning_effort_high: "High"
+
+# TTS Voicing Rules
+tts_rules_title: "Text-to-Speech Rules"
+section_tts_voicing_mode: "VOICING MODE SELECTION"
+tts_voicing_mode_label: "Voicing Mode"
+tts_custom_regex_label: "Custom Regex (Group 1)"
+tts_custom_regex_placeholder: "e.g., \\*(.*?)\\* to voice only inside asterisks"
+
+# LLM Params & Web Server
+custom_args_placeholder: "e.g., --rope-freq-base 10000 --temp 0.8"
+web_server_starting_btn: "Starting..."
+web_server_running_status: "Status: Running on http://127.0.0.1:8000"
+checkbox_auto_translate_new_messages: "Automatically translate new messages"
+auto_translate_new_messages_tooltip: "When enabled, every new character message is translated automatically.\nWhen disabled, messages stay in their original language and you can translate\nany of them manually via the Translate action in the message menu."
+delete_model: "Delete LLM"
+
+# Tool Calling in Chat
+toggle_tools_tooltip: "Let the character use tools (calculator, date/time, web search) while replying"
+toast_tools_title: "Tools"
+toast_tools_enabled: "The character can now use tools while replying: {tool_list}"
+toast_tools_disabled: "Tools are now disabled."
+tool_using_label: "using {tool}..."
+
+# Thinking Blocks (<think>)
+thinking_process_label: "THINKING PROCESS"
+thinking_hide_hint: "hide"
+thinking_show_hint: "show"
+
+# Attachments
+toast_attach_title: "Attachments"
+toast_attach_limit: "You can attach up to {limit} files per message."
+attach_file_dialog_title: "Attach files to your message"
+toast_attach_too_large: "'{filename}' is larger than {size} MB and was skipped."
+
+# Audio Replay & Voice
+toast_tts_replay_title: "Voice message"
+toast_tts_replay_missing: "No saved voice audio for this message."
+replay_voice_tooltip: "Play voice message"
+msg_action_replay_voice: "Play voice message"
+
+# Raw Prompt Preview Dialog
+preview_prompt_title: "Raw Prompt Preview"
+preview_prompt_desc: "This is approximately how the LLM model sees your character card before generating a response:"
+
+# AI Character Assistant Toast
+toast_ai_assistant_title: "AI Assistant"
+toast_ai_assistant_applied: "Successfully applied {applied_count} fields!"
+
+# Chat & Duplication
+duplicate_success: "Character duplicated as '{new_name}'"
+default_chat_name: "Default Chat"
+rename_chat_title: "Rename Chat"
+rename_chat_prompt: "Enter new chat name:"
+chat_renamed_success: "Chat renamed to '{new_name}'."
+imported_suffix: "Imported"
+edit_save_error: "Failed to save edited message!"
+translate_error: "Translation failed"
+
+# Memory Force Button
+force_memory_tooltip: "Force Soul Memory update now"
+
+image_gen_api_key: "API Key:"
+image_gen_started: "Analyzing scene & composing cinematic prompt..."
+image_gen_placeholder: "🖼 Generating image..."
+image_gen_failed: "⚠ Image generation failed"
+retry_button: "Retry"
+generated_image_title: "Generated Image"
+save_image_as: "Save image as..."
+regenerate_image: "Regenerate image"
+show_in_folder: "Show in folder"
+
+# Visual Modes in Dialog
+visual_engine_nothing: "Nothing"
+visual_engine_images: "Expressions Images"
+visual_engine_live2d: "Live2D Model"
+visual_engine_vrm: "VRM 3D Model"
+live2d_motion_mapper_btn: "Map Emotions to Motions"
+
+# Folders
+folder_no_chars_available: "No more characters available"
+folder_empty: "No characters in this folder"
+
+# About Dialog
+about_tagline: "AI ROLEPLAY ENGINE"
+
+# Story Summary
+author_notes_title: "Author's Notes"
+author_notes_saved_body: "The author's notes were saved successfully."
+summary_editor_no_new_msg: "No new messages to summarize."
+
+# Appearance Chat Preview
+appearance_preview_text_1: "She glances at you,"
+appearance_preview_text_2: "eyes narrowing slowly."
+appearance_preview_text_3: "So... you remember nothing?"
+appearance_preview_text_4: "I remember enough."
