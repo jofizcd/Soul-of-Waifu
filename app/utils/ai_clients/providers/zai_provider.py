@@ -4,6 +4,7 @@ from app.utils.ai_clients.base_provider import BaseAIProvider
 
 logger = logging.getLogger("Z.AI Provider")
 
+
 class ZAIProvider(BaseAIProvider):
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
@@ -12,6 +13,11 @@ class ZAIProvider(BaseAIProvider):
             api_key=self.api_key,
             base_url="https://api.z.ai/api/paas/v4/"
         )
+
+    def _thinking_extra_body(self, kwargs: dict) -> dict:
+        reasoning_effort = kwargs.get("reasoning_effort")
+        enabled = bool(reasoning_effort) and reasoning_effort != "none"
+        return {"thinking": {"type": "enabled" if enabled else "disabled"}}
 
     async def generate_stream(self, messages: list[dict], **kwargs):
         try:
@@ -23,6 +29,7 @@ class ZAIProvider(BaseAIProvider):
                 max_tokens=kwargs.get("max_tokens", 1000),
                 frequency_penalty=kwargs.get("frequency_penalty", 0.0),
                 presence_penalty=kwargs.get("presence_penalty", 0.0),
+                extra_body=self._thinking_extra_body(kwargs),
                 stream=True,
             )
 
@@ -45,6 +52,7 @@ class ZAIProvider(BaseAIProvider):
                 max_tokens=kwargs.get("max_tokens", 1000),
                 frequency_penalty=kwargs.get("frequency_penalty", 0.8),
                 presence_penalty=kwargs.get("presence_penalty", 0.3),
+                extra_body={"thinking": {"type": "disabled"}},
                 stream=False,
             )
             yield response.choices[0].message.content or ""
@@ -59,7 +67,8 @@ class ZAIProvider(BaseAIProvider):
                 "messages": messages,
                 "temperature": kwargs.get("temperature", 0.7),
                 "top_p": kwargs.get("top_p", 0.9),
-                "max_tokens": kwargs.get("max_tokens", 1000)
+                "max_tokens": kwargs.get("max_tokens", 1000),
+                "extra_body": {"thinking": {"type": "disabled"}},
             }
             if tools:
                 payload["tools"] = tools
