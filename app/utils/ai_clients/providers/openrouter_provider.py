@@ -44,6 +44,12 @@ class OpenRouterProvider(BaseAIProvider):
         if "presence_penalty" in kwargs:
             payload["presence_penalty"] = kwargs["presence_penalty"]
 
+        reasoning_effort = kwargs.get("reasoning_effort")
+        if reasoning_effort:
+            payload["extra_body"] = {
+                "reasoning": {"enabled": False} if reasoning_effort == "none" else {"effort": reasoning_effort}
+            }
+
         try:
             completion = await self.client.chat.completions.create(**payload)
             async for chunk in completion:
@@ -62,7 +68,8 @@ class OpenRouterProvider(BaseAIProvider):
             "temperature": kwargs.get("temperature", 0.5),
             "top_p": kwargs.get("top_p", 0.9),
             **({"stop": kwargs["stop"]} if kwargs.get("stop") else {}),
-            "extra_headers": self.extra_headers
+            "extra_headers": self.extra_headers,
+            "extra_body": {"reasoning": {"enabled": False}}
         }
 
         try:
@@ -83,7 +90,8 @@ class OpenRouterProvider(BaseAIProvider):
             "temperature": kwargs.get("temperature", 0.7),
             "top_p": kwargs.get("top_p", 0.9),
             **({"stop": kwargs["stop"]} if kwargs.get("stop") else {}),
-            "extra_headers": self.extra_headers
+            "extra_headers": self.extra_headers,
+            "extra_body": {"reasoning": {"enabled": False}}
         }
 
         if tools:
