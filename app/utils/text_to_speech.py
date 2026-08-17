@@ -44,6 +44,25 @@ os.environ["HUGGINGFACE_HUB_CACHE"] = CACHE_DIR
 
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+def fix_rvc_sample_rate(file_path, base_file_path=None, target_sr=48000):
+    if not file_path or not os.path.exists(file_path):
+        return file_path
+    try:
+        data, sr = sf.read(file_path, dtype='float32')
+
+        if sr != target_sr:
+            if base_file_path and os.path.exists(base_file_path):
+                data_base, sr_base = sf.read(base_file_path, dtype='float32')
+                dur_base = len(data_base) / sr_base
+                if dur_base > 0:
+                    target_sr = int(round(len(data) / dur_base))
+
+            sf.write(file_path, data, target_sr)
+            logger.info(f"[RVC Fix] Corrected header from {sr} Hz to {target_sr} Hz")
+    except Exception as e:
+        logger.warning(f"Failed to fix RVC sample rate: {e}")
+    return file_path
+
 class ElevenLabs:
     def __init__(self):
         self.configuration_settings = configuration.ConfigurationSettings()
@@ -195,8 +214,14 @@ class XTTSv2_SOW_System:
             model_name = os.path.splitext(os.path.basename(xttsv2_rvc_file))[0]
             rvc_output_file = f"app/voices/xttsv2_audio/output_rvc_{unique_id}.wav"
 
-            await asyncio.to_thread(self.rvc.load_model, model_name)
+            rvc_params = (model_name, f0up_key, index_rate, protect)
+            if getattr(self, "_current_rvc_params", None) != rvc_params:
+                await asyncio.to_thread(self.rvc.load_model, model_name)
+                self._current_rvc_params = rvc_params
+
             await asyncio.to_thread(self.rvc.infer_file, base_output_file, rvc_output_file)
+
+            fix_rvc_sample_rate(rvc_output_file, base_output_file)
 
             try:
                 await asyncio.to_thread(os.remove, base_output_file)
@@ -278,8 +303,14 @@ class EdgeTTS:
             model_name = os.path.splitext(os.path.basename(rvc_file))[0]
             rvc_output_file = os.path.join(self.output_dir, f"output_rvc_{unique_id}.wav")
 
-            await asyncio.to_thread(self.rvc.load_model, model_name)
+            rvc_params = (model_name, f0up_key, index_rate, protect)
+            if getattr(self, "_current_rvc_params", None) != rvc_params:
+                await asyncio.to_thread(self.rvc.load_model, model_name)
+                self._current_rvc_params = rvc_params
+
             await asyncio.to_thread(self.rvc.infer_file, wav_file, rvc_output_file)
+
+            fix_rvc_sample_rate(rvc_output_file, wav_file)
 
             try:
                 await asyncio.to_thread(os.remove, wav_file)
@@ -389,8 +420,14 @@ class KokoroTTS_SOW_System:
             model_name = os.path.splitext(os.path.basename(kokoro_rvc_file))[0]
             rvc_output_file = f"app/voices/kokoro_audio/output_rvc_{unique_id}.wav"
 
-            await asyncio.to_thread(self.rvc.load_model, model_name)
+            rvc_params = (model_name, f0up_key, index_rate, protect)
+            if getattr(self, "_current_rvc_params", None) != rvc_params:
+                await asyncio.to_thread(self.rvc.load_model, model_name)
+                self._current_rvc_params = rvc_params
+
             await asyncio.to_thread(self.rvc.infer_file, base_output_file, rvc_output_file)
+
+            fix_rvc_sample_rate(rvc_output_file, base_output_file)
 
             try:
                 await asyncio.to_thread(os.remove, base_output_file)
@@ -481,8 +518,14 @@ class SileroTTS_SOW_System:
             model_name = os.path.splitext(os.path.basename(silero_rvc_file))[0]
             rvc_output_file = f"app/voices/silero_audio/output_rvc_{unique_id}.wav"
 
-            await asyncio.to_thread(self.rvc.load_model, model_name)
+            rvc_params = (model_name, f0up_key, index_rate, protect)
+            if getattr(self, "_current_rvc_params", None) != rvc_params:
+                await asyncio.to_thread(self.rvc.load_model, model_name)
+                self._current_rvc_params = rvc_params
+            
             await asyncio.to_thread(self.rvc.infer_file, base_output_file, rvc_output_file)
+
+            fix_rvc_sample_rate(rvc_output_file, base_output_file)
 
             try:
                 await asyncio.to_thread(os.remove, base_output_file)
@@ -712,8 +755,14 @@ class Qwen3TTS_SOW_System:
             model_name = os.path.splitext(os.path.basename(qwen_rvc_file))[0]
             rvc_output_file = f"app/voices/qwen_audio/output_rvc_{unique_id}.wav"
 
-            await asyncio.to_thread(self.rvc.load_model, model_name)
+            rvc_params = (model_name, f0up_key, index_rate, protect)
+            if getattr(self, "_current_rvc_params", None) != rvc_params:
+                await asyncio.to_thread(self.rvc.load_model, model_name)
+                self._current_rvc_params = rvc_params
+
             await asyncio.to_thread(self.rvc.infer_file, base_output_file, rvc_output_file)
+
+            fix_rvc_sample_rate(rvc_output_file, base_output_file)
 
             try:
                 os.remove(base_output_file)
@@ -856,6 +905,12 @@ class TTSWorker(QThread):
 
         self.device_index = self.configuration_settings.get_main_setting("output_device_real_index")
 
+        self.tts_mode = self.configuration_settings.get_main_setting("tts_voicing_mode") or 0
+        self.tts_custom_regex = self.configuration_settings.get_main_setting("tts_custom_regex") or ""
+
+        self._in_tts_quote = False
+        self._in_asterisk = False
+
         self.xtts = XTTSv2_SOW_System()
         self.edge = EdgeTTS()
         self.kokoro = KokoroTTS_SOW_System()
@@ -936,17 +991,93 @@ class TTSWorker(QThread):
         if not text:
             return ""
 
-        text = re.sub(r'<[^>]+>', '', text)
-        text = re.sub(r'[*_~`#]', '', text)
-        text = re.sub(r'https?://\S+|www\.\S+', '', text)
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r"<[^>]+>", "", text)
+        text = re.sub(r"https?://\S+|www\.\S+", "", text)
 
-        return text
+        mode = self.tts_mode
+        regex = self.tts_custom_regex
+
+        # --- Mode 0: Voice Everything ---
+        if mode == 0:
+            return re.sub(r"[*_~`#]", "", text).strip()
+
+        # --- Mode 1: Voice Only Quotes ---
+        elif mode == 1:
+            result = []
+            parts = re.split(r'(["“”«»])', text)
+            for part in parts:
+                if part in ('"', "“", "”", "«", "»"):
+                    self._in_tts_quote = not self._in_tts_quote
+                    if not self._in_tts_quote:
+                        result.append(" ")
+                    continue
+                if self._in_tts_quote:
+                    result.append(part)
+            return re.sub(r"[*_~`#]", "", "".join(result)).strip()
+
+        # --- Mode 2: Ignore Asterisks ---
+        elif mode == 2:
+            result = []
+            parts = re.split(r"(\*|_)", text)
+            for part in parts:
+                if part in ("*", "_"):
+                    self._in_asterisk = not self._in_asterisk
+                    if not self._in_asterisk:
+                        result.append(" ")
+                    continue
+                if not self._in_asterisk:
+                    result.append(part)
+            return re.sub(r"[*_~`#]", "", "".join(result)).strip()
+
+        # --- Mode 3: Voice Outside Quotes ---
+        elif mode == 3:
+            result = []
+            parts = re.split(r'(["“”«»])', text)
+            for part in parts:
+                if part in ('"', "“", "”", "«", "»"):
+                    if part in ("“", "«"):
+                        self._in_tts_quote = True
+                    elif part in ("”", "»"):
+                        self._in_tts_quote = False
+                    else:
+                        self._in_tts_quote = not self._in_tts_quote
+
+                    if not self._in_tts_quote:
+                        result.append(" ")
+                    continue
+
+                if not self._in_tts_quote:
+                    result.append(part)
+
+            return re.sub(r"[*_~`#]", "", "".join(result)).strip()
+
+        # --- Mode 4: Custom Regex ---
+        elif mode == 4:
+            if not regex:
+                return re.sub(r"[*_~`#]", "", text).strip()
+            try:
+                matches = re.findall(regex, text)
+                if matches:
+                    extracted = []
+                    for m in matches:
+                        if isinstance(m, tuple):
+                            val = next((g for g in m if g), "")
+                            extracted.append(val)
+                        else:
+                            extracted.append(m)
+                    return " ".join(extracted).strip()
+                return ""
+            except re.error:
+                return re.sub(r"[*_~`#]", "", text).strip()
+
+        return text.strip()
     
     def clear_queue(self):
         with self.queue.mutex:
             self.queue.queue.clear()
         self.discard_current = True
+        self._in_tts_quote = False
+        self._in_asterisk = False
         if hasattr(self, 'playback_worker'):
             self.playback_worker.clear_queue()
 
@@ -1080,7 +1211,14 @@ class PipelinedTTSWorker(QThread):
         self.configuration_settings = configuration.ConfigurationSettings()
         self.configuration_api = configuration.ConfigurationAPI()
         self.configuration_characters = configuration.ConfigurationCharacters()
+
         self.device_index = self.configuration_settings.get_main_setting("output_device_real_index")
+
+        self.tts_mode = self.configuration_settings.get_main_setting("tts_voicing_mode") or 0
+        self.tts_custom_regex = self.configuration_settings.get_main_setting("tts_custom_regex") or ""
+
+        self._in_tts_quote = False
+        self._in_asterisk = False
 
         self._tts_engines_initialized = False
         self.xtts = None
@@ -1114,6 +1252,9 @@ class PipelinedTTSWorker(QThread):
     def add_text(self, text, message_id=None):
         if not text:
             return
+
+        self.discard_current = False
+        self._interrupt_flag.clear()
 
         text = self.clean_text_for_speech(text)
         if not text:
@@ -1160,17 +1301,103 @@ class PipelinedTTSWorker(QThread):
     def clean_text_for_speech(self, text: str) -> str:
         if not text:
             return ""
-        text = re.sub(r'<[^>]+>', '', text)
-        text = re.sub(r'[*_~`#]', '', text)
-        text = re.sub(r'https?://\S+|www\.\S+', '', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
+
+        text = re.sub(r"<[^>]+>", "", text)
+        text = re.sub(r"https?://\S+|www\.\S+", "", text)
+
+        mode = self.tts_mode
+        regex = self.tts_custom_regex
+
+        # --- Mode 0: Voice Everything ---
+        if mode == 0:
+            return re.sub(r"[*_~`#]", "", text).strip()
+
+        # --- Mode 1: Voice Only Quotes ---
+        elif mode == 1:
+            result = []
+            parts = re.split(r'(["“”«»])', text)
+            for part in parts:
+                if part in ('"', "“", "”", "«", "»"):
+                    self._in_tts_quote = not self._in_tts_quote
+                    if not self._in_tts_quote:
+                        result.append(" ")
+                    continue
+                if self._in_tts_quote:
+                    result.append(part)
+            
+            cleaned = re.sub(r"[*_~`#]", "", "".join(result)).strip()
+
+            if not cleaned and not any(q in text for q in ('"', "“", "”", "«", "»")):
+                no_actions = re.sub(r"\*[^*]+\*", "", text)
+                no_actions = re.sub(r"_[^_]+_", "", no_actions)
+                cleaned = re.sub(r"[*_~`#]", "", no_actions).strip()
+
+            return cleaned
+
+        # --- Mode 2: Ignore Asterisks ---
+        elif mode == 2:
+            result = []
+            parts = re.split(r"(\*|_)", text)
+            for part in parts:
+                if part in ("*", "_"):
+                    self._in_asterisk = not self._in_asterisk
+                    if not self._in_asterisk:
+                        result.append(" ")
+                    continue
+                if not self._in_asterisk:
+                    result.append(part)
+            return re.sub(r"[*_~`#]", "", "".join(result)).strip()
+
+        # --- Mode 3: Voice Outside Quotes ---
+        elif mode == 3:
+            result = []
+            parts = re.split(r'(["“”«»])', text)
+            for part in parts:
+                if part in ('"', "“", "”", "«", "»"):
+                    if part in ("“", "«"):
+                        self._in_tts_quote = True
+                    elif part in ("”", "»"):
+                        self._in_tts_quote = False
+                    else:
+                        self._in_tts_quote = not self._in_tts_quote
+
+                    if not self._in_tts_quote:
+                        result.append(" ")
+                    continue
+
+                if not self._in_tts_quote:
+                    result.append(part)
+
+            return re.sub(r"[*_~`#]", "", "".join(result)).strip()
+
+        # --- Mode 4: Custom Regex ---
+        elif mode == 4:
+            if not regex:
+                return re.sub(r"[*_~`#]", "", text).strip()
+            try:
+                matches = re.findall(regex, text)
+                if matches:
+                    extracted = []
+                    for m in matches:
+                        if isinstance(m, tuple):
+                            val = next((g for g in m if g), "")
+                            extracted.append(val)
+                        else:
+                            extracted.append(m)
+                    return " ".join(extracted).strip()
+                return ""
+            except re.error:
+                return re.sub(r"[*_~`#]", "", text).strip()
+
+        return text.strip()
 
     def clear_queue(self):
         with self.text_queue.mutex:
             self.text_queue.queue.clear()
         self.discard_current = True
         self._interrupt_flag.set()
+        self._in_tts_quote = False
+        self._in_asterisk = False
         if self._loop and self._audio_buffer and self._loop.is_running():
             def _drain():
                 while not self._audio_buffer.empty():
