@@ -23,8 +23,7 @@ app/configuration/characters.json
 
 # Not included in source, but shipped with releases.
 app/font/*.ttf
-app/gui/icons/*.png
-app/gui/icons/*.svg
+app/gui/icons
 app/utils/ai_clients/backend
 app/utils/all-MiniLM-L6-v2/
 app/utils/emotions/detector/
