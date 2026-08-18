@@ -27,11 +27,16 @@ class GrokProvider(BaseAIProvider):
             model_lower = self.model.lower()
             is_reasoning = ("grok-4" in model_lower or "reasoning" in model_lower) \
                 and "non-reasoning" not in model_lower
+            is_fixed_reasoning = model_lower.strip() in ("grok-4", "grok-code-fast-1")
             if not is_reasoning:
                 if "frequency_penalty" in kwargs:
                     params["frequency_penalty"] = kwargs["frequency_penalty"]
                 if "presence_penalty" in kwargs:
                     params["presence_penalty"] = kwargs["presence_penalty"]
+            elif not is_fixed_reasoning:
+                reasoning_effort = kwargs.get("reasoning_effort")
+                if reasoning_effort and reasoning_effort != "none":
+                    params["reasoning_effort"] = reasoning_effort
 
             stream = await self.client.chat.completions.create(**params)
 
@@ -68,6 +73,15 @@ class GrokProvider(BaseAIProvider):
                 "top_p": kwargs.get("top_p", 0.9),
                 "max_tokens": kwargs.get("max_tokens", 1000)
             }
+
+            model_lower = self.model.lower()
+            is_reasoning = ("grok-4" in model_lower or "reasoning" in model_lower) \
+                and "non-reasoning" not in model_lower
+            is_fixed_reasoning = model_lower.strip() in ("grok-4", "grok-code-fast-1")
+            reasoning_effort = kwargs.get("reasoning_effort")
+            if is_reasoning and not is_fixed_reasoning and reasoning_effort and reasoning_effort != "none":
+                payload["reasoning_effort"] = reasoning_effort
+
             if tools:
                 payload["tools"] = tools
                 payload["tool_choice"] = "auto"

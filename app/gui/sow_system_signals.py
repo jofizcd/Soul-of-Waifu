@@ -32,14 +32,17 @@ from PyQt6.QtWebEngineCore import QWebEnginePage
 from app.gui.sowSystem import SOW_System
 from app.configuration import configuration
 from app.utils.ai_clients.local_server_manager import LocalServerManager
-from app.utils.ai_clients.prompt_engine import PromptEngine
+from app.utils.ai_clients.prompt_engine import (
+    PromptEngine, strip_partial_state_tag, extract_state_update,
+    strip_partial_reasoning_tag, extract_reasoning, find_reasoning_open, find_reasoning_close
+)
 from app.utils.ai_clients.ai_factory import AIFactory
 from app.utils.soul_companion.soul_companion import SoulCompanion
 from app.utils.translator import Translator
 from app.utils.text_to_speech import TTSWorker, PipelinedTTSWorker
 from app.utils.speech_to_text import AudioInputWorker, STTWorker
 from app.utils.vrm_server import VRMServerThread
-from app.gui.custom_widgets import sow_toast
+from app.gui.custom_widgets import sow_toast, safe_paint
 
 import sys
 import ctypes
@@ -884,6 +887,10 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         self.set_state("PROCESSING")
         self.is_interrupted = False
 
+        if hasattr(self, 'tts_worker') and self.tts_worker:
+            self.tts_worker._in_tts_quote = False
+            self.tts_worker._in_asterisk = False
+
         user_message_container = await user_message_task
         user_message_id = user_message_container["message_id"]
 
@@ -903,6 +910,9 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
         full_text = ""
         sentence_buffer = ""
+        _state_tag_started = False
+        _in_reasoning = False
+        _reasoning_scan_buffer = ""
 
         translator_engine = self.configuration_settings.get_main_setting("translator") # 0-Off, 1-Google, 2-Yandex, 3-LLM
         target_lang = self.configuration_settings.get_main_setting("target_language") # 0-RU
@@ -942,11 +952,38 @@ class Soul_Of_Waifu_System(QtCore.QObject):
                     continue
 
                 full_text += chunk
-                sentence_buffer += chunk
+
+                if not _state_tag_started:
+                    if _in_reasoning:
+                        _reasoning_scan_buffer += chunk
+                        close_span = find_reasoning_close(_reasoning_scan_buffer)
+                        if close_span:
+                            _in_reasoning = False
+                            sentence_buffer += _reasoning_scan_buffer[close_span[1]:]
+                            _reasoning_scan_buffer = ""
+                    else:
+                        combined_buffer = sentence_buffer + chunk
+                        open_span = find_reasoning_open(combined_buffer)
+                        if open_span:
+                            _in_reasoning = True
+                            sentence_buffer = combined_buffer[:open_span[0]]
+                            _reasoning_scan_buffer = combined_buffer[open_span[1]:]
+                            close_span = find_reasoning_close(_reasoning_scan_buffer)
+                            if close_span:
+                                _in_reasoning = False
+                                sentence_buffer += _reasoning_scan_buffer[close_span[1]:]
+                                _reasoning_scan_buffer = ""
+                        else:
+                            safe_buffer = strip_partial_state_tag(combined_buffer)
+                            if len(safe_buffer) < len(combined_buffer):
+                                _state_tag_started = True
+                            sentence_buffer = safe_buffer
 
                 display_text = full_text
                 if display_text.startswith(f"{self.character_name}:"):
                     display_text = display_text[len(f"{self.character_name}:"):].lstrip()
+
+                display_text = strip_partial_state_tag(display_text)
 
                 display_html = self.markdown_to_html(display_text)
                 display_html = display_html.replace("{{user}}", user_name).replace("{{char}}", self.character_name)
@@ -957,21 +994,20 @@ class Soul_Of_Waifu_System(QtCore.QObject):
 
                 await asyncio.sleep(0.01)
 
-                match = re.search(r'([.!?\n]+)', sentence_buffer)
-                if match:
-                    split_idx = match.end()
-                    sentence = sentence_buffer[:split_idx].strip()
-                    
-                    clean_sentence = sentence.replace("*", "").replace("_", "").replace("~", "")
-                    
-                    if len(clean_sentence) > 2:
-                        logger.info(f"Sending to TTS: {clean_sentence}")
-                        if self.interaction_state != "SPEAKING":
-                            self.set_state("SPEAKING")
+                if not _state_tag_started:
+                    match = re.search(r'([.!?\n]+["”’\'»*_]*)', sentence_buffer)
+                    if match:
+                        split_idx = match.end()
+                        sentence = sentence_buffer[:split_idx].strip()
                         
-                        self.tts_worker.add_text(clean_sentence)
-                    
-                    sentence_buffer = sentence_buffer[split_idx:]
+                        if len(sentence) > 2:
+                            logger.info(f"Sending raw sentence to TTS: {sentence}")
+                            if self.interaction_state != "SPEAKING":
+                                self.set_state("SPEAKING")
+                            
+                            self.tts_worker.add_text(sentence)
+                        
+                        sentence_buffer = sentence_buffer[split_idx:]
         
         except asyncio.CancelledError:
             logger.info("The LLM task has been cancelled externally (Interrupt).")
@@ -986,18 +1022,39 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             character_answer_label.setText(display_html)
             sentence_buffer = ""
 
-        if not self.is_interrupted and len(sentence_buffer.strip()) > 1:
-            clean_tail = sentence_buffer.strip().replace("*", "").replace("_", "")
-            logger.info(f"Sending the remaining text to TTS: {clean_tail}")
+        if not self.is_interrupted and not _state_tag_started and len(sentence_buffer.strip()) > 1:
+            logger.info(f"Sending the remaining raw text to TTS: {sentence_buffer.strip()}")
             if self.interaction_state != "SPEAKING":
                 self.set_state("SPEAKING")
-            self.tts_worker.add_text(clean_tail)
+            self.tts_worker.add_text(sentence_buffer.strip())
 
-        if translator_engine in [1, 2, 3] and target_lang == 0:
+        char_data_for_vars = self.configuration_characters.load_configuration()
+        sow_variables_schema = char_data_for_vars.get("character_list", {}).get(self.character_name, {}).get("sow_variables", [])
+        allowed_var_ids = [v["id"] for v in sow_variables_schema] if sow_variables_schema else None
+
+        full_text, _reasoning_text_discarded = extract_reasoning(full_text)
+        full_text, state_updates = extract_state_update(full_text, allowed_keys=allowed_var_ids)
+        full_text = full_text.strip()
+
+        if state_updates:
+            for var_id, delta_or_val in state_updates.items():
+                try:
+                    self.modify_variable_value(self.character_name, var_id, delta_or_val, operation="add")
+                except Exception as e:
+                    logger.error(f"Failed to apply state update for '{var_id}': {e}")
+
+        display_html = self.markdown_to_html(full_text).replace("{{user}}", user_name).replace("{{char}}", self.character_name)
+        character_answer_label.setText(display_html)
+
+        auto_translate_setting = self.configuration_settings.get_main_setting("auto_translate_new_messages")
+        auto_translate_new_messages = True if auto_translate_setting is None else bool(auto_translate_setting)
+        if translator_engine in [1, 2, 3] and target_lang == 0 and auto_translate_new_messages:
             engine_name = "google" if translator_engine == 1 else "yandex"
             try:
                 translated_html = self.translator.translate(display_html, engine_name, 'ru')
                 character_answer_label.setText(translated_html)
+                character_answer_label.setProperty("original_text", display_html)
+                character_answer_label.setProperty("is_translated", True)
             except Exception as e:
                 logger.error(f"Error translating the finished text: {e}")
         
@@ -1326,8 +1383,12 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             think_blocks.append(think_html)
             return placeholder
 
-        text = re.sub(r'<(think|thought|reasoning)>(.*?)</\1>', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r'<(think|thought|reasoning)>(.*)$', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
+        _reasoning_tag_names = (
+            r"(?:think(?:ing)?|thoughts?|reasoning|reflect(?:ion)?|"
+            r"scratch[_\-\s]?pad|analysis|inner[_\-\s]?monologue|monologue)"
+        )
+        text = re.sub(rf'<\s*({_reasoning_tag_names})\s*>(.*?)<\s*/\s*\1\s*>', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(rf'<\s*({_reasoning_tag_names})\s*>(.*)$', replace_think_block, text, flags=re.DOTALL | re.IGNORECASE)
 
         text = re.sub(r'"(.*?)"', rf'<span style="color: {qc}; font-weight: 500;">"\1"</span>', text)
         text = re.sub(r'“(.*?)”', rf'<span style="color: {qc}; font-weight: 500;">“\1”</span>', text)
@@ -1937,6 +1998,15 @@ class Soul_Of_Waifu_System(QtCore.QObject):
         except Exception:
             pass
 
+    @QtCore.pyqtSlot(str, str, str)
+    def _sc_request_approval_slot(self, request_id: str, tool_name: str, summary: str):
+        try:
+            ActionApprovalOverlay(self, request_id, tool_name, summary)
+        except Exception as e:
+            logger.error(f"Failed to display Action Approval Banner for '{tool_name}': {e}")
+            if hasattr(self, "soul_companion"):
+                self.soul_companion.resolve_approval(request_id, False)
+
     def _stop_companion_systems(self):
         self._eye_tracker_timer.stop()
         self._idle_timer.stop()
@@ -2286,10 +2356,10 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             if mode == "VRM":
                 wv = self._get_webview()
                 if wv:
-                    wv.page().runJavaScript(f"setHeadAngle({x}, {y}, 0);")
+                    wv.page().runJavaScript(f"if (typeof setHeadAngle === 'function') setHeadAngle({x}, {y}, 0);")
         except Exception as e:
             logger.debug(f"Set head angle error: {e}")
-    
+
     def _set_body_angle(self, x):
         self._idle_target_body_x = x
         try:
@@ -2297,7 +2367,7 @@ class Soul_Of_Waifu_System(QtCore.QObject):
             if mode == "VRM":
                 wv = self._get_webview()
                 if wv:
-                    wv.page().runJavaScript(f"setBodyAngle({x}, 0);")
+                    wv.page().runJavaScript(f"if (typeof setBodyAngle === 'function') setBodyAngle({x}, 0);")
         except Exception as e:
             logger.debug(f"Set body angle error: {e}")
     
@@ -3040,11 +3110,50 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         self.text_input_overlay = CompanionTextInputOverlay(self)
         self.text_input_overlay.text_submitted_signal.connect(self._on_text_chat_submitted)
 
+        app = QtWidgets.QApplication.instance()
+        existing_trays = app.findChildren(QtWidgets.QSystemTrayIcon)
+        for tray in existing_trays:
+            if "Desktop Companion" in tray.toolTip():
+                tray.hide()
+                tray.deleteLater()
+
+        self.tray_icon = QtWidgets.QSystemTrayIcon(QtGui.QIcon("app/gui/icons/logotype.png"), self)
+        self.tray_icon.setToolTip("Desktop Companion (Live2D)")
+        tray_menu = QtWidgets.QMenu()
+        action_toggle_click = tray_menu.addAction("👁‍🗨 Toggle Click-Through")
+        action_toggle_click.triggered.connect(self._toggle_click_through_tray)
+        action_quit = tray_menu.addAction("❌ Quit Companion")
+        action_quit.triggered.connect(self.close)
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
+
         self.dragging_window = False
         self.drag_offset = QtCore.QPoint()
 
         self.right_button_pressed = False
         self.systemScale = QGuiApplication.primaryScreen().devicePixelRatio()
+
+    def _toggle_click_through_tray(self):
+        self._click_through = not getattr(self, "_click_through", False)
+        self.update_window_properties()
+
+    def _raise_subtitle_overlay(self):
+        overlay = getattr(self, "subtitle_overlay", None)
+        if overlay is not None and overlay.isVisible():
+            overlay.raise_()
+
+    def update_window_properties(self):
+        flags = QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Tool
+        if self._always_on_top:
+            flags |= QtCore.Qt.WindowType.WindowStaysOnTopHint
+        if self._click_through:
+            flags |= QtCore.Qt.WindowType.WindowTransparentForInput
+            
+        self.setWindowFlags(flags)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.show()
+
+        self._raise_subtitle_overlay()
 
     def initializeGL(self) -> None:
         if self.opengl_initialized: return
@@ -3206,10 +3315,16 @@ class Live2DWidget_NoGUI(QOpenGLWidget):
         hud.move(target_x, global_pos.y() + 40)
         hud.show()
 
+    def moveEvent(self, event):
+        super().moveEvent(event)
+        if hasattr(self, "subtitle_overlay"):
+            self.subtitle_overlay._reposition()
+
     def mousePressEvent(self, event: QtGui.QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging_window = True
             self.drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            self._raise_subtitle_overlay()
             if self.sow_system_ref:
                 ref = self.sow_system_ref
                 ref._drag_is_active = True
@@ -3616,22 +3731,23 @@ class VRMWidget_NoGUI(QWidget):
         self.server_thread.start()
  
         self.vrm_webview = QWebEngineView(self)
-        self.vrm_webview.page().setBackgroundColor(Qt.GlobalColor.transparent)
- 
-        self.vrm_webview.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.vrm_webview.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.vrm_webview.setStyleSheet("background: transparent;")
  
+        web_page = CustomWebEnginePage(self.vrm_webview)
+        web_page.setBackgroundColor(QColor(0, 0, 0, 0))
+        self.vrm_webview.setPage(web_page)
+ 
         self.vrm_webview.settings().setAttribute(self.vrm_webview.settings().WebAttribute.WebGLEnabled, True)
-        self.vrm_webview.setPage(CustomWebEnginePage(self.vrm_webview))
-        self.vrm_webview.page().setBackgroundColor(Qt.GlobalColor.transparent)
-        
-        self.overlay = QWidget(self)
-        self.overlay.setStyleSheet("background: transparent;")
+        self.vrm_webview.settings().setAttribute(self.vrm_webview.settings().WebAttribute.Accelerated2dCanvasEnabled, True)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.vrm_webview)
  
+        self.overlay = QWidget(self)
+        self.overlay.setStyleSheet("background: transparent;")
+
         self.dragging_window = False
         self.drag_offset = QtCore.QPoint()
 
@@ -3644,14 +3760,33 @@ class VRMWidget_NoGUI(QWidget):
         self.text_input_overlay.text_submitted_signal.connect(self._on_text_chat_submitted)
 
         self.subtitle_overlay = CompanionSubtitleOverlay(self)
-        self.subtitle_overlay.raise_()
 
         self.vrm_webview.page().loadFinished.connect(self.on_load_finished)
         self.load_vrm_model()
+
+        app = QtWidgets.QApplication.instance()
+        existing_trays = app.findChildren(QtWidgets.QSystemTrayIcon)
+        for tray in existing_trays:
+            if "Desktop Companion" in tray.toolTip():
+                tray.hide()
+                tray.deleteLater()
+
+        self.tray_icon = QtWidgets.QSystemTrayIcon(QtGui.QIcon("app/gui/icons/logotype.png"), self)
+        self.tray_icon.setToolTip("Desktop Companion (VRM)")
+        tray_menu = QtWidgets.QMenu()
+        action_toggle_click = tray_menu.addAction("👁‍🗨 Toggle Click-Through")
+        action_toggle_click.triggered.connect(self._toggle_click_through_tray)
+        action_quit = tray_menu.addAction("❌ Quit Companion")
+        action_quit.triggered.connect(self.close)
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
  
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.overlay.resize(self.size())
+        
+        if hasattr(self, "overlay") and self.overlay:
+            self.overlay.resize(self.size())
+            self.overlay.raise_()
 
         if hasattr(self, "subtitle_overlay"):
             self.subtitle_overlay._reposition()
@@ -3659,6 +3794,7 @@ class VRMWidget_NoGUI(QWidget):
         if hasattr(self, "text_input_overlay"):
             w = max(200, self.width() - 40)
             self.text_input_overlay.setGeometry(20, self.height() - 75, w, 36)
+            self.text_input_overlay.raise_()
 
     def enterEvent(self, event):
         if getattr(self, "_text_chat_enabled", False):
@@ -3670,6 +3806,27 @@ class VRMWidget_NoGUI(QWidget):
         if not self.text_input_overlay.hasFocus():
             self.text_input_overlay.hide()
         super().leaveEvent(event)
+
+    def _toggle_click_through_tray(self):
+        self._click_through = not getattr(self, "_click_through", False)
+        self.update_window_properties()
+
+    def _raise_subtitle_overlay(self):
+        overlay = getattr(self, "subtitle_overlay", None)
+        if overlay is not None and overlay.isVisible():
+            overlay.raise_()
+
+    def update_window_properties(self):
+        flags = QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Tool
+        if self._always_on_top:
+            flags |= QtCore.Qt.WindowType.WindowStaysOnTopHint
+        if self._click_through:
+            flags |= QtCore.Qt.WindowType.WindowTransparentForInput
+            
+        self.setWindowFlags(flags)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.show()
+        self._raise_subtitle_overlay()
 
     def _on_text_chat_submitted(self, text: str):
         if self.sow_system_ref:
@@ -3734,17 +3891,6 @@ class VRMWidget_NoGUI(QWidget):
             animation_url = f"/app/utils/emotions/vrm/expressions/{anim_file}"
             self.vrm_webview.page().runJavaScript(f"loadFBX('{animation_url}');")
 
-    def update_window_properties(self):
-        flags = QtCore.Qt.WindowType.FramelessWindowHint | QtCore.Qt.WindowType.Tool
-        if self._always_on_top:
-            flags |= QtCore.Qt.WindowType.WindowStaysOnTopHint
-        if self._click_through:
-            flags |= QtCore.Qt.WindowType.WindowTransparentForInput
-            
-        self.setWindowFlags(flags)
-        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.show()
-
     def show_hormones_hud(self):
         if not self.sow_system_ref or not hasattr(self.sow_system_ref, "soul_companion"):
             return
@@ -3777,8 +3923,14 @@ class VRMWidget_NoGUI(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging_window = True
             self.drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            self._raise_subtitle_overlay()
             if self.sow_system_ref:
                 self.sow_system_ref.companion_on_click()
+
+    def moveEvent(self, event):
+        super().moveEvent(event)
+        if hasattr(self, "subtitle_overlay"):
+            self.subtitle_overlay._reposition()
 
     def mouseMoveEvent(self, event):
         cur_pos = event.globalPosition().toPoint()
@@ -4038,6 +4190,10 @@ class VRMWidget_NoGUI(QWidget):
         self.resize(new_w, new_h)
  
     def closeEvent(self, event):
+        if hasattr(self, 'tray_icon'):
+            self.tray_icon.hide()
+            self.tray_icon.deleteLater()
+            
         logger.info("VRM Desktop Companion closing...")
  
         self.hide()
@@ -4086,9 +4242,22 @@ class CompanionSubtitleOverlay(QWidget):
     MAX_INTERVAL   = 700
  
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(None)
+        self._anchor_widget = parent
+        if parent is not None:
+            try:
+                parent.destroyed.connect(self.deleteLater)
+            except Exception:
+                pass
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.Tool
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+        )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setStyleSheet("background: transparent; border: none;")
 
         self._full_text    : str   = ""
@@ -4128,9 +4297,7 @@ class CompanionSubtitleOverlay(QWidget):
         clean_word = re.sub(r"[^\wа-яА-Яa-zA-Z]", "", word)
         
         char_time = len(clean_word) * 45
-        
         base_gap = 100
-        
         total_delay = char_time + base_gap
         
         if "," in word or ";" in word or ":" in word or "—" in word:
@@ -4234,6 +4401,7 @@ class CompanionSubtitleOverlay(QWidget):
         if self._opacity < 1.0:
             self._animate_opacity(self._opacity, 1.0, self.FADE_IN_MS)
         self.update()
+        self.raise_()
 
         if self._revealed_idx < len(self._words):
             next_word = self._words[self._revealed_idx]
@@ -4283,7 +4451,7 @@ class CompanionSubtitleOverlay(QWidget):
     def _get_available_width(self) -> int:
         w = self.width()
         if w <= 0:
-            p = self.parent()
+            p = self._anchor_widget
             if p:
                 w = p.width() - 30
             else:
@@ -4318,7 +4486,7 @@ class CompanionSubtitleOverlay(QWidget):
         return br.height() + self.PADDING_Y * 2
  
     def _reposition(self):
-        parent = self.parent()
+        parent = self._anchor_widget
         if not parent:
             return
  
@@ -4338,8 +4506,10 @@ class CompanionSubtitleOverlay(QWidget):
             needed_h = 80
  
         new_y = ph - needed_h - self.BOTTOM_MARGIN
-        self.setGeometry(slot_x, new_y, slot_w, needed_h)
+        global_pos = parent.mapToGlobal(QtCore.QPoint(slot_x, new_y))
+        self.setGeometry(global_pos.x(), global_pos.y(), slot_w, needed_h)
  
+    @safe_paint
     def paintEvent(self, event):
         text = self._revealed_text()
         if not text or self._opacity <= 0.01:
@@ -4377,7 +4547,7 @@ class CompanionSubtitleOverlay(QWidget):
         painter.setPen(QColor(255, 255, 255, alpha))
         painter.drawText(rect, flags, text)
 
-class HormonesHUDOverlay(QtWidgets.QFrame):
+class HormonesHUDOverlay(QtWidgets.QWidget):
     def __init__(self, parent, hormones_dict):
         super().__init__(None)
 
@@ -4391,13 +4561,19 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
             QtCore.Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
-        
-        self.setStyleSheet("""
-            QFrame#HormonesFrame {
-                background-color: #12121A;
+        self.setStyleSheet("background: transparent; border: none;")
+
+        outer_layout = QtWidgets.QVBoxLayout(self)
+        outer_layout.setContentsMargins(14, 14, 14, 14)
+        outer_layout.setSpacing(0)
+
+        self.card = QtWidgets.QFrame(self)
+        self.card.setObjectName("HormonesCard")
+        self.card.setStyleSheet("""
+            QFrame#HormonesCard {
+                background-color: #13131C;
                 border: 2px solid #8B5CF6;
-                border-radius: 14px;
+                border-radius: 16px;
             }
             QLabel {
                 color: #F3F4F6;
@@ -4408,7 +4584,7 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
                 background: transparent;
             }
             QProgressBar {
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.15);
                 border-radius: 4px;
                 background-color: #09090D;
                 text-align: right;
@@ -4419,21 +4595,20 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
                 border-radius: 3px;
             }
         """)
-        self.setObjectName("HormonesFrame")
 
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(25)
-        shadow.setColor(QColor(0, 0, 0, 220))
-        shadow.setOffset(0, 6)
-        self.setGraphicsEffect(shadow)
+        shadow = QGraphicsDropShadowEffect(self.card)
+        shadow.setBlurRadius(28)
+        shadow.setColor(QColor(0, 0, 0, 240))
+        shadow.setOffset(0, 8)
+        self.card.setGraphicsEffect(shadow)
         
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(8)
+        card_layout = QtWidgets.QVBoxLayout(self.card)
+        card_layout.setContentsMargins(18, 16, 18, 16)
+        card_layout.setSpacing(8)
         
         title_lbl = QtWidgets.QLabel(t("sc_hud_hormones_title", "Endocrine & Hormone Balance"))
-        title_lbl.setStyleSheet("font-size: 12px; color: #A78BFA; font-weight: bold;")
-        layout.addWidget(title_lbl)
+        title_lbl.setStyleSheet("font-size: 12px; color: #A78BFA; font-weight: bold; margin-bottom: 2px;")
+        card_layout.addWidget(title_lbl)
         
         bars_info = [
             (t("sc_hud_oxytocin", "🧪 Oxytocin (Love)"), "oxytocin", "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff758c, stop:1 #ff7eb3)"),
@@ -4452,14 +4627,16 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
             bar.setValue(pct)
             bar.setStyleSheet(f"QProgressBar::chunk {{ background: {chunk_style}; }}")
             
-            layout.addWidget(lbl)
-            layout.addWidget(bar)
-            
+            card_layout.addWidget(lbl)
+            card_layout.addWidget(bar)
+
+        outer_layout.addWidget(self.card)
+        self.setFixedWidth(300)
         self.adjustSize()
         
         self._opacity = 0.0
         self._opacity_anim = QtCore.QPropertyAnimation(self, b"windowOpacity", self)
-        self._opacity_anim.setDuration(250)
+        self._opacity_anim.setDuration(220)
         self._opacity_anim.setStartValue(0.0)
         self._opacity_anim.setEndValue(1.0)
         self._opacity_anim.start()
@@ -4471,7 +4648,7 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
 
     def _start_fade_out(self):
         self._opacity_anim.stop()
-        self._opacity_anim.setDuration(350)
+        self._opacity_anim.setDuration(300)
         self._opacity_anim.setStartValue(self._opacity)
         self._opacity_anim.setEndValue(0.0)
         self._opacity_anim.finished.connect(self.deleteLater)
@@ -4486,7 +4663,7 @@ class HormonesHUDOverlay(QtWidgets.QFrame):
         self._opacity = value
         self.setWindowOpacity(value)
 
-class ScratchpadHUDOverlay(QtWidgets.QFrame):
+class ScratchpadHUDOverlay(QtWidgets.QWidget):
     def __init__(self, parent, scratchpad_str: str):
         super().__init__(None)
 
@@ -4500,13 +4677,19 @@ class ScratchpadHUDOverlay(QtWidgets.QFrame):
             QtCore.Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_StyledBackground, True)
-        
-        self.setStyleSheet("""
-            QFrame#ScratchFrame {
-                background-color: #12121A;
+        self.setStyleSheet("background: transparent; border: none;")
+
+        outer_layout = QtWidgets.QVBoxLayout(self)
+        outer_layout.setContentsMargins(14, 14, 14, 14)
+        outer_layout.setSpacing(0)
+
+        self.card = QtWidgets.QFrame(self)
+        self.card.setObjectName("ScratchCard")
+        self.card.setStyleSheet("""
+            QFrame#ScratchCard {
+                background-color: #13131C;
                 border: 2px solid #C084FC;
-                border-radius: 14px;
+                border-radius: 16px;
             }
             QLabel {
                 color: #E5E7EB;
@@ -4515,31 +4698,33 @@ class ScratchpadHUDOverlay(QtWidgets.QFrame):
                 background: transparent;
             }
         """)
-        self.setObjectName("ScratchFrame")
 
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(25)
-        shadow.setColor(QColor(0, 0, 0, 220))
-        shadow.setOffset(0, 6)
-        self.setGraphicsEffect(shadow)
+        shadow = QGraphicsDropShadowEffect(self.card)
+        shadow.setBlurRadius(28)
+        shadow.setColor(QColor(0, 0, 0, 240))
+        shadow.setOffset(0, 8)
+        self.card.setGraphicsEffect(shadow)
         
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(16, 14, 16, 14)
+        card_layout = QtWidgets.QVBoxLayout(self.card)
+        card_layout.setContentsMargins(18, 16, 18, 16)
+        card_layout.setSpacing(8)
         
-        title_lbl = QtWidgets.QLabel(t("sc_hud_scratchpad_title", "🧠 Companion's Internal Thoughts (ScratchPad)"))
-        title_lbl.setStyleSheet("font-size: 12px; color: #C084FC; font-weight: bold; margin-bottom: 6px;")
-        layout.addWidget(title_lbl)
+        title_lbl = QtWidgets.QLabel(t("sc_hud_scratchpad_title", "🧠 Companion's Internal Thoughts"))
+        title_lbl.setStyleSheet("font-size: 12px; color: #C084FC; font-weight: bold; margin-bottom: 4px;")
+        card_layout.addWidget(title_lbl)
 
         body_lbl = QtWidgets.QLabel(scratchpad_str)
         body_lbl.setWordWrap(True)
-        body_lbl.setStyleSheet("font-size: 11px; color: #D1D5DB; line-height: 1.4;")
-        layout.addWidget(body_lbl)
-        
-        self.adjustSize()
-        self.resize(min(320, self.width()), self.height())
+        body_lbl.setStyleSheet("font-size: 11px; color: #D1D5DB; line-height: 1.45;")
+        card_layout.addWidget(body_lbl)
 
+        outer_layout.addWidget(self.card)
+        self.setFixedWidth(340)
+        self.adjustSize()
+
+        self._opacity = 0.0
         self._opacity_anim = QtCore.QPropertyAnimation(self, b"windowOpacity", self)
-        self._opacity_anim.setDuration(250)
+        self._opacity_anim.setDuration(220)
         self._opacity_anim.setStartValue(0.0)
         self._opacity_anim.setEndValue(1.0)
         self._opacity_anim.start()
@@ -4551,11 +4736,230 @@ class ScratchpadHUDOverlay(QtWidgets.QFrame):
 
     def _start_fade_out(self):
         self._opacity_anim.stop()
-        self._opacity_anim.setDuration(350)
-        self._opacity_anim.setStartValue(self.windowOpacity())
+        self._opacity_anim.setDuration(300)
+        self._opacity_anim.setStartValue(self._opacity)
         self._opacity_anim.setEndValue(0.0)
         self._opacity_anim.finished.connect(self.deleteLater)
         self._opacity_anim.start()
+
+    @QtCore.pyqtProperty(float)
+    def windowOpacity(self) -> float:
+        return self._opacity
+
+    @windowOpacity.setter
+    def windowOpacity(self, value):
+        self._opacity = value
+        self.setWindowOpacity(value)
+
+class ActionApprovalOverlay(QtWidgets.QWidget):
+    """
+    Human-in-the-Loop confirmation banner.
+    """
+    TIMEOUT_SEC = 25
+
+    def __init__(self, sow_system_ref, request_id: str, tool_name: str, summary: str):
+        super().__init__(None)
+
+        self.sow_system_ref = sow_system_ref
+        self.request_id = request_id
+        self._resolved = False
+
+        self._target_hwnd = None
+        if sys.platform == "win32":
+            try:
+                self._target_hwnd = ctypes.windll.user32.GetForegroundWindow()
+            except Exception:
+                pass
+
+        def t(k, default):
+            return sow_system_ref.translations.get(k, default) if sow_system_ref and hasattr(sow_system_ref, "translations") else default
+
+        self.setWindowFlags(
+            QtCore.Qt.WindowType.Tool |
+            QtCore.Qt.WindowType.FramelessWindowHint |
+            QtCore.Qt.WindowType.WindowStaysOnTopHint |
+            QtCore.Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setStyleSheet("background: transparent; border: none;")
+
+        outer_layout = QtWidgets.QVBoxLayout(self)
+        outer_layout.setContentsMargins(14, 14, 14, 14)
+        outer_layout.setSpacing(0)
+
+        self.card = QtWidgets.QFrame(self)
+        self.card.setObjectName("ApprovalCard")
+        self.card.setStyleSheet("""
+            QFrame#ApprovalCard {
+                background-color: #13131C;
+                border: 2px solid #F59E0B;
+                border-radius: 16px;
+            }
+            QLabel {
+                color: #E5E7EB;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                border: none;
+                background: transparent;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect(self.card)
+        shadow.setBlurRadius(28)
+        shadow.setColor(QColor(0, 0, 0, 240))
+        shadow.setOffset(0, 8)
+        self.card.setGraphicsEffect(shadow)
+
+        card_layout = QtWidgets.QVBoxLayout(self.card)
+        card_layout.setContentsMargins(18, 16, 18, 16)
+        card_layout.setSpacing(10)
+
+        title_lbl = QtWidgets.QLabel(t("sc_approval_title", "⚠️ Companion wants to perform an action"))
+        title_lbl.setStyleSheet("font-size: 13px; color: #F59E0B; font-weight: bold;")
+        card_layout.addWidget(title_lbl)
+
+        tool_lbl = QtWidgets.QLabel(f"{t('sc_approval_action', 'Action')}: {tool_name}")
+        tool_lbl.setWordWrap(True)
+        tool_lbl.setStyleSheet("font-size: 11px; color: #A78BFA; font-weight: bold;")
+        card_layout.addWidget(tool_lbl)
+
+        body_lbl = QtWidgets.QLabel(summary)
+        body_lbl.setWordWrap(True)
+        body_lbl.setStyleSheet("font-size: 12px; color: #D1D5DB; line-height: 1.4;")
+        card_layout.addWidget(body_lbl)
+
+        self._timer_bar = QtWidgets.QProgressBar()
+        self._timer_bar.setRange(0, self.TIMEOUT_SEC * 10)
+        self._timer_bar.setValue(self.TIMEOUT_SEC * 10)
+        self._timer_bar.setTextVisible(False)
+        self._timer_bar.setFixedHeight(4)
+        self._timer_bar.setStyleSheet("""
+            QProgressBar {
+                border: none;
+                border-radius: 2px;
+                background-color: #09090D;
+            }
+            QProgressBar::chunk {
+                border-radius: 2px;
+                background-color: #F59E0B;
+            }
+        """)
+        card_layout.addWidget(self._timer_bar)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.setSpacing(10)
+
+        self.deny_btn = QtWidgets.QPushButton(t("sc_approval_deny", "✕ Decline"))
+        self.deny_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.deny_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.15);
+                color: #F87171;
+                border: 1px solid #EF4444;
+                border-radius: 10px;
+                padding: 8px 14px;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: rgba(239, 68, 68, 0.30); }
+        """)
+        self.deny_btn.clicked.connect(lambda: self._resolve(False))
+
+        self.allow_btn = QtWidgets.QPushButton(t("sc_approval_allow", "✓ Allow"))
+        self.allow_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.allow_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(34, 197, 94, 0.18);
+                color: #4ADE80;
+                border: 1px solid #22C55E;
+                border-radius: 10px;
+                padding: 8px 14px;
+                font-family: 'Comfortaa', 'Segoe UI', sans-serif;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: rgba(34, 197, 94, 0.32); }
+        """)
+        self.allow_btn.clicked.connect(lambda: self._resolve(True))
+
+        btn_row.addWidget(self.deny_btn)
+        btn_row.addWidget(self.allow_btn)
+        card_layout.addLayout(btn_row)
+
+        outer_layout.addWidget(self.card)
+
+        self.setFixedWidth(380)
+        self.adjustSize()
+
+        screen = QGuiApplication.primaryScreen().geometry()
+        self.move(
+            screen.width() // 2 - self.width() // 2,
+            screen.height() - self.height() - 70
+        )
+
+        self._opacity = 0.0
+        self._opacity_anim = QtCore.QPropertyAnimation(self, b"windowOpacity", self)
+        self._opacity_anim.setDuration(220)
+        self._opacity_anim.setStartValue(0.0)
+        self._opacity_anim.setEndValue(1.0)
+        self._opacity_anim.start()
+
+        self._elapsed_ticks = 0
+        self._countdown_timer = QtCore.QTimer(self)
+        self._countdown_timer.timeout.connect(self._tick)
+        self._countdown_timer.start(100)
+
+        self.show()
+        self.raise_()
+
+    def _tick(self):
+        self._elapsed_ticks += 1
+        remaining = self.TIMEOUT_SEC * 10 - self._elapsed_ticks
+        self._timer_bar.setValue(max(0, remaining))
+        if remaining <= 0:
+            self._resolve(False)
+
+    def _resolve(self, approved: bool):
+        if self._resolved:
+            return
+        self._resolved = True
+        self._countdown_timer.stop()
+
+        if approved and sys.platform == "win32" and self._target_hwnd:
+            try:
+                user32 = ctypes.windll.user32
+                VK_MENU = 0x12
+                user32.keybd_event(VK_MENU, 0, 0, 0)
+                user32.keybd_event(VK_MENU, 0, 2, 0)
+                user32.SetForegroundWindow(self._target_hwnd)
+                time.sleep(0.06)
+            except Exception as e:
+                logger.debug(f"[Approval] Error restoring target window focus: {e}")
+
+        if self.sow_system_ref and hasattr(self.sow_system_ref, "soul_companion"):
+            try:
+                self.sow_system_ref.soul_companion.resolve_approval(self.request_id, approved)
+            except Exception as e:
+                logger.error(f"Failed to resolve approval '{self.request_id}': {e}")
+
+        self._start_fade_out()
+
+    def _start_fade_out(self):
+        self._opacity_anim.stop()
+        self._opacity_anim.setDuration(250)
+        self._opacity_anim.setStartValue(self._opacity)
+        self._opacity_anim.setEndValue(0.0)
+        self._opacity_anim.finished.connect(self.deleteLater)
+        self._opacity_anim.start()
+
+    @QtCore.pyqtProperty(float)
+    def windowOpacity(self) -> float:
+        return self._opacity
+
+    @windowOpacity.setter
+    def windowOpacity(self, value):
+        self._opacity = value
+        self.setWindowOpacity(value)
 
 class CompanionTextInputOverlay(QtWidgets.QLineEdit):
     """

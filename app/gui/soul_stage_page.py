@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QTextEdit, QComboBox, QFileDialog, QMessageBox,
 )
 
-from app.gui.custom_widgets import SowSelectDialog, SowInputDialog, SowConfirmDialog
+from app.gui.custom_widgets import SowSelectDialog, SowInputDialog, SowConfirmDialog, SceneFolderCard, sow_toast
 
 SOUL_STAGE_DIR = Path(".soul_stage")
 SCENES_FILE    = SOUL_STAGE_DIR / "scenes.json"
@@ -140,6 +140,37 @@ def _load_scenes() -> dict:
 
 def _save_scenes(data: dict):
     SCENES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), "utf-8")
+
+def _get_scene_groups() -> dict:
+    data = _load_scenes()
+    groups = data.get("scene_groups", {})
+    existing_scenes = set(data.get("scenes", {}).keys())
+    dirty = False
+    clean_groups = {}
+    for g_name, members in groups.items():
+        if isinstance(members, list):
+            valid = [m for m in members if m in existing_scenes]
+            if len(valid) != len(members):
+                dirty = True
+            clean_groups[g_name] = valid
+        else:
+            clean_groups[g_name] = []
+    if dirty:
+        data["scene_groups"] = clean_groups
+        _save_scenes(data)
+    return clean_groups
+
+def _save_scene_groups(groups: dict):
+    data = _load_scenes()
+    data["scene_groups"] = groups
+    _save_scenes(data)
+
+def _get_grouped_scenes() -> set:
+    groups = _get_scene_groups()
+    grouped = set()
+    for members in groups.values():
+        grouped.update(members)
+    return grouped
 
 def _get_assets(folder: str, exts: list) -> list:
     try:
@@ -533,6 +564,128 @@ class _GlassSection(QFrame):
     def section_layout(self) -> QVBoxLayout:
         return self._root
 
+class _PartyCharCard(QFrame):
+    toggled = pyqtSignal()
+
+    _BASE = """
+        QFrame#pcard {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-top: 1px solid rgba(255,255,255,0.11);
+            border-radius: 14px;
+        }
+    """
+    _HOVER = """
+        QFrame#pcard {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-top: 1px solid rgba(255,255,255,0.24);
+            border-radius: 14px;
+        }
+    """
+    _SELECTED = """
+        QFrame#pcard {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(120,140,255,0.22), stop:1 rgba(90,110,255,0.10));
+            border: 1px solid rgba(150,168,255,0.60);
+            border-top: 1px solid rgba(175,190,255,0.80);
+            border-radius: 14px;
+        }
+    """
+
+    def __init__(self, name: str, parent=None):
+        super().__init__(parent)
+        self.name = name
+        self._checked = False
+        self.setObjectName("pcard")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        name_font = _font("Inter Tight Medium", 11)
+        fm = QtGui.QFontMetrics(name_font)
+        text_rect = fm.boundingRect(
+            QtCore.QRect(0, 0, 128, 300),
+            int(Qt.TextFlag.TextWordWrap | Qt.AlignmentFlag.AlignCenter),
+            name
+        )
+        text_height = max(18, text_rect.height() + 4)
+
+        card_height = max(112, 10 + 52 + 8 + text_height + 10)
+        self.setFixedSize(148, card_height)
+
+        self.setStyleSheet(self._BASE)
+        self.setGraphicsEffect(_shadow(18, 5, 60))
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
+
+        av_wrap = QWidget(self)
+        av_wrap.setFixedSize(52, 52)
+
+        self.avatar_lbl = QLabel(av_wrap)
+        self.avatar_lbl.setGeometry(0, 0, 52, 52)
+        px = _get_char_avatar_pixmap(name)
+        self.avatar_lbl.setPixmap(_round_pixmap(px, 52))
+        self.avatar_lbl.setStyleSheet("background: transparent; border: none;")
+
+        self.check_badge = QLabel(av_wrap)
+        self.check_badge.setGeometry(52 - 18, 52 - 18, 18, 18)
+        self.check_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.check_badge.setText("✓")
+        self.check_badge.setFont(_font("Inter Tight SemiBold", 9, True))
+        self.check_badge.setStyleSheet("""
+            background: #6C86FF; color: white; border-radius: 9px;
+            border: 2px solid #14141a;
+        """)
+        self.check_badge.hide()
+
+        av_row = QHBoxLayout()
+        av_row.addStretch()
+        av_row.addWidget(av_wrap)
+        av_row.addStretch()
+        lay.addLayout(av_row)
+
+        self.name_lbl = QLabel(name)
+        self.name_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self.name_lbl.setFont(name_font)
+        self.name_lbl.setStyleSheet("color: rgba(230,230,235,0.92); background: transparent; border:none; line-height: 1.2;")
+        self.name_lbl.setWordWrap(True)
+        lay.addWidget(self.name_lbl)
+
+    def isChecked(self) -> bool:
+        return self._checked
+
+    def setChecked(self, value: bool):
+        value = bool(value)
+        if value == self._checked:
+            return
+        self._checked = value
+        self._refresh_style()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._checked = not self._checked
+            self._refresh_style()
+            self.toggled.emit()
+        super().mousePressEvent(event)
+
+    def enterEvent(self, e):
+        if not self._checked:
+            self.setStyleSheet(self._HOVER)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._refresh_style()
+        super().leaveEvent(e)
+
+    def _refresh_style(self):
+        if self._checked:
+            self.setStyleSheet(self._SELECTED)
+            self.check_badge.show()
+        else:
+            self.setStyleSheet(self._BASE)
+            self.check_badge.hide()
+
 class SceneCard(QFrame):
     play_clicked   = pyqtSignal(str)
     edit_clicked   = pyqtSignal(str)
@@ -563,7 +716,7 @@ class SceneCard(QFrame):
         header_layout.setSpacing(15)
 
         self.scene_icon = QLabel()
-        scene_px = QPixmap("app/gui/icons/scene_main.png")
+        scene_px = QPixmap("app/gui/icons/d20.png")
         if scene_px.isNull():
             self.scene_icon.setText("◈")
             self.scene_icon.setStyleSheet("color: #50C878; font-size: 20px; font-weight: bold;")
@@ -578,6 +731,20 @@ class SceneCard(QFrame):
 
         actions_container = QHBoxLayout()
         actions_container.setSpacing(8)
+
+        btn_folder = QPushButton()
+        btn_folder.setFixedSize(30, 30)
+        btn_folder.setIcon(QIcon("app/gui/icons/folder.png"))
+        btn_folder.setIconSize(QtCore.QSize(18, 18))
+        btn_folder.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_folder.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn_folder.setToolTip(self.translations.get("move_to_folder_btn", "Move to folder"))
+        btn_folder.setStyleSheet("""
+            QPushButton { background: rgba(255,255,255,0.03); border-radius: 15px; border: none; }
+            QPushButton:hover { background: rgba(255,255,255,0.12); }
+        """)
+        btn_folder.clicked.connect(lambda: self._on_move_to_folder(btn_folder))
+        actions_container.addWidget(btn_folder)
 
         actions = [
             ("app/gui/icons/export.png", self.export_clicked, "rgba(255,255,255,0.4)"),
@@ -679,6 +846,74 @@ class SceneCard(QFrame):
 
         root.addLayout(bottom_row)
 
+    def _on_move_to_folder(self, btn_widget):
+        groups = _get_scene_groups()
+        parent_lobby = self.window().findChild(SoulStageLobbyView)
+
+        if not groups:
+            dlg = SowConfirmDialog(
+                parent=self.window(),
+                title=self.translations.get("no_folders_title", "No folders"),
+                text=self.translations.get("no_folders_prompt_scenes", "No folders yet. Create one?"),
+                confirm_text=self.translations.get("create", "Create"),
+                danger=False
+            )
+            if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+                if parent_lobby:
+                    parent_lobby._open_create_folder_dialog()
+            return
+
+        folder_menu = QtWidgets.QMenu(self)
+        folder_menu.setStyleSheet("""
+            QMenu {
+                background: #14141a; border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 10px; padding: 5px; color: white; font-size: 12px;
+            }
+            QMenu::item { padding: 7px 16px; border-radius: 5px; }
+            QMenu::item:selected { background: rgba(0, 230, 118, 0.18); color: #00E676; }
+        """)
+
+        current_group = None
+        for g, members in groups.items():
+            if self.scene_id in members:
+                current_group = g
+                break
+
+        if current_group:
+            remove_act = QtGui.QAction(
+                f"✕  {self.translations.get('remove_from_folder', 'Remove from folder')}", folder_menu
+            )
+            def _remove():
+                grps = _get_scene_groups()
+                if self.scene_id in grps.get(current_group, []):
+                    grps[current_group].remove(self.scene_id)
+                    _save_scene_groups(grps)
+                    if parent_lobby:
+                        parent_lobby.refresh()
+            remove_act.triggered.connect(_remove)
+            folder_menu.addAction(remove_act)
+            folder_menu.addSeparator()
+
+        for g in groups.keys():
+            act = QtGui.QAction(f"📁  {g}", folder_menu)
+            if g == current_group:
+                act.setEnabled(False)
+            def _move(checked=False, gname=g):
+                grps = _get_scene_groups()
+                for og, om in grps.items():
+                    if self.scene_id in om:
+                        om.remove(self.scene_id)
+                grps.setdefault(gname, [])
+                if self.scene_id not in grps[gname]:
+                    grps[gname].append(self.scene_id)
+                _save_scene_groups(grps)
+                if parent_lobby:
+                    parent_lobby.refresh()
+            act.triggered.connect(_move)
+            folder_menu.addAction(act)
+
+        folder_menu.exec(btn_widget.mapToGlobal(QtCore.QPoint(0, btn_widget.height() + 4)))
+
     def enterEvent(self, e):
         self.setStyleSheet(self._H)
         self.setGraphicsEffect(_shadow(45, 12, 120))
@@ -698,92 +933,508 @@ class SoulStageLobbyView(QWidget):
         super().__init__(parent)
         self.setStyleSheet("background: transparent;")
         self._cards: dict[str, SceneCard] = {}
+        self._folder_cards: list = []
+        self._current_opened_folder: Optional[str] = None
+        self._folder_header_widget: Optional[QWidget] = None
 
         self.translations = _load_translations()
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(40, 24, 40, 20)
-        root.setSpacing(16)
+        self.root_layout = QVBoxLayout(self)
+        self.root_layout.setContentsMargins(40, 24, 40, 20)
+        self.root_layout.setSpacing(16)
 
-        hdr = QHBoxLayout()
-        title = QLabel(self.translations.get("soul_stage_title", "Soul Stage"))
-        title.setFont(_font("Inter Tight SemiBold", 22, True))
-        title.setStyleSheet("color: rgba(255,255,255,0.95); background:transparent; border:none;")
-        hdr.addWidget(title, 1)
+        self.hdr = QHBoxLayout()
+        self.title_lbl = QLabel(self.translations.get("soul_stage_title", "Soul Stage"))
+        self.title_lbl.setFont(_font("Inter Tight SemiBold", 22, True))
+        self.title_lbl.setStyleSheet("color: rgba(255,255,255,0.95); background:transparent; border:none;")
+        self.hdr.addWidget(self.title_lbl, 1)
+
+        self.btn_new_folder = _Btn(self.translations.get("new_folder", "📁 New Folder"), dim=False)
+        self.btn_new_folder.clicked.connect(self._open_create_folder_dialog)
+        self.hdr.addWidget(self.btn_new_folder)
 
         self.btn_import = _Btn(self.translations.get("import_scene", "Import"), dim=False)
         self.btn_import.clicked.connect(self.import_scene)
-        hdr.addWidget(self.btn_import)
+        self.hdr.addWidget(self.btn_import)
 
         self.btn_new = _Btn(self.translations.get("new_scene", "＋ New Scene"), primary=True)
         self.btn_new.clicked.connect(self.create_new)
-        hdr.addWidget(self.btn_new)
-        root.addLayout(hdr)
+        self.hdr.addWidget(self.btn_new)
+        self.root_layout.addLayout(self.hdr)
 
         self.search = QLineEdit()
         self.search.setPlaceholderText(self.translations.get("search_scenes", "Search scenes..."))
         self.search.setFixedHeight(36)
         self.search.setStyleSheet(INPUT)
         self.search.textChanged.connect(self._filter)
-        root.addWidget(self.search)
+        self.root_layout.addWidget(self.search)
 
-        root.addWidget(_Divider())
+        self.root_layout.addWidget(_Divider())
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(SCROLLBAR)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setStyleSheet(SCROLLBAR)
 
         self.grid_w = QWidget()
         self.grid_w.setStyleSheet("background:transparent;")
         self.grid_container = QVBoxLayout(self.grid_w)
         self.grid_container.setContentsMargins(0, 4, 8, 20)
-        self.grid_container.setSpacing(12)
+        self.grid_container.setSpacing(16)
         self.grid_container.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        self.grid = QGridLayout()
-        self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(12)
-        self.grid_container.addLayout(self.grid)
+        self.folders_section_w = QWidget()
+        self.folders_section_w.setStyleSheet("background:transparent;")
+        self.folders_section_w.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Maximum)
+        self.folders_section_lay = QVBoxLayout(self.folders_section_w)
+        self.folders_section_lay.setContentsMargins(0, 0, 0, 0)
+        self.folders_section_lay.setSpacing(10)
+        self.folders_section_lay.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+
+        self.folders_title = QLabel(self.translations.get("lobby_folders_section", "SCENE FOLDERS"))
+        self.folders_title.setFont(_font("Inter Tight SemiBold", 11, True))
+        self.folders_title.setStyleSheet("color: rgba(0, 230, 118, 0.85); letter-spacing: 1.5px;")
+        self.folders_section_lay.addWidget(self.folders_title)
+
+        self.folders_grid = QGridLayout()
+        self.folders_grid.setContentsMargins(0, 0, 0, 0)
+        self.folders_grid.setSpacing(12)
+        self.folders_grid.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.folders_section_lay.addLayout(self.folders_grid)
+
+        self.folders_divider = _Divider()
+
+        self.grid_container.addWidget(self.folders_section_w)
+        self.grid_container.addWidget(self.folders_divider)
+
+        self.scenes_section_w = QWidget()
+        self.scenes_section_w.setStyleSheet("background:transparent;")
+        self.scenes_section_w.setSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Maximum)
+        self.scenes_section_lay = QVBoxLayout(self.scenes_section_w)
+        self.scenes_section_lay.setContentsMargins(0, 0, 0, 0)
+        self.scenes_section_lay.setSpacing(10)
+
+        self.scenes_title = QLabel(self.translations.get("lobby_scenes_section", "SCENARIOS"))
+        self.scenes_title.setFont(_font("Inter Tight SemiBold", 11, True))
+        self.scenes_title.setStyleSheet("color: rgba(255, 255, 255, 0.5); letter-spacing: 1.5px;")
+        self.scenes_section_lay.addWidget(self.scenes_title)
+
+        self.scenes_grid = QGridLayout()
+        self.scenes_grid.setContentsMargins(0, 0, 0, 0)
+        self.scenes_grid.setSpacing(12)
+        self.scenes_grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.scenes_section_lay.addLayout(self.scenes_grid)
+
+        self.grid_container.addWidget(self.scenes_section_w)
         self.grid_container.addStretch()
 
-        scroll.setWidget(self.grid_w)
-        root.addWidget(scroll, 1)
+        self.scroll.setWidget(self.grid_w)
+        self.root_layout.addWidget(self.scroll, 1)
 
         self.empty_lbl = QLabel(self.translations.get("no_scenes", "No scenes yet.\nClick  ＋ New Scene  to start your first story."))
         self.empty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_lbl.setFont(_font("Inter Tight Medium", 14))
         self.empty_lbl.setStyleSheet("color: rgba(120,120,120,0.5); background:transparent; border:none;")
+        
+        self.refresh()
+
+    def _get_scene_groups(self) -> dict:
+        return _get_scene_groups()
+
+    def _save_scene_groups(self, groups: dict):
+        _save_scene_groups(groups)
+
+    def refresh_lobby(self):
         self.refresh()
 
     def refresh(self):
         for c in list(self._cards.values()):
-            self.grid.removeWidget(c)
+            self.scenes_grid.removeWidget(c)
             c.deleteLater()
         self._cards.clear()
+
+        for fc in self._folder_cards:
+            self.folders_grid.removeWidget(fc)
+            fc.deleteLater()
+        self._folder_cards.clear()
+
         scenes = _load_scenes().get("scenes", {})
-        if not scenes:
+        groups = _get_scene_groups()
+        grouped_scenes = _get_grouped_scenes()
+
+        if not scenes and not groups:
+            self.folders_section_w.hide()
+            self.folders_divider.hide()
+            self.scenes_section_w.hide()
             if self.empty_lbl.parent() != self.grid_w:
                 self.grid_container.insertWidget(0, self.empty_lbl)
             self.empty_lbl.show()
             return
+
         self.empty_lbl.hide()
-        sorted_s = sorted(scenes.items(), key=lambda kv: kv[1].get("last_played", ""), reverse=True)
-        for i, (sid, sdata) in enumerate(sorted_s):
-            card = SceneCard(sid, sdata)
-            card.play_clicked.connect(self.open_scene)
-            card.edit_clicked.connect(self.edit_scene)
-            card.delete_clicked.connect(self.delete_scene)
-            card.export_clicked.connect(self._on_export_scene)
-            self.grid.addWidget(card, i // 2, i % 2)
-            self._cards[sid] = card
+
+        if self._current_opened_folder and self._current_opened_folder in groups:
+            self.folders_section_w.hide()
+            self.folders_divider.hide()
+            self.scenes_title.hide()
+            self.scenes_section_w.show()
+
+            members = groups[self._current_opened_folder]
+            row, col = 0, 0
+            for sid in members:
+                if sid in scenes:
+                    card = SceneCard(sid, scenes[sid])
+                    card.play_clicked.connect(self.open_scene)
+                    card.edit_clicked.connect(self.edit_scene)
+                    card.delete_clicked.connect(self.delete_scene)
+                    card.export_clicked.connect(self._on_export_scene)
+                    self._cards[sid] = card
+                    self.scenes_grid.addWidget(card, row, col, Qt.AlignmentFlag.AlignTop)
+                    col += 1
+                    if col >= 2:
+                        col = 0
+                        row += 1
+            return
+
+        self.scenes_title.show()
+
+        if groups:
+            self.folders_section_w.show()
+            self.folders_divider.show()
+
+            row_f, col_f = 0, 0
+            max_folder_cols = 4
+
+            for g_name, members in groups.items():
+                preview_bgs = []
+                for sid in members[:4]:
+                    bg = scenes.get(sid, {}).get("starting_bg")
+                    if bg and bg != "None":
+                        preview_bgs.append(f"assets/backgrounds/{bg}")
+
+                folder_card = SceneFolderCard(
+                    group_name=g_name,
+                    scene_count=len(members),
+                    preview_bgs=preview_bgs,
+                    soul_stage_page=self,
+                    parent=self.grid_w
+                )
+                self._folder_cards.append(folder_card)
+                self.folders_grid.addWidget(folder_card, row_f, col_f, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+                col_f += 1
+                if col_f >= max_folder_cols:
+                    col_f = 0
+                    row_f += 1
+        else:
+            self.folders_section_w.hide()
+            self.folders_divider.hide()
+
+        ungrouped_scenes = [
+            (sid, sdata) for sid, sdata in scenes.items() if sid not in grouped_scenes
+        ]
+        
+        if ungrouped_scenes:
+            self.scenes_section_w.show()
+            sorted_s = sorted(ungrouped_scenes, key=lambda kv: kv[1].get("last_played") or "", reverse=True)
+            row_s, col_s = 0, 0
+            for sid, sdata in sorted_s:
+                card = SceneCard(sid, sdata)
+                card.play_clicked.connect(self.open_scene)
+                card.edit_clicked.connect(self.edit_scene)
+                card.delete_clicked.connect(self.delete_scene)
+                card.export_clicked.connect(self._on_export_scene)
+                self._cards[sid] = card
+                self.scenes_grid.addWidget(card, row_s, col_s, Qt.AlignmentFlag.AlignTop)
+                col_s += 1
+                if col_s >= 2:
+                    col_s = 0
+                    row_s += 1
+        else:
+            if groups:
+                self.scenes_section_w.hide()
+            else:
+                self.scenes_section_w.show()
+
+    def _open_folder_view(self, group_name: str):
+        self._current_opened_folder = group_name
+        self._show_folder_header(group_name)
+        self.refresh()
+
+    def _close_folder_view(self):
+        self._current_opened_folder = None
+        if self._folder_header_widget:
+            self.root_layout.removeWidget(self._folder_header_widget)
+            self._folder_header_widget.deleteLater()
+            self._folder_header_widget = None
+            self.hdr.setEnabled(True)
+            self.search.show()
+        self.refresh()
+
+    def _show_folder_header(self, group_name: str):
+        if self._folder_header_widget:
+            self.root_layout.removeWidget(self._folder_header_widget)
+            self._folder_header_widget.deleteLater()
+            self._folder_header_widget = None
+
+        header = QWidget()
+        header.setFixedHeight(45)
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+
+        back_btn = QPushButton("←")
+        back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        back_btn.setFixedHeight(30)
+        back_btn.setFont(_font("Inter Tight Medium", 11))
+        back_btn.setStyleSheet("""
+            QPushButton {
+                background: transparent; color: rgba(255,255,255,0.7);
+                border: 1px solid rgba(255,255,255,0.15); border-radius: 15px; padding: 0 14px;
+            }
+            QPushButton:hover { background: rgba(255,255,255,0.1); color: white; }
+        """)
+        back_btn.clicked.connect(self._close_folder_view)
+
+        title_lbl = QLabel(f"📁 {group_name}")
+        title_lbl.setFont(_font("Inter Tight SemiBold", 16, bold=True))
+        title_lbl.setStyleSheet("color: rgba(255, 255, 255, 0.95);")
+
+        groups = _get_scene_groups()
+        count_lbl = QLabel(f"{len(groups.get(group_name, []))} {self.translations.get('folder_scenes_label', 'scenes')}")
+        count_lbl.setFont(_font("Inter Tight Medium", 12))
+        count_lbl.setStyleSheet("color: rgba(0, 230, 118, 0.65);")
+
+        edit_btn = QPushButton(self.translations.get("folder_edit_btn", "Edit"))
+        edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        edit_btn.setFixedHeight(28)
+        edit_btn.setFont(_font("Inter Tight Medium", 12))
+        edit_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.75);
+                border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 7px; padding: 0 12px;
+            }
+            QPushButton:hover { background: rgba(0, 230, 118, 0.15); border-color: rgba(0, 230, 118, 0.4); color: #00E676; }
+        """)
+        edit_btn.clicked.connect(lambda: self._open_folder_editor(group_name))
+
+        layout.addWidget(back_btn)
+        layout.addWidget(title_lbl)
+        layout.addWidget(count_lbl)
+        layout.addStretch()
+        layout.addWidget(edit_btn)
+
+        self._folder_header_widget = header
+        self.root_layout.insertWidget(2, header)
+
+    def _open_create_folder_dialog(self):
+        scenes = _load_scenes().get("scenes", {})
+        groups = _get_scene_groups()
+
+        dialog = QtWidgets.QDialog(self.window())
+        dialog.setWindowTitle(self.translations.get("folder_create_title_scene", "Create Scene Folder"))
+        dialog.setFixedSize(480, 560)
+        dialog.setStyleSheet("""
+            QDialog { background: #0c0c10; }
+            QLabel { color: rgba(255,255,255,0.85); background: transparent; }
+            QLineEdit {
+                background: rgba(255,255,255,0.04); color: white;
+                border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px;
+            }
+            QListWidget {
+                background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 10px; color: white; padding: 6px;
+            }
+            QListWidget::item { padding: 6px; min-height: 28px; }
+            QPushButton#createBtn {
+                background: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.4);
+                border-radius: 8px; color: #00E676; padding: 10px; font-weight: bold;
+            }
+            QPushButton#createBtn:hover { background: rgba(0, 230, 118, 0.3); color: white; }
+        """)
+
+        lyt = QVBoxLayout(dialog)
+        lyt.setContentsMargins(24, 24, 24, 24)
+        lyt.setSpacing(14)
+
+        t_lbl = QLabel(self.translations.get("folder_create_title_scene", "Create Scene Folder"))
+        t_lbl.setFont(_font("Inter Tight SemiBold", 16, True))
+        lyt.addWidget(t_lbl)
+
+        name_in = QLineEdit()
+        name_in.setPlaceholderText(self.translations.get("folder_name_placeholder", "Folder name..."))
+        lyt.addWidget(name_in)
+
+        pick_lbl = QLabel(self.translations.get("folder_select_scenes_label", "Select Scenes to include:"))
+        pick_lbl.setFont(_font("Inter Tight Medium", 11))
+        lyt.addWidget(pick_lbl)
+
+        list_w = QtWidgets.QListWidget()
+        list_w.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.MultiSelection)
+        for sid, sdata in scenes.items():
+            it = QtWidgets.QListWidgetItem(f"🎬 {sdata.get('title', 'Untitled')}")
+            it.setData(Qt.ItemDataRole.UserRole, sid)
+            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            it.setCheckState(Qt.CheckState.Unchecked)
+            list_w.addItem(it)
+        lyt.addWidget(list_w, 1)
+
+        btn_create = QPushButton(self.translations.get("folder_create_btn", "Create Folder"))
+        btn_create.setObjectName("createBtn")
+        btn_create.setCursor(Qt.CursorShape.PointingHandCursor)
+        lyt.addWidget(btn_create)
+
+        def _do_create():
+            name = name_in.text().strip()
+            if not name:
+                return
+            if name in groups:
+                sow_toast(self.window(), "Error", "A folder with this name already exists!", "error")
+                return
+            selected_ids = []
+            for idx in range(list_w.count()):
+                it = list_w.item(idx)
+                if it.checkState() == Qt.CheckState.Checked:
+                    selected_ids.append(it.data(Qt.ItemDataRole.UserRole))
+            groups[name] = selected_ids
+            _save_scene_groups(groups)
+            dialog.accept()
+            self.refresh()
+
+        btn_create.clicked.connect(_do_create)
+        dialog.exec()
+
+    def _open_folder_editor(self, group_name: str):
+        scenes = _load_scenes().get("scenes", {})
+        groups = _get_scene_groups()
+        members = list(groups.get(group_name, []))
+
+        dialog = QtWidgets.QDialog(self.window())
+        dialog.setWindowTitle(f"Edit Folder — {group_name}")
+        dialog.setFixedSize(480, 560)
+        dialog.setStyleSheet("""
+            QDialog { background: #0c0c10; }
+            QLabel { color: rgba(255,255,255,0.85); background: transparent; }
+            QLineEdit {
+                background: rgba(255,255,255,0.04); color: white;
+                border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px;
+            }
+            QListWidget {
+                background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+                border-radius: 10px; color: white; padding: 6px;
+            }
+            QListWidget::item { padding: 6px; min-height: 28px; }
+            QPushButton#saveBtn {
+                background: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.4);
+                border-radius: 8px; color: #00E676; padding: 10px; font-weight: bold;
+            }
+            QPushButton#saveBtn:hover { background: rgba(0, 230, 118, 0.3); color: white; }
+            QPushButton#delBtn {
+                background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3);
+                border-radius: 8px; color: #F44336; padding: 10px;
+            }
+            QPushButton#delBtn:hover { background: rgba(244, 67, 54, 0.25); color: white; }
+        """)
+
+        lyt = QVBoxLayout(dialog)
+        lyt.setContentsMargins(24, 24, 24, 24)
+        lyt.setSpacing(14)
+
+        edit_folder_tr = self.translations.get("folder_select_scenes_title", "Edit Folder: ")
+        t_lbl = QLabel(f"{edit_folder_tr} {group_name}")
+        t_lbl.setFont(_font("Inter Tight SemiBold", 16, True))
+        lyt.addWidget(t_lbl)
+
+        name_in = QLineEdit(group_name)
+        lyt.addWidget(name_in)
+
+        pick_lbl = QLabel(self.translations.get("folder_select_scenes_label", "Scenes inside this folder:"))
+        pick_lbl.setFont(_font("Inter Tight Medium", 11))
+        lyt.addWidget(pick_lbl)
+
+        list_w = QtWidgets.QListWidget()
+        for sid, sdata in scenes.items():
+            it = QtWidgets.QListWidgetItem(f"🎬 {sdata.get('title', 'Untitled')}")
+            it.setData(Qt.ItemDataRole.UserRole, sid)
+            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            it.setCheckState(Qt.CheckState.Checked if sid in members else Qt.CheckState.Unchecked)
+            list_w.addItem(it)
+        lyt.addWidget(list_w, 1)
+
+        btn_row = QHBoxLayout()
+        btn_del = QPushButton(self.translations.get("delete_folder", "Delete Folder"))
+        btn_del.setObjectName("delBtn")
+        btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        btn_save = QPushButton(self.translations.get("save_changes", "Save Changes"))
+        btn_save.setObjectName("saveBtn")
+        btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        btn_row.addWidget(btn_del)
+        btn_row.addStretch()
+        btn_row.addWidget(btn_save)
+        lyt.addLayout(btn_row)
+
+        def _do_save():
+            new_name = name_in.text().strip()
+            if not new_name:
+                return
+            new_selected = []
+            for idx in range(list_w.count()):
+                it = list_w.item(idx)
+                if it.checkState() == Qt.CheckState.Checked:
+                    new_selected.append(it.data(Qt.ItemDataRole.UserRole))
+            groups[group_name] = new_selected
+            if new_name != group_name and new_name not in groups:
+                groups[new_name] = groups.pop(group_name)
+                self._current_opened_folder = new_name
+
+            _save_scene_groups(groups)
+            dialog.accept()
+            if self._current_opened_folder:
+                self._show_folder_header(self._current_opened_folder)
+            self.refresh()
+
+        def _do_delete():
+            dlg = SowConfirmDialog(
+                parent=dialog,
+                title=self.translations.get("delete_folder", "Delete Folder"),
+                text=f"Delete folder '{group_name}'? (Scenes will not be deleted)",
+                confirm_text=self.translations.get("delete", "Delete"),
+                danger=True
+            )
+            if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+                groups.pop(group_name, None)
+                _save_scene_groups(groups)
+                dialog.accept()
+                self._close_folder_view()
+
+        btn_save.clicked.connect(_do_save)
+        btn_del.clicked.connect(_do_delete)
+        dialog.exec()
 
     def _filter(self, text: str):
         q = text.lower().strip()
+        
+        visible_scenes = 0
         for sid, card in self._cards.items():
             t = card.scene_data.get("title", "").lower()
             d = card.scene_data.get("description", "").lower()
-            card.setVisible(not q or q in t or q in d)
+            match = not q or q in t or q in d
+            card.setVisible(match)
+            if match:
+                visible_scenes += 1
+
+        visible_folders = 0
+        for fc in self._folder_cards:
+            match = not q or q in fc.group_name.lower()
+            fc.setVisible(match)
+            if match:
+                visible_folders += 1
+
+        if self.folders_section_w.isVisible():
+            self.folders_title.setVisible(visible_folders > 0)
+        if self.scenes_section_w.isVisible():
+            self.scenes_title.setVisible(visible_scenes > 0)
 
     def _on_export_scene(self, scene_id: str):
         data = _load_scenes()
@@ -799,6 +1450,7 @@ class SoulStageLobbyView(QWidget):
             "time_of_day": scene_data.get("time_of_day", "day"),
             "opening_narration": scene_data.get("opening_narration", ""),
             "first_message": scene_data.get("first_message", ""),
+            "party": scene_data.get("party", []),
             "gm_tone": scene_data.get("gm_tone", "epic_fantasy"),
             "narrator_style": scene_data.get("narrator_style", "Standard evocative present-tense prose"),
             "conversation_method": scene_data.get("conversation_method", "Local LLM"),
@@ -826,7 +1478,7 @@ class SceneEditorView(QWidget):
         super().__init__(parent)
         self.setStyleSheet("background: transparent;")
         self._editing_id: str = None
-        self._char_checks: dict[str, QtWidgets.QCheckBox] = {}
+        self._char_checks: dict[str, "_PartyCharCard"] = {}
 
         self.translations = _load_translations()
 
@@ -984,88 +1636,93 @@ class SceneEditorView(QWidget):
 
         bot = QHBoxLayout()
         bot.setSpacing(16)
-        bot.setAlignment(Qt.AlignmentFlag.AlignTop)
+        bot.setContentsMargins(0, 0, 0, 0)
 
         sec4a = _GlassSection(self.translations.get("section_party", "IV.  PARTY MEMBERS"))
+        sec4a.setFixedHeight(480)
         ly4a = sec4a.section_layout()
-        ly4a.setAlignment(Qt.AlignmentFlag.AlignTop)
+        ly4a.setSpacing(10)
 
-        ly4a.addWidget(_FieldLabel(self.translations.get("select_characters", "Select characters for this scene")))
+        party_hdr = QHBoxLayout()
+        party_hdr.addWidget(_FieldLabel(self.translations.get("select_characters", "Select characters for this scene")))
+        party_hdr.addStretch()
+        self.party_count_lbl = QLabel(self.translations.get("party_member_selected", "0 selected").replace("{n}", "0"))
+        self.party_count_lbl.setFont(_font("Inter Tight SemiBold", 10, True))
+        self.party_count_lbl.setStyleSheet(
+            "color: rgba(150,168,255,0.85); background: rgba(120,140,255,0.12); "
+            "border: 1px solid rgba(150,168,255,0.30); border-radius: 9px; padding: 3px 10px;"
+        )
+        party_hdr.addWidget(self.party_count_lbl)
+        ly4a.addLayout(party_hdr)
 
         self.char_scroll = QScrollArea()
         self.char_scroll.setWidgetResizable(True)
-        self.char_scroll.setMinimumHeight(120)
-
-        self.char_scroll.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-
-        self.char_scroll.setStyleSheet(SCROLLBAR + "QScrollArea { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; }")
+        self.char_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.char_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.char_scroll.setStyleSheet(
+            SCROLLBAR + "QScrollArea { background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }"
+        )
 
         self.char_inner = QWidget()
         self.char_inner.setStyleSheet("background: transparent;")
         self.char_grid = QGridLayout(self.char_inner)
-        self.char_grid.setContentsMargins(14, 10, 14, 10)
-        self.char_grid.setSpacing(12)
-        self.char_grid.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.char_grid.setContentsMargins(10, 10, 10, 10)
+        self.char_grid.setSpacing(10)
+        self.char_grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
         self.char_scroll.setWidget(self.char_inner)
-
         ly4a.addWidget(self.char_scroll, 1)
 
         bot.addWidget(sec4a, 6)
 
         sec4b = _GlassSection(self.translations.get("section_engine", "V.  ENGINE SETTINGS"))
+        sec4b.setFixedHeight(480)
         ly4b = sec4b.section_layout()
+        ly4b.setSpacing(8)
+
         ly4b.addWidget(_FieldLabel(self.translations.get("conversation_method", "Conversation Method")))
-        self.f_method = QComboBox(); 
+        self.f_method = QComboBox()
         self.f_method.addItems([
-            "Local LLM", 
-            "Open AI", 
-            "Anthropic", 
-            "Google Gemini", 
-            "DeepSeek", 
-            "Grok", 
-            "Qwen", 
-            "Z.AI", 
-            "Mistral AI", 
-            "OpenRouter"
+            "Local LLM", "Open AI", "Anthropic", "Google Gemini", 
+            "DeepSeek", "Grok", "Qwen", "Z.AI", "Mistral AI", "OpenRouter", "Player2"
         ])
-        self.f_method.setFixedHeight(38); 
-        self.f_method.setStyleSheet(INPUT); 
-        ly4b.addWidget(self.f_method)
+        self.f_method.setFixedHeight(36)
         self.f_method.setStyleSheet(COMBO_STYLE)
+        ly4b.addWidget(self.f_method)
 
         ly4b.addWidget(_FieldLabel(self.translations.get("user_persona", "User Persona"), self.translations.get("user_persona_hint", "Name and avatar shown in the chat for your messages.")))
         self.f_persona = QComboBox()
         self.f_persona.setStyleSheet(COMBO_STYLE)
-        self.f_persona.setFixedHeight(38)
+        self.f_persona.setFixedHeight(36)
         ly4b.addWidget(self.f_persona)
 
         ly4b.addWidget(_FieldLabel(
             self.translations.get("max_actor_depth", "Max Actors Per Turn"),
-            self.translations.get("max_actor_depth_hint",
-                "How many party members and NPCs may speak in a single turn (1-6, default 3).")
+            self.translations.get("max_actor_depth_hint", "How many party members and NPCs may speak in a single turn (1-6, default 3).")
         ))
         from PyQt6.QtWidgets import QSpinBox
         self.f_max_actor_depth = QSpinBox()
         self.f_max_actor_depth.setRange(1, 6)
         self.f_max_actor_depth.setValue(3)
-        self.f_max_actor_depth.setFixedHeight(38)
+        self.f_max_actor_depth.setFixedHeight(36)
         self.f_max_actor_depth.setStyleSheet(INPUT)
         ly4b.addWidget(self.f_max_actor_depth)
 
         self._selected_lorebooks = []
         ly4b.addWidget(_FieldLabel(self.translations.get("lorebooks_soul_stage_page", "Lorebooks  (optional)")))
         self.btn_lorebook = QPushButton("None")
-        self.btn_lorebook.setFixedHeight(38)
+        self.btn_lorebook.setFixedHeight(36)
         self.btn_lorebook.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_lorebook.setStyleSheet("""
             QPushButton {
                 background-color: rgba(15, 15, 18, 0.4);
                 color: #e0e0e0;
                 border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 12px;
-                padding: 8px 12px;
+                border-radius: 10px;
+                padding: 6px 12px;
                 text-align: left;
+                font-family: 'Inter Tight Medium';
+                font-size: 13px;
             }
             QPushButton:hover {
                 border: 1px solid rgba(255, 255, 255, 0.4);
@@ -1074,6 +1731,7 @@ class SceneEditorView(QWidget):
         """)
         self.btn_lorebook.clicked.connect(self._open_lorebook_selector)
         ly4b.addWidget(self.btn_lorebook)
+
         ly4b.addWidget(_FieldLabel(
             self.translations.get("dice_rolls", "Dice Rolls"),
             self.translations.get("dice_rolls_hint", "Lets the GM call for d20/2d6/3d6 checks on risky or contested actions.")
@@ -1081,14 +1739,13 @@ class SceneEditorView(QWidget):
         self.f_dice_enabled = QtWidgets.QCheckBox(
             self.translations.get("dice_rolls_enable", "🎲 Enable Dice Rolls for this scene")
         )
-        self.f_dice_enabled.setFont(_font("Inter Tight Medium", 13))
+        self.f_dice_enabled.setFont(_font("Inter Tight Medium", 12))
         self.f_dice_enabled.setStyleSheet(CB_STYLE)
         ly4b.addWidget(self.f_dice_enabled)
 
         ly4b.addStretch()
         bot.addWidget(sec4b, 4)
-        ly4b.addStretch()
-        bot.addWidget(sec4b, 4)
+
         fly.addLayout(bot)
 
         scroll.setWidget(form)
@@ -1127,22 +1784,30 @@ class SceneEditorView(QWidget):
     def rebuild_char_list(self, characters: list):
         while self.char_grid.count():
             item = self.char_grid.takeAt(0)
-            if item.widget(): 
+            if item.widget():
                 item.widget().deleteLater()
         self._char_checks.clear()
-        
+
         if not characters:
             lbl = QLabel(self.translations.get("no_characters", "No characters found."))
             lbl.setStyleSheet("color: rgba(120,120,120,0.6); font-size:13px; background:transparent; border:none;")
             self.char_grid.addWidget(lbl, 0, 0)
+            self._update_party_count()
             return
-        
+
+        cols = 3
         for i, name in enumerate(characters):
-            cb = QtWidgets.QCheckBox(name)
-            cb.setFont(_font("Inter Tight Medium", 13))
-            cb.setStyleSheet(CB_STYLE)
-            self._char_checks[name] = cb
-            self.char_grid.addWidget(cb, i, 0)
+            card = _PartyCharCard(name)
+            card.toggled.connect(self._update_party_count)
+            self._char_checks[name] = card
+            self.char_grid.addWidget(card, i // cols, i % cols)
+
+        self._update_party_count()
+
+    def _update_party_count(self):
+        n = sum(1 for cb in self._char_checks.values() if cb.isChecked())
+        label = self.translations.get("party_member_selected", "{n} selected").format(n=n)
+        self.party_count_lbl.setText(label)
 
     def load_scene(self, scene_id: str, scene_data: dict):
         self._editing_id = scene_id
@@ -1182,6 +1847,7 @@ class SceneEditorView(QWidget):
         party = scene_data.get("party", [])
         for name, cb in self._char_checks.items():
             cb.setChecked(name in party)
+        self._update_party_count()
 
         bg_val = scene_data.get("starting_bg", "None")
         idx = self.f_bg_image.findText(bg_val)
@@ -1210,6 +1876,7 @@ class SceneEditorView(QWidget):
         self._selected_lorebooks = []
         self._update_lorebook_button_text()
         for cb in self._char_checks.values(): cb.setChecked(False)
+        self._update_party_count()
 
     def load_personas(self, personas_dict):
         self.f_persona.clear()
@@ -1231,13 +1898,20 @@ class SceneEditorView(QWidget):
         self.f_tone.setCurrentText(import_data.get("gm_tone", "Epic Fantasy"))
         self.f_method.setCurrentIndex({
             "Local LLM": 0, "Open AI": 1, "Anthropic": 2, "Google Gemini": 3,
-            "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9
+            "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9,
+            "Player2": 10
         }.get(import_data.get("conversation_method", "Local LLM"), 0))
         self.f_persona.setCurrentText(import_data.get("persona", "None"))
         self.f_narrator_style.setCurrentText(import_data.get("narrator_style", "Standard evocative present-tense prose"))
         self.f_dice_enabled.setChecked(bool(import_data.get("dice_rolls_enabled", False)))
         self.f_lock_bg.setChecked(bool(import_data.get("lock_bg", False)))
         self.f_disable_ambient.setChecked(bool(import_data.get("disable_ambient", False)))
+
+        party = import_data.get("party", [])
+        for name, cb in self._char_checks.items():
+            cb.setChecked(name in party)
+        self._update_party_count()
+
         lb_data = import_data.get("lorebook", [])
         if isinstance(lb_data, str):
             if lb_data and lb_data != "None":
@@ -1255,10 +1929,14 @@ class SceneEditorView(QWidget):
         ok = True
         err   = INPUT + "QLineEdit { border-color: rgba(255,60,60,0.6); }"
         err_t = INPUT + "QTextEdit { border-color: rgba(255,60,60,0.6); }"
+        err_scroll = SCROLLBAR + "QScrollArea { background: rgba(0,0,0,0.18); border: 1px solid rgba(255,60,60,0.6); border-radius: 14px; }"
+        ok_scroll  = SCROLLBAR + "QScrollArea { background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; }"
         if not title:   self.f_title.setStyleSheet(err);   ok = False
         else:           self.f_title.setStyleSheet(INPUT)
         if not opening: self.f_opening.setStyleSheet(err_t); ok = False
         else:           self.f_opening.setStyleSheet(INPUT)
+        if not party:   self.char_scroll.setStyleSheet(err_scroll); ok = False
+        else:           self.char_scroll.setStyleSheet(ok_scroll)
         if not party or not ok: return
         tod  = ["morning", "day", "evening", "night"][self.f_time.currentIndex()]
         now  = datetime.datetime.now().isoformat()
@@ -1306,7 +1984,7 @@ class _BaseChatBubble(QFrame):
             h = bg_color.lstrip("#")
             try:
                 bg_color = f"rgba({int(h[0:2], 16)}, {int(h[2:4], 16)}, {int(h[4:6], 16)}, {alpha})"
-            except:
+            except Exception:
                 pass
 
         self.setStyleSheet("background: transparent; border: none;")
@@ -1319,7 +1997,8 @@ class _BaseChatBubble(QFrame):
         self.bubble_frame.setObjectName("bubble_frame")
         
         radius_css = (
-            f"border-top-left-radius: {r}px; border-bottom-left-radius: {r}px; border-bottom-right-radius: {r}px; border-top-right-radius: {r}px;"
+            f"border-top-right-radius: {r}px; border-bottom-right-radius: {r}px; "
+            f"border-top-left-radius: {r}px; border-bottom-left-radius: 0px;"
         )
         
         self.bubble_frame.setStyleSheet(f"""
@@ -1330,7 +2009,8 @@ class _BaseChatBubble(QFrame):
             }}
         """)
 
-        self.bubble_frame.setFixedWidth(s.get("max_width", 750)) 
+        bubble_width = s.get("max_width", 750)
+        self.bubble_frame.setFixedWidth(bubble_width)
         
         bubble_layout = QVBoxLayout(self.bubble_frame)
         bubble_layout.setContentsMargins(14, 12, 14, 12)
@@ -1362,7 +2042,7 @@ class _BaseChatBubble(QFrame):
         painter = QPainter(final_avatar_pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
-        path = QtGui.QPainterPath()
+        path = QPainterPath()
         path.addEllipse(0, 0, target_size, target_size)
         painter.setClipPath(path)
         painter.drawPixmap(0, 0, square_pixmap)
@@ -1376,9 +2056,8 @@ class _BaseChatBubble(QFrame):
         header_layout.addWidget(self.avatar_label)
         
         self.header_label = QLabel(name)
-        font = QtGui.QFont()
-        font.setFamily("Inter Tight SemiBold")
-        font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        font = QtGui.QFont("Inter Tight SemiBold", max(11, font_size - 2), QtGui.QFont.Weight.Bold)
+        font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
         self.header_label.setFont(font)
         self.header_label.setStyleSheet(f"""
             QLabel {{
@@ -1400,8 +2079,7 @@ class _BaseChatBubble(QFrame):
         self._text_label.setWordWrap(True)
         self._text_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
         
-        font_text = QtGui.QFont()
-        font_text.setFamily("Inter Tight Medium")
+        font_text = QtGui.QFont("Inter Tight Medium", font_size)
         font_text.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
         self._text_label.setFont(font_text)
         
@@ -1448,16 +2126,23 @@ def format_dice_dict(d: dict) -> str:
 class SoulStageDiceCard(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
+        from app.configuration import configuration
+        s = configuration.ConfigurationSettings().get_main_setting("chat_appearance") or {}
+        bubble_width = s.get("max_width", 750)
+
         self.setStyleSheet("background: transparent; border: none;")
 
         outer = QHBoxLayout(self)
         outer.setContentsMargins(10, 2, 10, 2)
+        outer.setSpacing(0)
         outer.addStretch()
 
         self.card = QFrame()
         self.card.setObjectName("dice_card")
+        self.card.setFixedWidth(bubble_width)
+        
         card_layout = QHBoxLayout(self.card)
-        card_layout.setContentsMargins(14, 8, 14, 8)
+        card_layout.setContentsMargins(14, 10, 14, 10)
         card_layout.setSpacing(10)
 
         self.icon_lbl = QLabel("🎲")
@@ -1499,9 +2184,9 @@ class SoulStageDiceCard(QFrame):
             border = "rgba(255, 210, 90, 0.60)"
         self.card.setStyleSheet(f"""
             QFrame#dice_card {{
-                background: rgba(28, 26, 20, 0.85);
+                background: rgba(24, 22, 18, 0.85);
                 border: 1px solid rgba(255, 255, 255, 0.08);
-                border-left: 3px solid {border};
+                border-left: 4px solid {border};
                 border-radius: 10px;
             }}
         """)
@@ -1553,7 +2238,7 @@ class SoulStageEventCard(_BaseChatBubble):
         label, bg_color = self._EVENT_THEMES[event_type]
         super().__init__(
             name=label,
-            avatar_path="app/gui/icons/scene_main.png",
+            avatar_path="app/gui/icons/d20.png",
             bg_color=bg_color,
             parent=parent
         )
@@ -2579,6 +3264,9 @@ class WorldInfoDialog(QtWidgets.QDialog):
             (self.translations.get("tab_resources", "Resources"), self._build_resources_tab),
             (self.translations.get("tab_lore", "Lore Cards"), self._build_lore_tab),
             (self.translations.get("tab_campaign", "Campaign Board"), self._build_campaign_tab),
+            (self.translations.get("tab_arcs", "Story Arcs"), self._build_arcs_tab),
+            (self.translations.get("tab_relationships", "Relationships"), self._build_relationships_tab),
+            (self.translations.get("tab_character_states", "Character States"), self._build_overlays_tab),
             (self.translations.get("tab_npcs", "Active NPCs"), self._build_npcs_tab),
         ]
         
@@ -2848,6 +3536,98 @@ class WorldInfoDialog(QtWidgets.QDialog):
         l.addStretch()
         return self._scroll_wrap(w)
 
+    def _build_arcs_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_arcs", "Story Arcs")))
+
+        hint = QLabel(self.translations.get(
+            "hint_arcs_format",
+            "This is where you gate your plot. An arc in \"locked\" stage does not exist for "
+            "any character — nobody will mention it or hint at it. Set it to \"available\" once "
+            "the player has found the lead that should unlock it, or \"active\" once it's fully "
+            "underway. \"trigger\" is a note to the GM about what should cause the unlock — it is "
+            "never shown to characters."
+        ))
+        self._set_font(hint, "Inter Tight Medium", 10)
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: rgba(255,255,255,0.35); margin-bottom: 4px;")
+        l.addWidget(hint)
+
+        self.edit_arcs = QTextEdit()
+        self.edit_arcs.setPlaceholderText(
+            "### Investigation into the Theft\n"
+            "stage: locked\n"
+            "trigger: player finds the torn ledger page in the quartermaster's room\n"
+            "notes: The quartermaster has been skimming coin from the payroll for months.\n"
+        )
+        self.edit_arcs.setMinimumHeight(320)
+        self._set_font(self.edit_arcs, "Inter Tight Medium", 12)
+        l.addWidget(self.edit_arcs)
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_relationships_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_relationships", "Relationships")))
+
+        hint = QLabel(self.translations.get(
+            "hint_relationships_format",
+            "How one character feels about and perceives another — usually a party member or "
+            "NPC's view of PLAYER, but it can be between any two actors. This is injected "
+            "directly into that character's own prompt, so it's never forgotten. Affinity runs "
+            "-100 (hostile) to 100 (devoted). \"role\" is how the subject currently sees the "
+            "target's status or title — independent of affinity."
+        ))
+        self._set_font(hint, "Inter Tight Medium", 10)
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: rgba(255,255,255,0.35); margin-bottom: 4px;")
+        l.addWidget(hint)
+
+        self.edit_relationships = QTextEdit()
+        self.edit_relationships.setPlaceholderText(
+            "Garen -> PLAYER | 45 | captain | respects_authority, owes_debt\n"
+            "Vivy -> Holo | -15 | rival | distrustful\n"
+        )
+        self.edit_relationships.setMinimumHeight(280)
+        self._set_font(self.edit_relationships, "Inter Tight Medium", 12)
+        self._field_col(
+            l, self.translations.get("field_relationships", "Relationships"), self.edit_relationships,
+            self.translations.get("field_relationships_hint",
+                'Format: "subject -> target | affinity(-100..100) | role_view | tag1, tag2"')
+        )
+        l.addStretch()
+        return self._scroll_wrap(w)
+
+    def _build_overlays_tab(self) -> QWidget:
+        w, l = self._inner_widget()
+        l.addWidget(self._section_label(self.translations.get("section_character_states", "Character States")))
+
+        hint = QLabel(self.translations.get(
+            "hint_overlays_format",
+            "A character's own evolving state — their current role/title and any personal "
+            "facts worth tracking (loyalty, a secret, an internal conflict). This travels with "
+            "the character and shows up in their own prompt, separate from the static "
+            "character card."
+        ))
+        self._set_font(hint, "Inter Tight Medium", 10)
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: rgba(255,255,255,0.35); margin-bottom: 4px;")
+        l.addWidget(hint)
+
+        self.edit_overlays = QTextEdit()
+        self.edit_overlays.setPlaceholderText(
+            "### Garen\n"
+            "role: captain\n"
+            "arc: reconciled\n"
+            "loyalty: torn between duty and player\n"
+            "secret: knows about the theft but hasn't reported it\n"
+        )
+        self.edit_overlays.setMinimumHeight(320)
+        self._set_font(self.edit_overlays, "Inter Tight Medium", 12)
+        l.addWidget(self.edit_overlays)
+        l.addStretch()
+        return self._scroll_wrap(w)
+
     def _build_npcs_tab(self) -> QWidget:
         w, l = self._inner_widget()
         l.addWidget(self._section_label(self.translations.get("section_npcs", "Characters in Scene")))
@@ -3002,6 +3782,129 @@ class WorldInfoDialog(QtWidgets.QDialog):
                 entries.append({"title": title, "current": cur, "max": mx, "status": status, "description": description})
         return entries
 
+    @staticmethod
+    def _format_arcs(arcs: list) -> str:
+        blocks = []
+        for a in arcs:
+            lines = [f"### {a.get('title', 'Untitled arc')}"]
+            lines.append(f"stage: {a.get('stage', 'locked')}")
+            lines.append(f"trigger: {a.get('trigger_hint', '')}")
+            if a.get("gm_notes"):
+                lines.append(f"notes: {a.get('gm_notes', '')}")
+            lines.append(f"[id: {a.get('id', '')}]")
+            blocks.append("\n".join(lines))
+        return "\n\n".join(blocks)
+
+    @staticmethod
+    def _parse_arcs(text: str) -> list:
+        arcs = []
+        blocks = re.split(r"\n\s*\n(?=###\s)", text.strip())
+        for block in blocks:
+            block = block.strip()
+            if not block.startswith("###"):
+                continue
+            lines = block.splitlines()
+            title = lines[0][3:].strip()
+            if not title:
+                continue
+            data = {"title": title, "stage": "locked", "trigger_hint": ""}
+            notes_lines = []
+            for line in lines[1:]:
+                stripped = line.strip()
+                m_id = re.match(r"^\[id:\s*(.*?)\]$", stripped)
+                if m_id:
+                    if m_id.group(1).strip():
+                        data["id"] = m_id.group(1).strip()
+                    continue
+                if stripped.lower().startswith("stage:"):
+                    stage = stripped.split(":", 1)[1].strip().lower()
+                    data["stage"] = stage if stage in ("locked", "available", "active", "resolved") else "locked"
+                elif stripped.lower().startswith("trigger:"):
+                    data["trigger_hint"] = stripped.split(":", 1)[1].strip()
+                elif stripped.lower().startswith("notes:"):
+                    notes_lines.append(stripped.split(":", 1)[1].strip())
+                elif stripped:
+                    notes_lines.append(line)
+            data["gm_notes"] = "\n".join(notes_lines).strip()
+            arcs.append(data)
+        return arcs
+
+    @staticmethod
+    def _format_relationships(rels: list) -> str:
+        lines = []
+        for r in rels:
+            tags = ", ".join(r.get("tags", []))
+            lines.append(f"{r.get('subject','')} -> {r.get('target','')} | {r.get('affinity',0)} | {r.get('role_view','')} | {tags}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_relationships(text: str) -> list:
+        rels = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or "->" not in line:
+                continue
+            left, _, rest = line.partition("->")
+            subject = left.strip()
+            parts = [p.strip() for p in rest.split("|")]
+            target = parts[0] if parts else ""
+            if not subject or not target:
+                continue
+            affinity = 0
+            if len(parts) > 1 and parts[1]:
+                try:
+                    affinity = max(-100, min(100, int(parts[1])))
+                except ValueError:
+                    pass
+            role_view = parts[2] if len(parts) > 2 else ""
+            tags = [t.strip() for t in parts[3].split(",")] if len(parts) > 3 and parts[3] else []
+            tags = [t for t in tags if t]
+            rels.append({"subject": subject, "target": target, "affinity": affinity, "role_view": role_view, "tags": tags})
+        return rels
+
+    @staticmethod
+    def _format_overlays(overlays: list) -> str:
+        blocks = []
+        for o in overlays:
+            lines = [f"### {o.get('name', '')}"]
+            if o.get("current_role"):
+                lines.append(f"role: {o['current_role']}")
+            if o.get("arc_stage"):
+                lines.append(f"arc: {o['arc_stage']}")
+            for k, v in o.get("mutable_facts", {}).items():
+                lines.append(f"{k.replace('_', ' ')}: {v}")
+            blocks.append("\n".join(lines))
+        return "\n\n".join(blocks)
+
+    @staticmethod
+    def _parse_overlays(text: str) -> list:
+        overlays = []
+        blocks = re.split(r"\n\s*\n(?=###\s)", text.strip())
+        for block in blocks:
+            block = block.strip()
+            if not block.startswith("###"):
+                continue
+            lines = block.splitlines()
+            name = lines[0][3:].strip()
+            if not name:
+                continue
+            data = {"name": name, "current_role": "", "arc_stage": "", "mutable_facts": {}}
+            for line in lines[1:]:
+                stripped = line.strip()
+                if not stripped or ":" not in stripped:
+                    continue
+                key, _, value = stripped.partition(":")
+                key_l = key.strip().lower()
+                value = value.strip()
+                if key_l == "role":
+                    data["current_role"] = value
+                elif key_l == "arc":
+                    data["arc_stage"] = value
+                else:
+                    data["mutable_facts"][key.strip()] = value
+            overlays.append(data)
+        return overlays
+
     def _populate(self):
         ws = self.world_state
         
@@ -3021,6 +3924,9 @@ class WorldInfoDialog(QtWidgets.QDialog):
         board = ws.campaign_board.to_dict()
         self.edit_objectives.setPlainText(self._format_campaign_entries(board.get("objectives", []), is_clock=False))
         self.edit_clocks.setPlainText(self._format_campaign_entries(board.get("clocks", []), is_clock=True))
+        self.edit_arcs.setPlainText(self._format_arcs(ws.arc_registry.to_dict()))
+        self.edit_relationships.setPlainText(self._format_relationships(ws.relationship_graph.to_dict()))
+        self.edit_overlays.setPlainText(self._format_overlays(ws.overlay_registry.to_dict()))
 
         if self.npc_registry:
             npcs = self.npc_registry.list_active()
@@ -3097,12 +4003,26 @@ class WorldInfoDialog(QtWidgets.QDialog):
         for clk_data in parsed_clocks:
             ws.campaign_board.upsert_clock(clk_data)
 
+        ws.arc_registry.arcs = {}
+        for arc_data in self._parse_arcs(self.edit_arcs.toPlainText()):
+            ws.arc_registry.upsert(arc_data)
+
+        ws.relationship_graph.replace_all(self._parse_relationships(self.edit_relationships.toPlainText()))
+
+        ws.overlay_registry.overlays = {}
+        for ov_data in self._parse_overlays(self.edit_overlays.toPlainText()):
+            ws.overlay_registry.replace(
+                ov_data["name"], ov_data["current_role"], ov_data["arc_stage"], ov_data["mutable_facts"]
+            )
+
         self.world_state_changed.emit({
             "location": ws.location, "time_of_day": ws.time_of_day,
             "atmosphere": ws.atmosphere, "key_facts": ws.key_facts,
             "player_inventory": ws.player_inventory, "player_status": ws.player_status,
             "resources": ws.resources, "player_skills": ws.player_skills,
             "lore_cards": ws.lore_registry.to_dict(), "campaign_board": ws.campaign_board.to_dict(),
+            "story_arcs": ws.arc_registry.to_dict(), "relationships": ws.relationship_graph.to_dict(),
+            "character_overlays": ws.overlay_registry.to_dict(),
         })
         self.accept()
 
@@ -3361,105 +4281,27 @@ class SoulStageChatView(QFrame):
         self.scroll_area.setSizeAdjustPolicy(
             QtWidgets.QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored
         )
-        self.scroll_area.setStyleSheet("""
-            QScrollArea {
-                background: transparent;
-                border: none;
-            }
-            QScrollArea > QWidget, 
-            QScrollArea #qt_scrollarea_viewport, 
-            QScrollArea QWidget {
-                background: transparent;
-                background-color: transparent;
-            }
-            QScrollArea QScrollBar {
-                background: transparent;
-                background-color: transparent;
-            }
-            QScrollBar:vertical {
-                background: transparent;
-                width: 8px;
-                margin: 4px 2px 4px 2px;
-                border: none;
-            }
-            QScrollBar::handle:vertical {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 rgba(255, 255, 255, 0.15), 
-                    stop:1 rgba(255, 255, 255, 0.08)
-                );
-                border: 1px solid rgba(255, 255, 255, 0.20);
-                border-radius: 4px;
-                min-height: 40px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 rgba(255, 255, 255, 0.25), 
-                    stop:1 rgba(255, 255, 255, 0.16)
-                );
-                border: 1px solid rgba(255, 255, 255, 0.32);
-            }
-            QScrollBar::handle:vertical:pressed {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 rgba(255, 255, 255, 0.35), 
-                    stop:1 rgba(255, 255, 255, 0.24)
-                );
-                border: 1px solid rgba(255, 255, 255, 0.45);
-            }
-            QScrollBar:horizontal {
-                background: transparent;
-                height: 8px;
-                margin: 2px 4px 2px 4px;
-                border: none;
-            }
-            QScrollBar::handle:horizontal {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 rgba(255, 255, 255, 0.15), 
-                    stop:1 rgba(255, 255, 255, 0.08)
-                );
-                border: 1px solid rgba(255, 255, 255, 0.18);
-                border-radius: 4px;
-                min-width: 40px;
-            }
-            QScrollBar::handle:horizontal:hover {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 rgba(255, 255, 255, 0.25), 
-                    stop:1 rgba(255, 255, 255, 0.16)
-                );
-                border: 1px solid rgba(255, 255, 255, 0.32);
-            }
-            QScrollBar::handle:horizontal:pressed {
-                background: qlineargradient(
-                    x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 rgba(255, 255, 255, 0.35), 
-                    stop:1 rgba(255, 255, 255, 0.24)
-                );
-                border: 1px solid rgba(255, 255, 255, 0.45);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                background: transparent;
-                border: none;
-                width: 0px;
-                height: 0px;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-                background: transparent;
-                border: none;
-            }
-        """)
 
-        self._chat_w = QWidget()
-        self._chat_w.setStyleSheet("background: transparent;")
-        self.chat_container = QVBoxLayout(self._chat_w)
+        self.chat_container = QVBoxLayout()
         self.chat_container.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.chat_container.setContentsMargins(0, 20, 0, 30)
         self.chat_container.setSpacing(0)
+
+        self.chat_messages_widget = QWidget()
+        self.chat_messages_widget.setStyleSheet("background: transparent;")
+        self.chat_messages_widget.setLayout(self.chat_container)
+        self.chat_messages_widget.setMaximumWidth(850)
+
+        self.chat_wrapper_layout = QHBoxLayout()
+        self.chat_wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        self.chat_wrapper_layout.setSpacing(0)
+        self.chat_wrapper_layout.addStretch()
+        self.chat_wrapper_layout.addWidget(self.chat_messages_widget)
+        self.chat_wrapper_layout.addStretch()
+
+        self._chat_w = QWidget()
+        self._chat_w.setStyleSheet("background: transparent;")
+        self._chat_w.setLayout(self.chat_wrapper_layout)
 
         self.scroll_area.setWidget(self._chat_w)
         cl.addWidget(self.scroll_area)
@@ -3687,6 +4529,9 @@ class SoulStageChatView(QFrame):
                 while item.layout().count():
                     child = item.layout().takeAt(0)
                     if child.widget(): child.widget().deleteLater()
+        
+        self.clear_choices()
+        self.inventory_hud.hide()
     
     def show_choices(self, choices: list, event_type: str = "none"):
         self.choices_bar.show_choices(choices, event_type)
@@ -3880,8 +4725,10 @@ class SoulStagePage(QWidget):
         message = self.translations.get("delete_scene_confirm", "Permanently delete this scene?")
         full_text = f"{message}<br><span style='color: rgba(255,255,255,0.4); font-size: 9pt;'>{detail}</span>"
 
+        parent_win = self.window() if hasattr(self, "window") else self
+
         dialog = SowConfirmDialog(
-            parent=self,
+            parent=parent_win,
             title=self.translations.get("delete_scene_title", "Delete Scene"),
             text=full_text,
             confirm_text=self.translations.get("delete", "Delete"),

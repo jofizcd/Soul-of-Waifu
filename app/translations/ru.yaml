@@ -466,17 +466,46 @@ enable_tool_calling_text: "Включить вызов инструментов"
 enable_tool_calling_tooltip: "Позволяет ИИ нативно выполнять Python-функции во время генерации."
 
 tool_web_title: "WebSearchTool"
-tool_web_desc: "Поиск в интернете через скрытый API DuckDuckGo. Позволяет модели узнавать свежие факты, погоду или новости."
-tool_media_title: "MediaControlTool"
-tool_media_desc: "Управление медиаплеером ОС Windows (пауза, воспроизведение, переключение треков в браузере или Spotify)."
+tool_web_desc: "Поиск в сети через скрытый API DuckDuckGo для получения актуальных фактов, погоды или новостей в реальном времени."
+
+tool_browse_web_title: "BrowserAgentTool [Playwright]"
+tool_browse_web_desc: "Автономный веб-серфинг через Chromium. Читает чистый текст страниц, нажимает кнопки, заполняет формы и скачивает файлы в песочницу."
+
+tool_gui_action_title: "GUIActionTool [Computer Use]"
+tool_gui_action_desc: "Прямое управление интерфейсом ОС: перемещение курсора, клики мыши, ввод текста, скроллинг окон и нажатие горячих клавиш (Ctrl+S, Enter и др.)."
+
+tool_execute_code_title: "ExecuteCodeTool [Code Interpreter]"
+tool_execute_code_desc: "Написание и запуск скриптов на Python и PowerShell в изолированной локальной песочнице для вычислений, обработки файлов и парсинга."
+
+tool_file_organizer_title: "FileOrganizerTool [Workspace Manager]"
+tool_file_organizer_desc: "Просмотр содержимого рабочего стола и папок (ярлыки .lnk, папки, файлы), поиск файлов и автоматическая сортировка файлов по категориям."
+
+tool_planner_title: "TaskPlannerTool [Иерархический планировщик]"
+tool_planner_desc: "Разбивает сложные составные задачи пользователя на упорядоченные цепочки вызовов инструментов и последовательно выполняет их."
+
+tool_app_control_title: "AppControlTool"
+tool_app_control_desc: "Управление приложениями и ярлыками: запуск программ, открытие системных папок/Корзины, фокус окон или завершение процессов."
+
+tool_env_snapshot_title: "SystemVitalsMonitorTool [Hardware Watchdog]"
+tool_env_snapshot_desc: "Мониторинг железа в реальном времени и фоновый вотчдог, предупреждающий о низком заряде батареи, перегреве GPU или завершении загрузок."
+
+tool_hardware_specs_title: "GetHardwareSpecsTool"
+tool_hardware_specs_desc: "Получение подробных характеристик ПК (CPU, RAM, GPU, VRAM, накопители) для оценки совместимости с играми и локальными нейросетями."
+
 tool_read_clipboard_title: "ClipboardReaderTool"
-tool_read_clipboard_desc: "Чтение текста, скопированного в пользовательский буфер обмена."
+tool_read_clipboard_desc: "Чтение текущего текстового содержимого системного буфера обмена для анализа и ответов на вопросы."
+
 tool_url_title: "OpenURLTool"
-tool_url_desc: "Запуск сайтов в стандартном браузере по умолчанию (например, быстрое открытие YouTube или GitHub по вашей просьбе)."
+tool_url_desc: "Открытие ссылок и веб-сайтов (например, YouTube или GitHub) в браузере по умолчанию по вашей просьбе."
+
 tool_sysinfo_title: "GetSystemInfoTool"
-tool_sysinfo_desc: "Получение точного времени и даты вашего ПК. Помогает модели ориентироваться во времени суток и днях недели."
+tool_sysinfo_desc: "Получение точного системного времени, даты и дня недели для ориентации спутника в текущем расписании."
+
+tool_media_title: "MediaControlTool"
+tool_media_desc: "Управление системным воспроизведением медиа на ПК (пауза, плей, переключение треков в Spotify, YouTube или плеере)."
+
 tool_vision_title: "TakeScreenshotTool [Зрение]"
-tool_vision_desc: "Анализ происходящего на экране. Делает скриншот и отправляет его в мультимодальную ИИ-модель. Ресурсоемкая функция!"
+tool_vision_desc: "Анализ происходящего на экране. Делает быстрый снимок и отправляет его мультимодальной нейросети. Очень ресурсоёмко!"
 
 mcp_title: "Model Context Protocol (MCP)"
 section_mcp_settings: "ВНЕШНИЕ СЕРВЕРЫ MCP"
@@ -485,6 +514,10 @@ enable_mcp_text: "Включить прокси-интеграцию MCP"
 mcp_url_label: "URL сервера MCP"
 mcp_url_placeholder: "например, http://127.0.0.1:8000"
 
+sc_approval_title: "⚠️ Компаньон запрашивает действие"
+sc_approval_action: "Действие"
+sc_approval_allow: "✓ Разрешить"
+sc_approval_deny: "✕ Отклонить"
 
 # ──────────────────────────────────────────────────────────
 # OPTIONS — SOW MODULES
@@ -1196,6 +1229,9 @@ import_success: "Сцена успешно импортирована!"
 import_error: "Не удалось импортировать сцену. Неверный формат файла."
 select_file: "Выберите файл сцены"
 
+folder_select_scenes_label: "Сцены внутри папки:"
+delete_folder: "Удалить папку"
+folder_select_scenes_title: "Редактирование папки: "
 
 # ──────────────────────────────────────────────────────────
 # SOUL STAGE — SCENE EDITOR
@@ -1463,7 +1499,7 @@ model_loading_step_6: "МОДЕЛЬ ЗАГРУЖЕНА"
 update_available_title: "Обновление Доступно"
 update_available_body: "Доступна новая версия: "
 update_available_info: "Вы хотите обновить программу?"
-update_current_version: "Текущая версия: v2.4.5"
+update_current_version: "Текущая версия: v2.4.7"
 update_available_close: "Закрыть"
 update_available_link: "Перейти на GitHub"
 language_changed_title: "Требуется перезагрузка"
@@ -1482,7 +1518,7 @@ about_program_description: "<b>Soul of Waifu</b> — это бесплатная
 support_btn: "Поддержать"
 creator_label: "Разработал"
 simple_version_label: "Версия"
-version_label: "Soul of Waifu v2.4.5"
+version_label: "Soul of Waifu v2.4.7"
 nsfw_checkbox: "NSFW"
 value: "Значение: "
 
@@ -1501,6 +1537,9 @@ soul_memory_no_chat: "Откройте чат с персонажем."
 soul_memory_empty: "История чата пустая."
 soul_memory_manual_start: "Началось ручное обновление памяти..."
 soul_memory_manual_completed: "Ручное обновление памяти было успешно завершено..."
+soul_memory_manual_error: "Ошибка обновления памяти."
+soul_memory_manual_cancelled: "Обновление памяти отменено."
+soul_memory_provider_error: "Провайдер '{provider}' не найден."
 toast_voice_settings_title: "Настройки озвучки"
 toast_search_title: "Поиск озвучки"
 toast_connection_error_title: "Ошибка подключения"
@@ -1672,6 +1711,11 @@ max_tokens_tooltip: |-
   Ограничивает <b>максимальное количество слов</b>, которое может написать персонаж за один раз.<br><br>
   💡 <i>Слишком длинные ответы забивают контекст. Оптимально: 300–500 токенов.</i>
 
+reasoning_effort_tooltip: |-
+  <b>Объем рассуждений</b><br><br>
+  Управляет объемом внутренних рассуждений, которые могут выполнять языковые модели перед ответом.<br>
+  Применяется к моделям OpenAI o-series/GPT-5, Claude extended thinking, Gemini, Grok, DeepSeek, Qwen и GLM.
+
 custom_args_tooltip: |-
   <b>Пользовательские аргументы</b><br><br>
   Позволяет передавать дополнительные аргументы командной строки напрямую локальному LLM-серверу (llama.cpp).<br><br>
@@ -1782,6 +1826,9 @@ auto_summary_tooltip: "Этот параметр позволит вам наз�
 # OTHER TOOLTIPS
 # ──────────────────────────────────────────────────────────
 attach_file_tooltip: "Прикрепите к сообщению изображение или документ."
+tooltip_create_character: "Создать нового персонажа"
+tooltip_import_character: "Импортировать карточку персонажа"
+tooltip_new_folder: "Создать новую папку"
 
 
 # ──────────────────────────────────────────────────────────
@@ -1830,7 +1877,7 @@ sc_menu_min_60: "60 минут"
 
 tts_notice_title: "💡 Информация перед первым запуском озвучки"
 tts_notice_first_run_text: "Обратите внимание: перед первым использованием голосовых движков <b>XTTSv2</b>, <b>Kokoro</b>, <b>Silero</b> или <b>Qwen 3 TTS</b> программа автоматически скачает необходимые файлы и веса выбранной нейросети. Вы можете увидеть прогресс загрузки модели в консоли.<br><br>После завершения первой загрузки вы сможете свободно и мгновенно использовать озвучку без повторных скачиваний."
-models_hub_recommendations_banner: "⭐ Список локальных языковых моделей, тщательно отобранный и проверенный разработчиком программы."
+models_hub_recommendations_banner: "⭐ Список локальных языковых моделей, тщательно отобранный и проверенный разработчиком программы. Данные основаны на совместимости Q4 кванта модели."
 models_hub_popular_banner: "🔥 Список актуальных и популярных на данный момент GGUF-моделей из репозиториев сайта HuggingFace."
 
 world_lorebook_gateway: "Лорбуки"
@@ -2105,3 +2152,164 @@ sc_hud_cortisol: "🔥 Кортизол (Стресс)"
 sc_hud_energy: "🔋 Энергия (Бодрость)"
 sc_hud_scratchpad_title: "🧠 Внутренние мысли компаньона (ScratchPad)"
 sc_input_placeholder: "Напишите ваше сообщение..."
+
+
+# Soul Stage — Lobby & Folders
+no_folders_prompt_scenes: "Папок сцен пока нет. Создать?"
+create: "Создать"
+new_folder: "📁 Новая папка"
+lobby_folders_section: "ПАПКИ СЦЕН"
+lobby_scenes_section: "СЦЕНЫ"
+folder_scenes_label: "сцен"
+folder_create_title_scene: "Создать папку для сцен"
+folder_delete_detail_scenes: "Сцены вернутся в общий список лобби."
+party_member_selected: "Выбрано: {n}"
+soul_stage_no_party_error: "В сцене нет участников группы! Добавьте хотя бы одного персонажа перед запуском."
+
+# Soul Stage — World State Tabs & Arcs/Relationships
+tab_arcs: "Сюжетные арки"
+tab_relationships: "Отношения"
+tab_character_states: "Состояния героев"
+section_arcs: "Сюжетные арки"
+hint_arcs_format: "Здесь вы управляете доступом к веткам сюжета. Арка в статусе \"locked\" не существует для персонажей — никто не упомянет её. Переведите в \"available\", когда игрок найдёт нужную зацепку, или в \"active\", когда она началась. \"trigger\" — это заметка для ГМ о триггере разблокировки (персонажам не видна)."
+section_relationships: "Отношения"
+hint_relationships_format: "Как персонаж воспринимает другого (чаще всего отношение к ИГРОКУ, но можно задать между любыми героями). Внедряется прямо в системный промпт персонажа. Симпатия от -100 (вражда) до 100 (преданность). \"role\" — текущий статус/титул цели в глазах субъекта."
+field_relationships: "Отношения"
+field_relationships_hint: 'Формат: "субъект -> цель | симпатия(-100..100) | роль/титул | тег1, тег2"'
+section_character_states: "Состояния персонажей"
+hint_overlays_format: "Личное развивающееся состояние персонажа — текущая роль, титул и важные факты (верность, тайна, внутренний конфликт). Передаётся прямо в промпт персонажа отдельно от статичной карточки."
+
+# Soul Stage — Markdown Export
+export_md_no_scene: "Нет активной сцены для экспорта."
+export_md_failed: "Не удалось сформировать экспорт сцены."
+export_md_dialog_title: "Экспорт сцены в Markdown"
+export_md_write_failed: "Не удалось записать файл — проверьте путь и права доступа."
+export_md_success: "Сцена успешно экспортирована в Markdown."
+
+call_mode_dialog_title: "Выбор режима звонка"
+call_mode_dialog_subtitle: "Вы можете переключать режим в любой момент — это не меняет ваши глобальные настройки."
+call_mode_sow_title: "Soul of Waifu System"
+call_mode_sow_desc: "Режим звонка с интерактивной моделью и голосовым чатом."
+call_mode_companion_title: "Soul Companion"
+call_mode_companion_desc: "Персонаж-компаньон поверх всех окон прямо на вашем рабочем столе."
+call_mode_dialog_cancel: "Отмена"
+call_mode_dialog_confirm: "Начать звонок"
+
+confirm: "Подтвердить"
+var_preset_empty_title: "Пусто"
+var_preset_empty_msg: "Нет переменных для сохранения."
+var_preset_save_title: "Сохранить пресет"
+var_preset_save_label: "Введите название пресета:"
+var_preset_save_placeholder: "Мой кастомный пресет"
+var_preset_overwrite_title: "Перезапись пресета"
+var_preset_overwrite_msg: "Пресет с именем '{name}' уже существует. Перезаписать?"
+var_preset_saved_title: "Сохранено"
+var_preset_saved_msg: "Пресет '{name}' успешно сохранён."
+var_preset_not_found_title: "Не найдено"
+var_preset_not_found_msg: "Удалять можно только пользовательские пресеты."
+var_preset_delete_title: "Удаление пресета"
+var_preset_delete_msg: "Удалить пресет '{preset_name}'?"
+var_preset_deleted_title: "Удалено"
+var_preset_deleted_msg: "Пресет '{preset_name}' успешно удалён."
+
+# Reasoning Effort
+reasoning_effort_text: "Объем рассуждений"
+reasoning_effort_none: "Выкл"
+reasoning_effort_low: "Низкие"
+reasoning_effort_medium: "Средние"
+reasoning_effort_high: "Высокие"
+
+# TTS Voicing Rules
+tts_rules_title: "Правила озвучки (TTS)"
+section_tts_voicing_mode: "РЕЖИМ ОЗВУЧИВАНИЯ ТЕКСТА"
+tts_voicing_mode_label: "Режим озвучки"
+tts_custom_regex_label: "Кастомный Regex (Группа 1)"
+tts_custom_regex_placeholder: "напр., \\*(.*?)\\* для озвучки только текста в звёздочках"
+
+# LLM Params & Web Server
+custom_args_placeholder: "напр., --rope-freq-base 10000 --temp 0.8"
+web_server_starting_btn: "Запуск..."
+web_server_running_status: "Статус: Работает по адресу http://127.0.0.1:8000"
+checkbox_auto_translate_new_messages: "Автоматически переводить новые сообщения"
+auto_translate_new_messages_tooltip: "Если включено, каждое новое сообщение персонажа переводится автоматически.\nЕсли выключено, текст остаётся на исходном языке с возможностью\nручного перевода через меню реплики."
+delete_model: "Удалить модель"
+
+# Tool Calling in Chat
+toggle_tools_tooltip: "Разрешить персонажу вызывать инструменты (поиск в сети, время, плеер) при ответе"
+toast_tools_title: "Инструменты"
+toast_tools_enabled: "Персонаж теперь может использовать инструменты при ответе: {tool_list}"
+toast_tools_disabled: "Использование инструментов отключено."
+tool_using_label: "использует {tool}..."
+
+# Thinking Blocks (<think>)
+thinking_process_label: "ПРОЦЕСС РАЗМЫШЛЕНИЯ"
+thinking_hide_hint: "скрыть"
+thinking_show_hint: "показать"
+
+# Attachments
+toast_attach_title: "Вложения"
+toast_attach_limit: "Вы можете прикрепить до {limit} файлов к одному сообщению."
+attach_file_dialog_title: "Прикрепить файлы к сообщению"
+toast_attach_too_large: "Файл '{filename}' превышает {size} МБ и был пропущен."
+
+# Audio Replay & Voice
+toast_tts_replay_title: "Голосовое сообщение"
+toast_tts_replay_missing: "Нет сохранённой озвучки для этого сообщения."
+replay_voice_tooltip: "Воспроизвести озвучку"
+msg_action_replay_voice: "Воспроизвести озвучку"
+
+# Raw Prompt Preview Dialog
+preview_prompt_title: "Предпросмотр сырого промпта"
+preview_prompt_desc: "Примерно так языковая модель видит карточку персонажа перед генерацией ответа:"
+
+# AI Character Assistant Toast
+toast_ai_assistant_title: "ИИ-Помощник"
+toast_ai_assistant_applied: "Успешно заполнено полей: {applied_count}!"
+
+# Chat & Duplication
+duplicate_success: "Персонаж продублирован как '{new_name}'"
+default_chat_name: "Основной чат"
+rename_chat_title: "Переименовать чат"
+rename_chat_prompt: "Введите новое название чата:"
+chat_renamed_success: "Чат переименован в '{new_name}'."
+imported_suffix: "Импортировано"
+edit_save_error: "Не удалось сохранить отредактированное сообщение!"
+translate_error: "Ошибка перевода"
+
+# Memory Force Button
+force_memory_tooltip: "Обновить Soul Memory вручную прямо сейчас"
+
+image_gen_api_key: "API Ключ:"
+image_gen_started: "Анализ сцены и создание кинематографичного промпта..."
+image_gen_placeholder: "🖼 Генерация изображения..."
+image_gen_failed: "⚠ Ошибка генерации изображения"
+retry_button: "Повторить"
+generated_image_title: "Сгенерированное изображение"
+save_image_as: "Сохранить изображение как..."
+regenerate_image: "Перегенерировать изображение"
+show_in_folder: "Показать в папке"
+
+# Visual Modes in Dialog
+visual_engine_nothing: "Отключено"
+visual_engine_images: "Изображения эмоций"
+visual_engine_live2d: "Live2D модель"
+visual_engine_vrm: "VRM 3D модель"
+live2d_motion_mapper_btn: "Назначить анимации на эмоции"
+
+# Folders
+folder_no_chars_available: "Нет доступных персонажей для добавления"
+folder_empty: "В этой папке пока нет персонажей"
+
+# About Dialog
+about_tagline: "ДВИЖОК РОЛЕВЫХ ИГР С ИИ"
+
+# Story Summary
+author_notes_title: "Заметки автора"
+author_notes_saved_body: "Заметки автора успешно сохранены."
+summary_editor_no_new_msg: "Нет новых сообщений для суммаризации."
+
+# Appearance Chat Preview
+appearance_preview_text_1: "Она смотрит на тебя,"
+appearance_preview_text_2: "медленно прищуривая глаза."
+appearance_preview_text_3: "Значит... ты ничего не помнишь?"
+appearance_preview_text_4: "Я помню достаточно."

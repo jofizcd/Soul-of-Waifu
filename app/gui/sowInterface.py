@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QLabel, QGraphicsDropShado
 from PyQt6.QtCore import Qt, QPointF, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty, QRectF, QPoint
 from PyQt6.QtGui import QColor, QPainter, QRadialGradient, QCursor, QFont, QPixmap, QPen, QBrush
 
-from app.gui.custom_widgets import LocalModelStatusWidget, SowConfirmDialog, SowInputDialog, sow_toast
+from app.gui.custom_widgets import LocalModelStatusWidget, SowConfirmDialog, SowInputDialog, sow_toast, safe_paint
 from app.gui.soul_stage_page import SoulStagePage
 from app.configuration import configuration
 
@@ -548,7 +548,7 @@ class Ui_MainWindow(object):
             }
         """
 
-        self.btn_create_character_menu = QtWidgets.QPushButton(parent=self.control_capsule)
+        self.btn_create_character_menu = CenteredTooltipButton(parent=self.control_capsule)
         self.btn_create_character_menu.setObjectName("btn_create_character_menu")
         self.btn_create_character_menu.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.btn_create_character_menu.setFixedSize(QtCore.QSize(34, 34))
@@ -557,9 +557,10 @@ class Ui_MainWindow(object):
         icon_create = QtGui.QIcon("app/gui/icons/create_character.png") 
         self.btn_create_character_menu.setIcon(icon_create)
         self.btn_create_character_menu.setIconSize(QtCore.QSize(16, 16))
+        self.btn_create_character_menu.setToolTip(self.translations.get("tooltip_create_character", "Create New Character"))
         self.capsule_layout.addWidget(self.btn_create_character_menu)
 
-        self.btn_import_character_menu = QtWidgets.QPushButton(parent=self.control_capsule)
+        self.btn_import_character_menu = CenteredTooltipButton(parent=self.control_capsule)
         self.btn_import_character_menu.setObjectName("btn_import_character_menu")
         self.btn_import_character_menu.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.btn_import_character_menu.setFixedSize(QtCore.QSize(34, 34))
@@ -568,9 +569,10 @@ class Ui_MainWindow(object):
         icon_import = QtGui.QIcon("app/gui/icons/import.png")
         self.btn_import_character_menu.setIcon(icon_import)
         self.btn_import_character_menu.setIconSize(QtCore.QSize(15, 15))
+        self.btn_import_character_menu.setToolTip(self.translations.get("tooltip_import_character", "Import Character Card"))
         self.capsule_layout.addWidget(self.btn_import_character_menu)
 
-        self.btn_new_folder_menu = QtWidgets.QPushButton(parent=self.control_capsule)
+        self.btn_new_folder_menu = CenteredTooltipButton(parent=self.control_capsule)
         self.btn_new_folder_menu.setObjectName("btn_new_folder_menu")
         self.btn_new_folder_menu.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         self.btn_new_folder_menu.setFixedSize(QtCore.QSize(34, 34))
@@ -579,6 +581,7 @@ class Ui_MainWindow(object):
         icon_folder = QtGui.QIcon("app/gui/icons/add_folder.png") 
         self.btn_new_folder_menu.setIcon(icon_folder)
         self.btn_new_folder_menu.setIconSize(QtCore.QSize(16, 16))
+        self.btn_new_folder_menu.setToolTip(self.translations.get("tooltip_new_folder", "Create New Folder"))
         self.capsule_layout.addWidget(self.btn_new_folder_menu)
 
         self.gridLayout_6.addWidget(self.control_capsule, 0, 2, 1, 1)
@@ -2015,6 +2018,22 @@ class Ui_MainWindow(object):
         form_trans.addRow(self.target_language_translator_label, self.comboBox_target_language_translator)
 
         l_lang.addLayout(form_trans)
+
+        self.checkBox_auto_translate_new_messages = QtWidgets.QCheckBox(
+            self.translations.get("checkbox_auto_translate_new_messages", "Automatically translate new messages")
+        )
+        self.checkBox_auto_translate_new_messages.setFont(font_label)
+        self.checkBox_auto_translate_new_messages.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.checkBox_auto_translate_new_messages.setObjectName("checkBox_auto_translate_new_messages")
+        self.checkBox_auto_translate_new_messages.setToolTip(
+            self.translations.get(
+                "auto_translate_new_messages_tooltip",
+                "When enabled, every new character message is translated automatically.\nWhen disabled, messages stay in their original language and you can translate\nany of them manually via the Translate action in the message menu."
+            )
+        )
+        l_lang.addSpacing(6)
+        l_lang.addWidget(self.checkBox_auto_translate_new_messages)
+
         sys_layout.addWidget(card_lang)
 
         # -----------------------------------------------------------------
@@ -2048,6 +2067,45 @@ class Ui_MainWindow(object):
 
         l_audio.addLayout(form_audio)
         sys_layout.addWidget(card_audio)
+
+        # -----------------------------------------------------------------
+        # CARD: TTS Voicing Rules
+        # -----------------------------------------------------------------
+        card_tts_rules, l_tts_rules = create_glass_card(self.translations.get("tts_rules_title", "Text-to-Speech Rules"))
+        
+        l_tts_rules.addLayout(create_section_header(self.translations.get("section_tts_voicing_mode", "VOICING MODE SELECTION")))
+        
+        form_tts_rules = QtWidgets.QFormLayout()
+        form_tts_rules.setVerticalSpacing(20)
+        form_tts_rules.setHorizontalSpacing(30)
+
+        self.tts_voicing_mode_label = QtWidgets.QLabel(self.translations.get("tts_voicing_mode_label", "Voicing Mode"))
+        self.tts_voicing_mode_label.setFont(font_label)
+        self.comboBox_tts_voicing_mode = QtWidgets.QComboBox()
+        self.comboBox_tts_voicing_mode.setFont(font_input)
+        self.comboBox_tts_voicing_mode.setFixedHeight(40)
+        self.comboBox_tts_voicing_mode.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_tts_voicing_mode.addItems([
+            "Voice Everything",
+            "Voice Only Quotes",
+            "Ignore Asterisks",
+            "Voice Outside Quotes",
+            "Custom Regex"
+        ])
+        self.comboBox_tts_voicing_mode.setObjectName("comboBox_tts_voicing_mode")
+        form_tts_rules.addRow(self.tts_voicing_mode_label, self.comboBox_tts_voicing_mode)
+
+        self.tts_custom_regex_label = QtWidgets.QLabel(self.translations.get("tts_custom_regex_label", "Custom Regex (Group 1)"))
+        self.tts_custom_regex_label.setFont(font_label)
+        self.lineEdit_tts_custom_regex = QtWidgets.QLineEdit()
+        self.lineEdit_tts_custom_regex.setFont(font_input)
+        self.lineEdit_tts_custom_regex.setFixedHeight(40)
+        self.lineEdit_tts_custom_regex.setPlaceholderText(self.translations.get("tts_custom_regex_placeholder", "e.g., \*(.*?)\* to voice only inside asterisks"))
+        self.lineEdit_tts_custom_regex.setObjectName("lineEdit_tts_custom_regex")
+        form_tts_rules.addRow(self.tts_custom_regex_label, self.lineEdit_tts_custom_regex)
+
+        l_tts_rules.addLayout(form_tts_rules)
+        sys_layout.addWidget(card_tts_rules)
 
         # -----------------------------------------------------------------
         # CARD 3: Hardware Diagnostics
@@ -2283,7 +2341,7 @@ class Ui_MainWindow(object):
             """)
             
             line_edit_obj.setFont(font_input)
-            line_edit_obj.setFixedSize(65, 35)
+            line_edit_obj.setFixedSize(85, 35)
             line_edit_obj.setAlignment(Qt.AlignmentFlag.AlignCenter)
             if tooltip:
                 line_edit_obj.setToolTip(tooltip)
@@ -2307,8 +2365,33 @@ class Ui_MainWindow(object):
         self.lineEdit_maxTokens.setObjectName("lineEdit_maxTokens")
         l_llm_gen.addLayout(create_slider_row(
             self.translations.get("max_tokens_text", "Max Tokens"), 
-            self.max_tokens_horizontalSlider, self.lineEdit_maxTokens, 16, 4096, 16, 
-            self.translations.get("max_tokens_tooltip", "Max Response Length")))
+            self.max_tokens_horizontalSlider, self.lineEdit_maxTokens, 16, 131072, 64, 
+            self.translations.get("max_tokens_tooltip", "Max Response Length. Raise this well above the default if you use reasoning/thinking models, since their internal reasoning tokens are also counted against this limit.")))
+
+        l_llm_gen.addSpacing(10)
+
+        reasoning_effort_row = QtWidgets.QHBoxLayout()
+        reasoning_effort_row.setSpacing(20)
+        reasoning_effort_label = QtWidgets.QLabel(self.translations.get("reasoning_effort_text", "Reasoning Effort"))
+        reasoning_effort_label.setFont(font_label)
+        reasoning_effort_label.setFixedWidth(160)
+        reasoning_effort_label.setToolTip(self.translations.get(
+            "reasoning_effort_tooltip",
+            "Controls how much internal reasoning cloud reasoning models are allowed to do before answering. "
+            "Applies to OpenAI o-series/GPT-5, Claude extended thinking, Gemini, Grok, DeepSeek, Qwen and GLM reasoning models."
+        ))
+        self.comboBox_reasoning_effort = QtWidgets.QComboBox()
+        self.comboBox_reasoning_effort.setFont(font_input)
+        self.comboBox_reasoning_effort.setFixedHeight(40)
+        self.comboBox_reasoning_effort.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.comboBox_reasoning_effort.setObjectName("comboBox_reasoning_effort")
+        self.comboBox_reasoning_effort.addItem(self.translations.get("reasoning_effort_none", "Off"), "none")
+        self.comboBox_reasoning_effort.addItem(self.translations.get("reasoning_effort_low", "Low"), "low")
+        self.comboBox_reasoning_effort.addItem(self.translations.get("reasoning_effort_medium", "Medium"), "medium")
+        self.comboBox_reasoning_effort.addItem(self.translations.get("reasoning_effort_high", "High"), "high")
+        reasoning_effort_row.addWidget(reasoning_effort_label)
+        reasoning_effort_row.addWidget(self.comboBox_reasoning_effort, 1)
+        l_llm_gen.addLayout(reasoning_effort_row)
 
         l_llm_gen.addSpacing(10)
 
@@ -2727,7 +2810,7 @@ class Ui_MainWindow(object):
         self.tools_tab.setObjectName("tools_tab")
 
         # -----------------------------------------------------------------
-        # CARD 1: Native AI Capabilities (Glass Grid Refactoring)
+        # CARD 1: Native AI Capabilities
         # -----------------------------------------------------------------
         card_tools_native, l_tools_native = create_glass_card(self.translations.get("tools_native_title", "Native AI Capabilities"))
         
@@ -2759,17 +2842,66 @@ class Ui_MainWindow(object):
                 "experimental": False
             },
             {
-                "id": "media_control",
-                "emoji": "💻",
-                "title": self.translations.get("tool_media_title", "MediaControlTool"),
-                "desc": self.translations.get("tool_media_desc", "Control media playback on your Windows PC (pause, play, next/prev tracks in Spotify, YouTube, or browser players)."),
+                "id": "browse_web",
+                "emoji": "🧭",
+                "title": self.translations.get("tool_browse_web_title", "BrowserAgentTool [Playwright]"),
+                "desc": self.translations.get("tool_browse_web_desc", "Autonomous web browsing: visit URLs, extract clean text, click buttons, fill forms, and download files into sandbox."),
+                "experimental": True
+            },
+            {
+                "id": "gui_action",
+                "emoji": "🖱️",
+                "title": self.translations.get("tool_gui_action_title", "GUIActionTool [Computer Use]"),
+                "desc": self.translations.get("tool_gui_action_desc", "Direct OS interaction: mouse clicks, cursor movement, scrolling, typing text, and pressing hotkeys (e.g. Ctrl+S, Enter)."),
+                "experimental": True
+            },
+            {
+                "id": "execute_code",
+                "emoji": "⚡",
+                "title": self.translations.get("tool_execute_code_title", "ExecuteCodeTool [Sandbox]"),
+                "desc": self.translations.get("tool_execute_code_desc", "Write and execute Python and PowerShell scripts inside a dedicated sandbox folder for automation, calculations, and batch tasks."),
+                "experimental": True
+            },
+            {
+                "id": "file_organizer",
+                "emoji": "📁",
+                "title": self.translations.get("tool_file_organizer_title", "FileOrganizerTool"),
+                "desc": self.translations.get("tool_file_organizer_desc", "Inspect folder contents, list desktop shortcuts/games, search files, and automatically organize loose files into categories."),
+                "experimental": False
+            },
+            {
+                "id": "plan_and_execute",
+                "emoji": "🧩",
+                "title": self.translations.get("tool_planner_title", "TaskPlannerTool"),
+                "desc": self.translations.get("tool_planner_desc", "Hierarchical task planning: breaks complex multi-step user goals into ordered tool chains and executes them sequentially."),
+                "experimental": False
+            },
+            {
+                "id": "app_control",
+                "emoji": "🪟",
+                "title": self.translations.get("tool_app_control_title", "AppControlTool"),
+                "desc": self.translations.get("tool_app_control_desc", "Manage system applications and shortcuts: launch programs, open folders/Recycle Bin, focus windows, or terminate processes."),
+                "experimental": False
+            },
+            {
+                "id": "get_environment_snapshot",
+                "emoji": "📊",
+                "title": self.translations.get("tool_env_snapshot_title", "SystemVitalsMonitorTool"),
+                "desc": self.translations.get("tool_env_snapshot_desc", "Live system self-awareness: monitor CPU/RAM/Disk load, battery level, GPU temperature, and active downloads in real-time."),
+                "experimental": False
+            },
+            {
+                "id": "get_hardware_specs",
+                "emoji": "⚙️",
+                "title": self.translations.get("tool_hardware_specs_title", "GetHardwareSpecsTool"),
+                "desc": self.translations.get("tool_hardware_specs_desc", "Retrieve detailed PC hardware specifications (CPU, RAM, GPU, VRAM, and Storage) to evaluate compatibility for games and local AI models."),
                 "experimental": False
             },
             {
                 "id": "read_clipboard",
                 "emoji": "📋",
                 "title": self.translations.get("tool_read_clipboard_title", "ClipboardReaderTool"),
-                "desc": self.translations.get("tool_read_clipboard_desc", "Read the current text content copied in the user's clipboard."),
+                "desc": self.translations.get("tool_read_clipboard_desc", "Read the current text content copied in the user's clipboard for analysis or questions."),
                 "experimental": False
             },
             {
@@ -2784,6 +2916,13 @@ class Ui_MainWindow(object):
                 "emoji": "📅",
                 "title": self.translations.get("tool_sysinfo_title", "GetSystemInfoTool"),
                 "desc": self.translations.get("tool_sysinfo_desc", "Retrieve the exact system time and date from your PC to help the AI keep track of the current schedule."),
+                "experimental": False
+            },
+            {
+                "id": "media_control",
+                "emoji": "💻",
+                "title": self.translations.get("tool_media_title", "MediaControlTool"),
+                "desc": self.translations.get("tool_media_desc", "Control media playback on your Windows PC (pause, play, next/prev tracks in Spotify, YouTube, or browser players)."),
                 "experimental": False
             },
             {
@@ -3024,7 +3163,7 @@ class Ui_MainWindow(object):
         self.comboBox_live2d_mode.setFont(font_input)
         self.comboBox_live2d_mode.setFixedHeight(40)
         self.comboBox_live2d_mode.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.comboBox_live2d_mode.addItems(["With GUI", "Without GUI"])
+        self.comboBox_live2d_mode.addItems(["Soul of Waifu System", "Soul Companion"])
         self.comboBox_live2d_mode.setObjectName("comboBox_live2d_mode")
         form_vis.addRow(self.label_live2d_mode, self.comboBox_live2d_mode)
 
@@ -5712,6 +5851,7 @@ class RippleButton(QPushButton):
 
         self.update()
 
+    @safe_paint
     def paintEvent(self, event):
         super().paintEvent(event)
 
@@ -5785,6 +5925,7 @@ class PushButton(QtWidgets.QPushButton):
         self._animation.start()
         super().mouseReleaseEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -5855,6 +5996,7 @@ class PushButton_2(QtWidgets.QPushButton):
         self._animation.start()
         super().mouseReleaseEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -5928,6 +6070,7 @@ class AnimatedToggle(QtWidgets.QCheckBox):
     def hitButton(self, pos: QPoint):
         return self.rect().contains(pos)
 
+    @safe_paint
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -6059,6 +6202,7 @@ class ModernSearchBar(QtWidgets.QFrame):
         self.animation.setEndValue(end_color)
         self.animation.start()
 
+    @safe_paint
     def paintEvent(self, event):
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
@@ -6134,6 +6278,7 @@ class LiquidButton(QtWidgets.QPushButton):
         self._animation.start()
         super().leaveEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -7091,6 +7236,7 @@ class GlassPortalButton(QPushButton):
             self.update()
         super().mouseReleaseEvent(event)
 
+    @safe_paint
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -7151,3 +7297,79 @@ class GlassPortalButton(QPushButton):
         painter.setPen(text_color)
         painter.setFont(self.font())
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
+
+class ArrowTooltip(QtWidgets.QWidget):
+    def __init__(self, text, parent=None):
+        super().__init__(parent)
+        self.text = text
+        self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        
+        self.font = QtGui.QFont("Inter Tight SemiBold", 10)
+        self.font.setHintingPreference(QtGui.QFont.HintingPreference.PreferNoHinting)
+        self.fm = QtGui.QFontMetrics(self.font)
+        text_width = self.fm.horizontalAdvance(text)
+        
+        self.setFixedWidth(text_width + 28)
+        self.setFixedHeight(38)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        
+        rect = self.rect().adjusted(1, 8, -1, -1)
+        painter.setBrush(QtGui.QColor(35, 35, 40, 250))
+        painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255, 40), 1))
+        painter.drawRoundedRect(rect, 8, 8)
+        
+        center_x = self.width() / 2
+        arrow_w = 12
+        arrow_h = 8
+        
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QtGui.QColor(35, 35, 40, 250))
+        triangle = QtGui.QPolygon([
+            QtCore.QPoint(int(center_x - arrow_w / 2), 9),
+            QtCore.QPoint(int(center_x + arrow_w / 2), 9),
+            QtCore.QPoint(int(center_x), 1)
+        ])
+        painter.drawPolygon(triangle)
+        
+        painter.setPen(QtGui.QPen(QtGui.QColor(255, 255, 255, 40), 1))
+        painter.drawLine(QtCore.QPoint(int(center_x - arrow_w / 2), 9), QtCore.QPoint(int(center_x), 1))
+        painter.drawLine(QtCore.QPoint(int(center_x), 1), QtCore.QPoint(int(center_x + arrow_w / 2), 9))
+        
+        painter.setPen(QtGui.QColor(240, 240, 240))
+        painter.setFont(self.font)
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text)
+
+
+class CenteredTooltipButton(QtWidgets.QPushButton):
+    def __init__(self, tooltip_text="", parent=None):
+        super().__init__(parent)
+        self._tooltip_text = ""
+        self._custom_tooltip = None
+
+    def setToolTip(self, text):
+        self._tooltip_text = text
+
+    def enterEvent(self, event):
+        if self._tooltip_text:
+            self._custom_tooltip = ArrowTooltip(self._tooltip_text)
+            self._custom_tooltip.adjustSize()
+            
+            btn_global_pos = self.mapToGlobal(QtCore.QPoint(0, 0))
+            x = btn_global_pos.x() + (self.width() - self._custom_tooltip.width()) // 2
+            y = btn_global_pos.y() + self.height() + 6
+            
+            self._custom_tooltip.move(x, y)
+            self._custom_tooltip.show()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if self._custom_tooltip:
+            self._custom_tooltip.close()
+            self._custom_tooltip.deleteLater()
+            self._custom_tooltip = None
+        super().leaveEvent(event)

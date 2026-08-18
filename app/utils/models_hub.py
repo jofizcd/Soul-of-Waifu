@@ -119,7 +119,12 @@ class ModelRecommendations(QThread):
                     "raw_model": model
                 })
 
-            evaluated_models.sort(key=lambda x: x["is_compatible"], reverse=True)
+            evaluated_models.sort(
+                key=lambda x: (
+                    self.get_compatibility_priority(x["compatibility_text"])
+                ),
+                reverse=True
+            )
 
             model_ids = []
             for item in evaluated_models:
@@ -240,7 +245,24 @@ class ModelRecommendations(QThread):
             else:
                 return f"✅ Fully loads into GPU ({self.gpu_vram_gb:.1f} GB VRAM)", True
         else:
-            return f"✅ Will run on CPU", True
+            return f"✅ Will run on your PC", True
+
+    def get_compatibility_priority(self, compatibility_text):
+        if "❌" in compatibility_text:
+            return 0
+        if "⚠️" in compatibility_text:
+            if "VRAM" in compatibility_text:
+                return 2
+            return 1
+        if "✅" in compatibility_text:
+            if "Fully loads into GPU" in compatibility_text:
+                return 5
+            if "some layers on CPU" in compatibility_text:
+                return 4
+            if "Will run on CPU" in compatibility_text:
+                return 3
+            return 3
+        return 0
     
     def get_fallback_models(self):
         return [

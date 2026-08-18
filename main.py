@@ -231,7 +231,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_rp_editors.setText(self.translations.get("rp_editors_button", " RP Editors"))
         self.ui.pushButton_soul_stage.setText(self.translations.get("soul_stage_button", " Soul Stage"))
         self.ui.pushButton_options.setText(self.translations.get("options_button", " Options"))
-        self.ui.version_label.setText(self.translations.get("version_label", "v2.4.5"))
+        self.ui.version_label.setText(self.translations.get("version_label", "v2.4.7"))
         
         # Main Tab Without Characters
         self.ui.main_no_characters_advice_label.setText(self.translations.get("no_characters_advice", "You haven\'t added any characters. Click on the button and create it"))
@@ -324,6 +324,15 @@ class MainWindow(QMainWindow):
         self.ui.comboBox_translator.setItemText(2, self.translations.get("translator_item_yandex", "Yandex"))
         self.ui.target_language_translator_label.setText(self.translations.get("target_language_label", "Target Language"))
         self.ui.comboBox_target_language_translator.setItemText(0, self.translations.get("target_language_item_ru", "Russian"))
+        self.ui.checkBox_auto_translate_new_messages.setText(
+            self.translations.get("checkbox_auto_translate_new_messages", "Automatically translate new messages")
+        )
+        self.ui.checkBox_auto_translate_new_messages.setToolTip(
+            self.translations.get(
+                "auto_translate_new_messages_tooltip",
+                "When enabled, every new character message is translated automatically.\nWhen disabled, messages stay in their original language and you can translate\nany of them manually via the Translate action in the message menu."
+            )
+        )
 
         if hasattr(self.ui, 'options_menu'):
             item0 = self.ui.options_menu.item(0)
@@ -456,6 +465,7 @@ class MainWindow(QMainWindow):
         self.ui.comboBox_input_devices.currentIndexChanged.connect(self.interface_signals.on_comboBox_input_devices_changed)
         self.ui.comboBox_output_devices.currentIndexChanged.connect(self.interface_signals.on_comboBox_output_devices_changed)
         self.ui.comboBox_translator.currentIndexChanged.connect(self.interface_signals.on_comboBox_translator_changed)
+        self.ui.checkBox_auto_translate_new_messages.stateChanged.connect(self.interface_signals.on_checkBox_auto_translate_new_messages_stateChanged)
         self.ui.comboBox_target_language_translator.currentIndexChanged.connect(self.interface_signals.on_comboBox_target_language_translator_changed)
         self.ui.comboBox_conversation_method.currentIndexChanged.connect(self.interface_signals.update_api_token)
         self.ui.comboBox_live2d_mode.currentIndexChanged.connect(self.interface_signals.on_comboBox_live2d_mode_changed)
@@ -468,6 +478,7 @@ class MainWindow(QMainWindow):
         self.ui.comboBox_llm_gpu_devices.currentIndexChanged.connect(self.interface_signals.on_comboBox_llm_gpu_devices_changed)
         self.ui.comboBox_chat_template.currentTextChanged.connect(self.interface_signals.on_comboBox_chat_template_changed)
         self.ui.comboBox_kv_cache.currentIndexChanged.connect(self.interface_signals.on_comboBox_kv_cache_changed)
+        self.ui.comboBox_tts_voicing_mode.currentIndexChanged.connect(self.interface_signals.on_comboBox_tts_voicing_mode_changed)
 
         # LineEdits
         self.ui.lineEdit_api_token_options.textChanged.connect(self.interface_signals.save_api_token_in_real_time)
@@ -508,6 +519,7 @@ class MainWindow(QMainWindow):
         self.ui.lineEdit_cpuMoeLayers.editingFinished.connect(self.interface_signals.update_cpu_moe_layers_from_line_edit)
         self.ui.lineEdit_customArgs.textChanged.connect(self.interface_signals.save_lineEdit_customArgs_in_real_time)
         self.ui.lineEdit_mcp_url.textChanged.connect(self.interface_signals.save_lineEdit_mcp_url_in_real_time)
+        self.ui.lineEdit_tts_custom_regex.textChanged.connect(self.interface_signals.save_tts_custom_regex_in_real_time)
         
         # Sliders
         self.ui.gpu_layers_horizontalSlider.valueChanged.connect(self.interface_signals.save_gpu_layers_in_real_time)
@@ -542,6 +554,7 @@ class MainWindow(QMainWindow):
         self.ui.checkBox_enable_soul_memory.stateChanged.connect(self.interface_signals.on_checkBox_enable_soul_memory_stateChanged)
         self.ui.checkBox_enable_summary.stateChanged.connect(self.interface_signals.on_checkBox_enable_summary_stateChanged)
         self.ui.checkBox_reasoning_mode.stateChanged.connect(self.interface_signals.on_checkBox_reasoning_mode_stateChanged)
+        self.ui.comboBox_reasoning_effort.currentIndexChanged.connect(self.interface_signals.on_comboBox_reasoning_effort_changed)
         self.ui.checkBox_enable_tool_calling.stateChanged.connect(self.interface_signals.on_checkBox_enable_tool_calling_stateChanged)
         self.ui.checkBox_enable_mcp.stateChanged.connect(self.interface_signals.on_checkBox_enable_mcp_stateChanged)
 
@@ -868,7 +881,7 @@ if __name__ == "__main__":
 
     main_window.show()    
 
-    current_version = "v2.4.5"
+    current_version = "v2.4.7"
 
     def deferred_update_check():
         latest_version, github_url = main_window.check_for_updates(current_version)

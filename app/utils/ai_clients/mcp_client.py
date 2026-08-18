@@ -40,7 +40,6 @@ class MCPClient:
     MCP Client that connects to a remote MCP server.
     """
 
-    # Widely-supported Streamable HTTP protocol version to negotiate with.
     _PROTOCOL_VERSION = "2025-06-18"
 
     def __init__(self, name: str, url: str):
@@ -153,7 +152,7 @@ class MCPClient:
             return False
 
     async def _try_legacy_sse(self) -> bool:
-        """Falls back to the deprecated (2024-11-05) two-endpoint HTTP+SSE transport."""
+        """Falls back to the deprecated two-endpoint HTTP+SSE transport."""
         try:
             self._sse_response = await self.session.get(
                 self.url, timeout=aiohttp.ClientTimeout(total=10.0)

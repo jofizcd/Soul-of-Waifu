@@ -5,6 +5,13 @@ from app.utils.ai_clients.base_provider import BaseAIProvider
 
 logger = logging.getLogger("Local Provider")
 
+REASONING_EFFORT_TO_BUDGET = {
+    "low": 1000,
+    "medium": 4000,
+    "high": 10000,
+    "xhigh": 20000,
+}
+
 class LocalProvider(BaseAIProvider):
     def __init__(self, port: int = 48596, advanced_params: dict = None):
         self.base_url = f"http://127.0.0.1:{port}/v1"
@@ -27,6 +34,18 @@ class LocalProvider(BaseAIProvider):
             "It may still be loading the model, may have crashed, or the port may be blocked."
         )
 
+    def _apply_thinking_budget(self, extra_body: dict, kwargs: dict, payload: dict) -> None:
+        reasoning_mode = kwargs.get("reasoning_mode")
+        if reasoning_mode is False:
+            extra_body["thinking_budget_tokens"] = 0
+            return
+
+        reasoning_effort = kwargs.get("reasoning_effort")
+        if reasoning_effort and reasoning_effort != "none":
+            budget = REASONING_EFFORT_TO_BUDGET.get(reasoning_effort, 4000)
+            extra_body["thinking_budget_tokens"] = budget
+            payload["max_tokens"] = max(payload["max_tokens"], budget + 1024)
+
     async def generate_stream(self, messages: list[dict], **kwargs):
         payload = {
             "model": "local-model",
@@ -44,9 +63,7 @@ class LocalProvider(BaseAIProvider):
             payload["stop"] = stop_sequences
 
         extra_body = dict(self.advanced_params) if self.advanced_params else {}
-        reasoning_mode = kwargs.get("reasoning_mode")
-        if reasoning_mode is False:
-            extra_body["thinking_budget_tokens"] = 0
+        self._apply_thinking_budget(extra_body, kwargs, payload)
         if extra_body:
             payload["extra_body"] = extra_body
 

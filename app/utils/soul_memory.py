@@ -6,72 +6,73 @@ import logging
 import datetime
 import asyncio
 import shutil
+import hashlib
 import threading
 from pathlib import Path
 from typing import Callable, Awaitable, Optional
-from sentence_transformers import SentenceTransformer
-
 from app.configuration import configuration
+from app.utils.embedding_provider import get_embedder as _get_embedder
 
 logger = logging.getLogger("SoulMemory")
 
-_EMBEDDER = None
-_EMBEDDER_FAILED: bool = False
-_EMBEDDER_AVAILABLE: Optional[bool] = None
-_EMBEDDER_LOCK = threading.Lock()
-
-LOCAL_MODEL_PATH = Path("app/utils/all-MiniLM-L6-v2")
-
-
-def _check_embedder_available() -> bool:
-    global _EMBEDDER_AVAILABLE
-    if _EMBEDDER_AVAILABLE is None:
-        try:
-            import sentence_transformers
-            _EMBEDDER_AVAILABLE = True
-        except ImportError:
-            _EMBEDDER_AVAILABLE = False
-            logger.warning(
-                "[Soul Memory] sentence-transformers not found. "
-                "Topic RAG filtering will fall back to simple truncation. "
-                "Install with: pip install sentence-transformers"
-            )
-    return _EMBEDDER_AVAILABLE
-
-
-def _get_embedder():
-    global _EMBEDDER, _EMBEDDER_FAILED
-
-    if _EMBEDDER is not None or _EMBEDDER_FAILED or not _check_embedder_available():
-        return _EMBEDDER
-
-    with _EMBEDDER_LOCK:
-        if _EMBEDDER is None and not _EMBEDDER_FAILED:
-            try:
-                abs_path = LOCAL_MODEL_PATH.resolve()
-                model_target = str(abs_path) if abs_path.exists() else "all-MiniLM-L6-v2"
-
-                device = "cpu"
-
-                logger.info(f"[Soul Memory] Loading embedding model on {device.upper()} from '{model_target}'...")
-                _EMBEDDER = SentenceTransformer(model_target, device=device)
-                logger.info(f"[Soul Memory] Embedding model successfully loaded on {device.upper()}")
-
-            except Exception as e:
-                logger.error(f"[Soul Memory] Failed to load embedding model: {e}", exc_info=True)
-                _EMBEDDER = None
-                _EMBEDDER_FAILED = True
-
-    return _EMBEDDER
-
 
 class TopicRAG:
+    """
+    RAG over per-character topic files with vector caching.
+    """
     RAG_THRESHOLD = 4
     EMBED_CHARS   = 600
     PASS_CHARS    = 8000
 
+    USE_E5_PREFIXES   = True
+    E5_QUERY_PREFIX   = "query: "
+    E5_PASSAGE_PREFIX = "passage: "
+
+    _VECTOR_CACHE: dict[str, dict[str, tuple[str, np.ndarray]]] = {}
+    _CACHE_LOCK = threading.Lock()
+
     def __init__(self, topics_dir: Path):
         self.topics_dir = topics_dir
+
+    def _cache_bucket(self) -> dict:
+        key = str(self.topics_dir.resolve())
+        with self._CACHE_LOCK:
+            return self._VECTOR_CACHE.setdefault(key, {})
+
+    def _encode_topics_cached(self, embedder, names: list[str], snippets: list[str]) -> np.ndarray:
+        bucket  = self._cache_bucket()
+        hashes  = [hashlib.md5(s.encode("utf-8", "ignore")).hexdigest() for s in snippets]
+        vectors: list = [None] * len(names)
+        missing_idx = []
+
+        with self._CACHE_LOCK:
+            for i, (name, h) in enumerate(zip(names, hashes)):
+                cached = bucket.get(name)
+                if cached is not None and cached[0] == h:
+                    vectors[i] = cached[1]
+                else:
+                    missing_idx.append(i)
+
+        if missing_idx:
+            raw_missing_snippets = [snippets[i] for i in missing_idx]
+            prefixed_snippets = [
+                f"{self.E5_PASSAGE_PREFIX}{s}" if self.USE_E5_PREFIXES else s
+                for s in raw_missing_snippets
+            ]
+            
+            new_vecs = embedder.encode(prefixed_snippets, convert_to_numpy=True)
+            with self._CACHE_LOCK:
+                for pos, i in enumerate(missing_idx):
+                    vec = new_vecs[pos]
+                    vectors[i] = vec
+                    bucket[names[i]] = (hashes[i], vec)
+
+        with self._CACHE_LOCK:
+            stale = set(bucket.keys()) - set(names)
+            for s in stale:
+                bucket.pop(s, None)
+
+        return np.vstack(vectors)
 
     def _load_all_topics(self) -> dict[str, str]:
         result = {}
@@ -94,7 +95,6 @@ class TopicRAG:
         return result
 
     def get_relevant_topics(self, query_text: str, max_topics: int = 3) -> dict[str, str]:
-        """Returns up to max_topics files ranked by relevance to query_text."""
         all_topics = self._load_all_topics()
         if not all_topics:
             return {}
@@ -111,8 +111,10 @@ class TopicRAG:
             names    = list(all_topics.keys())
             snippets = [v[:self.EMBED_CHARS] for v in all_topics.values()]
 
-            query_vec  = embedder.encode(query_text, convert_to_numpy=True)
-            topic_vecs = embedder.encode(snippets, convert_to_numpy=True)
+            safe_query_text = str(query_text)[:1000]
+            formatted_query = f"{self.E5_QUERY_PREFIX}{safe_query_text}" if self.USE_E5_PREFIXES else safe_query_text
+            query_vec  = embedder.encode(formatted_query, convert_to_numpy=True)
+            topic_vecs = self._encode_topics_cached(embedder, names, snippets)
 
             q_norm = query_vec / (np.linalg.norm(query_vec) + 1e-9)
             t_norm = topic_vecs / (np.linalg.norm(topic_vecs, axis=1, keepdims=True) + 1e-9)
@@ -149,8 +151,10 @@ class TopicRAG:
             names    = list(all_topics.keys())
             snippets = [v[:self.EMBED_CHARS] for v in all_topics.values()]
 
-            query_vec  = embedder.encode(query_text, convert_to_numpy=True)
-            topic_vecs = embedder.encode(snippets, convert_to_numpy=True)
+            safe_query_text = str(query_text)[:1000]
+            formatted_query = f"{self.E5_QUERY_PREFIX}{safe_query_text}" if self.USE_E5_PREFIXES else safe_query_text
+            query_vec  = embedder.encode(formatted_query, convert_to_numpy=True)
+            topic_vecs = self._encode_topics_cached(embedder, names, snippets)
 
             q_norm = query_vec / (np.linalg.norm(query_vec) + 1e-9)
             t_norm = topic_vecs / (np.linalg.norm(topic_vecs, axis=1, keepdims=True) + 1e-9)
@@ -327,7 +331,7 @@ CRITICAL CONSTRAINTS:
 1. PERSPECTIVE: Write entirely in the FIRST-PERSON ("I", "me", "my"). You are {character}.
 2. SUBJECT: Refer to {user_name} in the third-person ("he", "she", "they", or by name "{user_name}").
 3. FORMAT: Write ONLY plain text prose. NO asterisks (*), NO actions, NO dialogue, NO quotation marks, NO headers.
-4. LENGTH: Strictly 2 to 4 sentences. Keep it short and impactful.
+4. LENGTH: Strictly 4 to 6 sentences. Keep it short and impactful.
 5. FOCUS: Describe your INTERNAL EMOTIONS. How did {user_name} make you feel? Are you annoyed, happy, scared, or curious?
 
 Output strictly the diary text. Do not add any greetings or explanations.
@@ -585,6 +589,32 @@ class SoulMemoryAgent:
         first, last = stripped.find("{"), stripped.rfind("}")
         if first != -1 and last != -1 and last > first:
             candidates.append(stripped[first:last + 1])
+
+        if first != -1:
+            depth, in_str, escape = 0, False, False
+            closers: list[str] = []
+            for ch in stripped[first:]:
+                if in_str:
+                    if escape:
+                        escape = False
+                    elif ch == "\\":
+                        escape = True
+                    elif ch == '"':
+                        in_str = False
+                    continue
+                if ch == '"':
+                    in_str = True
+                elif ch == "{":
+                    closers.append("}")
+                elif ch == "[":
+                    closers.append("]")
+                elif ch in "}]":
+                    if closers:
+                        closers.pop()
+            if closers:
+                repaired_tail = stripped[first:].rstrip()
+                repaired_tail = re.sub(r',\s*$', '', repaired_tail)
+                candidates.append(repaired_tail + "".join(reversed(closers)))
 
         for candidate in list(candidates):
             repaired = re.sub(r',\s*([\]}])', r'\1', candidate)
@@ -1002,94 +1032,99 @@ class SoulMemoryAgent:
                 else:
                     topic_plan = []
 
-        tracker_file.write_text(str(msg_count), encoding="utf-8")
-
-        diary_task = None
-        if soul_memory_mode in [0, 1, 3]:
-            diary_task = asyncio.create_task(
-                self._update_daily_diary(
-                    character_name = character_name,
-                    user_name      = user_name,
-                    current_index  = safe_index,
-                    delta_messages = delta_messages,
-                    topics_dir     = topics_dir,
-                    log_path       = log_path,
+        try:
+            diary_task = None
+            if soul_memory_mode in [0, 1, 3]:
+                diary_task = asyncio.create_task(
+                    self._update_daily_diary(
+                        character_name = character_name,
+                        user_name      = user_name,
+                        current_index  = safe_index,
+                        delta_messages = delta_messages,
+                        topics_dir     = topics_dir,
+                        log_path       = log_path,
+                    )
                 )
-            )
 
-        if not topic_plan:
-            logger.info("[Soul Memory] No topic actions scheduled.")
+            if not topic_plan:
+                logger.info("[Soul Memory] No topic actions scheduled.")
+            else:
+                logger.info(f"[Soul Memory] Archivist: {len(topic_plan)} topic action(s) scheduled.")
+
+                for action in topic_plan:
+                    try:
+                        filename = str(action.get("filename", "")).strip()
+                        if not filename:
+                            continue
+
+                        safe_fname = "".join(
+                            c for c in filename if c.isalnum() or c in "._-"
+                        ).lower()
+                        if not safe_fname.endswith(".md"):
+                            safe_fname += ".md"
+
+                        if safe_fname in self._BAD_TOPIC_NAMES:
+                            logger.debug(f"[Soul Memory] Skipping hallucinated topic name: {safe_fname}")
+                            continue
+
+                        if safe_fname.startswith("diary_"):
+                            logger.debug(f"[Soul Memory] Protecting diary file from Archivist: {safe_fname}")
+                            continue
+
+                        action_type = str(action.get("action", "update")).strip().lower()
+
+                        if action_type == "create":
+                            dedup_query  = f"{filename} {action.get('summary', '')}".strip()
+                            dedup_target = await asyncio.to_thread(topic_rag.find_similar_topic, dedup_query)
+                            if dedup_target and dedup_target != safe_fname:
+                                logger.info(
+                                    f"[Soul Memory] Dedup: redirecting CREATE '{safe_fname}' onto "
+                                    f"existing similar topic '{dedup_target}'."
+                                )
+                                safe_fname = dedup_target
+
+                        topic_path       = topics_dir / safe_fname
+                        existing_content = ""
+                        if topic_path.exists():
+                            try:
+                                existing_content = topic_path.read_text(encoding="utf-8")
+                            except Exception:
+                                pass
+
+                        new_content = await self._call_archivist_agent(
+                            character        = character_name,
+                            user_name        = user_name,
+                            action           = action,
+                            existing_content = existing_content,
+                            delta_messages   = delta_messages,
+                            current_index    = safe_index,
+                        )
+
+                        if new_content:
+                            written    = self._safe_write_topic(topic_path, new_content)
+                            op         = "updated" if existing_content else "created"
+                            log_status = "OK" if written else "SKIPPED"
+                            logger.info(f"[Soul Memory] Topic {op}: {safe_fname} | write={log_status}")
+                            self._append_log(
+                                log_path, timestamp,
+                                f"TOPIC_{op.upper()} | file={safe_fname} | write={log_status}",
+                            )
+                        else:
+                            logger.warning(f"[Soul Memory] Archivist returned empty content for {safe_fname}.")
+
+                    except Exception as e:
+                        logger.error(
+                            f"[Soul Memory] Archivist action failed for "
+                            f"{action.get('filename', '?')}: {e}", exc_info=True,
+                        )
+
             if diary_task:
                 await diary_task
+
             logger.info("[Soul Memory] Pipeline complete.")
-            return
 
-        logger.info(f"[Soul Memory] Archivist: {len(topic_plan)} topic action(s) scheduled.")
-
-        for action in topic_plan:
-            filename = str(action.get("filename", "")).strip()
-            if not filename:
-                continue
-
-            safe_fname = "".join(
-                c for c in filename if c.isalnum() or c in "._-"
-            ).lower()
-            if not safe_fname.endswith(".md"):
-                safe_fname += ".md"
-
-            if safe_fname in self._BAD_TOPIC_NAMES:
-                logger.debug(f"[Soul Memory] Skipping hallucinated topic name: {safe_fname}")
-                continue
-
-            if safe_fname.startswith("diary_"):
-                logger.debug(f"[Soul Memory] Protecting diary file from Archivist: {safe_fname}")
-                continue
-
-            action_type = str(action.get("action", "update")).strip().lower()
-
-            if action_type == "create":
-                dedup_query  = f"{filename} {action.get('summary', '')}".strip()
-                dedup_target = await asyncio.to_thread(topic_rag.find_similar_topic, dedup_query)
-                if dedup_target and dedup_target != safe_fname:
-                    logger.info(
-                        f"[Soul Memory] Dedup: redirecting CREATE '{safe_fname}' onto "
-                        f"existing similar topic '{dedup_target}'."
-                    )
-                    safe_fname = dedup_target
-
-            topic_path       = topics_dir / safe_fname
-            existing_content = ""
-            if topic_path.exists():
-                try:
-                    existing_content = topic_path.read_text(encoding="utf-8")
-                except Exception:
-                    pass
-
-            new_content = await self._call_archivist_agent(
-                character        = character_name,
-                user_name        = user_name,
-                action           = action,
-                existing_content = existing_content,
-                delta_messages   = delta_messages,
-                current_index    = safe_index,
-            )
-
-            if new_content:
-                written    = self._safe_write_topic(topic_path, new_content)
-                op         = "updated" if existing_content else "created"
-                log_status = "OK" if written else "SKIPPED"
-                logger.info(f"[Soul Memory] Topic {op}: {safe_fname} | write={log_status}")
-                self._append_log(
-                    log_path, timestamp,
-                    f"TOPIC_{op.upper()} | file={safe_fname} | write={log_status}",
-                )
-            else:
-                logger.warning(f"[Soul Memory] Archivist returned empty content for {safe_fname}.")
-
-        if diary_task:
-            await diary_task
-
-        logger.info("[Soul Memory] Pipeline complete.")
+        finally:
+            tracker_file.write_text(str(msg_count), encoding="utf-8")
 
     @staticmethod
     def _append_log(log_path: Path, timestamp: str, message: str):

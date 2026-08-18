@@ -1,18 +1,16 @@
 import os
-import gc
 import re
+import json
 import logging
-import threading
 import asyncio
 from pathlib import Path
-from typing import Optional
 
 import tiktoken
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from app.configuration import configuration
+from app.utils.embedding_provider import get_embedder
 
 logger = logging.getLogger("Prompt Engine")
 
@@ -22,54 +20,167 @@ tiktoken_file = ai_clients_dir / "9b5ad71b2ce5302211f9c61530b329a4922fc6a4"
 if tiktoken_file.exists():
     os.environ["TIKTOKEN_CACHE_DIR"] = str(ai_clients_dir)
 
-class EmbeddingCache:
-    _model: Optional[SentenceTransformer] = None
-    _lock: threading.Lock = threading.Lock()
-    _failed: bool = False
+_STATE_TAG_OPEN_RE = re.compile(r"<\s*(?:state[_\-\s]*update|update[_\-\s]*state)\s*>", re.IGNORECASE)
+_STATE_TAG_FULL_RE = re.compile(
+    r"<\s*(state[_\-\s]*update|update[_\-\s]*state)\s*>(.*?)<\s*/\s*\1\s*>",
+    re.IGNORECASE | re.DOTALL
+)
+_TRAILING_PARTIAL_TAG_RE = re.compile(r"<[A-Za-z_\-\s]{0,24}$")
 
-    @classmethod
-    def get_model(
-        cls, 
-        model_path: str = "app/utils/all-MiniLM-L6-v2", 
-        device: str = "cpu"
-    ) -> Optional[SentenceTransformer]:
-        if cls._model is None and not cls._failed:
-            with cls._lock:
-                if cls._model is None and not cls._failed:
-                    try:
-                        project_root = Path(__file__).resolve().parent.parent.parent
-                        local_model_path = project_root / model_path
+_REASONING_TAG_NAMES = (
+    r"(?:think(?:ing)?|thoughts?|reasoning|reflect(?:ion)?|"
+    r"scratch[_\-\s]?pad|analysis|inner[_\-\s]?monologue|monologue)"
+)
+_REASONING_OPEN_RE = re.compile(rf"<\s*{_REASONING_TAG_NAMES}\s*>", re.IGNORECASE)
+_REASONING_CLOSE_ANY_RE = re.compile(rf"<\s*/\s*{_REASONING_TAG_NAMES}\s*>", re.IGNORECASE)
+_REASONING_FULL_RE = re.compile(
+    rf"<\s*({_REASONING_TAG_NAMES})\s*>(.*?)<\s*/\s*\1\s*>",
+    re.IGNORECASE | re.DOTALL
+)
 
-                        target_path = str(local_model_path) if local_model_path.exists() else model_path
+_REASONING_HARMONY_RE = re.compile(
+    r"<\|channel\|>\s*analysis\s*<\|message\|>(.*?)"
+    r"(?:<\|end\|>|<\|start\|>|<\|channel\|>\s*final|$)",
+    re.IGNORECASE | re.DOTALL
+)
+_STRAY_HARMONY_TOKEN_RE = re.compile(r"<\|(?:start|end|message|channel)\|>\s*(?:final|assistant)?", re.IGNORECASE)
 
-                        logger.info(f"Loading embedding model on device='{device}' from '{target_path}'...")
-                        cls._model = SentenceTransformer(target_path, device=device)
-                        logger.info("Embedding model successfully loaded to memory")
 
-                    except Exception as e:
-                        logger.error(f"Failed to load embedding model: {e}", exc_info=True)
-                        cls._model = None
-                        cls._failed = True
+def strip_partial_reasoning_tag(text: str) -> str:
+    if not text:
+        return text
 
-        return cls._model
+    open_match = _REASONING_OPEN_RE.search(text)
+    if open_match:
+        return text[:open_match.start()].rstrip()
 
-    @classmethod
-    def clear(cls):
-        with cls._lock:
-            if cls._model is not None:
-                del cls._model
-                cls._model = None
-                cls._failed = False
-                gc.collect()
+    harmony_match = re.search(r"<\|channel\|>\s*analysis", text, re.IGNORECASE)
+    if harmony_match:
+        return text[:harmony_match.start()].rstrip()
 
-                try:
-                    import torch
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                except ImportError:
-                    pass
+    partial_match = _TRAILING_PARTIAL_TAG_RE.search(text)
+    if partial_match:
+        return text[:partial_match.start()].rstrip()
 
-                logger.info("Embedding model unloaded from memory")
+    return text
+
+
+def find_reasoning_open(text: str):
+    m = _REASONING_OPEN_RE.search(text)
+    if m:
+        return (m.start(), m.end())
+    hm = re.search(r"<\|channel\|>\s*analysis\s*<\|message\|>", text, re.IGNORECASE)
+    if hm:
+        return (hm.start(), hm.end())
+    return None
+
+
+def find_reasoning_close(text: str):
+    m = _REASONING_CLOSE_ANY_RE.search(text)
+    if m:
+        return (m.start(), m.end())
+    hm = re.search(r"<\|end\|>|<\|start\|>|<\|channel\|>\s*final", text, re.IGNORECASE)
+    if hm:
+        return (hm.start(), hm.end())
+    return None
+
+
+def extract_reasoning(text: str):
+    if not text:
+        return text, ""
+
+    reasoning_parts = []
+
+    def _collect(match):
+        reasoning_parts.append(match.group(2).strip())
+        return ""
+
+    clean_text = _REASONING_FULL_RE.sub(_collect, text)
+
+    def _collect_harmony(match):
+        reasoning_parts.append(match.group(1).strip())
+        return ""
+
+    clean_text = _REASONING_HARMONY_RE.sub(_collect_harmony, clean_text)
+    clean_text = _STRAY_HARMONY_TOKEN_RE.sub("", clean_text)
+
+    open_match = _REASONING_OPEN_RE.search(clean_text)
+    if open_match:
+        reasoning_parts.append(clean_text[open_match.end():].strip())
+        clean_text = clean_text[:open_match.start()]
+
+    clean_text = clean_text.strip()
+    reasoning_text = "\n\n".join(p for p in reasoning_parts if p)
+    return clean_text, reasoning_text
+
+
+def strip_partial_state_tag(text: str) -> str:
+    if not text:
+        return text
+
+    open_match = _STATE_TAG_OPEN_RE.search(text)
+    if open_match:
+        return text[:open_match.start()].rstrip()
+
+    partial_match = _TRAILING_PARTIAL_TAG_RE.search(text)
+    if partial_match:
+        return text[:partial_match.start()].rstrip()
+
+    return text
+
+
+def _sanitize_state_json(raw: str) -> str:
+    s = raw.strip()
+
+    s = re.sub(r"^```(?:json)?\s*", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"```\s*$", "", s).strip()
+    s = re.sub(r':\s*\+\s*(\d+(?:\.\d+)?)', r': \1', s)
+    s = re.sub(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:', r'\1"\2":', s)
+
+    if "'" in s and '"' not in s:
+        s = re.sub(r"'([^']*)'", r'"\1"', s)
+
+    s = re.sub(r'\bTrue\b', 'true', s)
+    s = re.sub(r'\bFalse\b', 'false', s)
+    s = re.sub(r'\bNone\b', 'null', s)
+
+    s = re.sub(r',\s*([}\]])', r'\1', s)
+
+    return s
+
+
+def extract_state_update(text: str, allowed_keys=None):
+    if not text:
+        return text, {}
+
+    full_match = _STATE_TAG_FULL_RE.search(text)
+
+    if full_match:
+        payload = full_match.group(2)
+        clean_text = _STATE_TAG_FULL_RE.sub("", text).strip()
+    else:
+        open_match = _STATE_TAG_OPEN_RE.search(text)
+        if not open_match:
+            return text, {}
+        payload = text[open_match.end():]
+        clean_text = text[:open_match.start()].rstrip()
+
+    updates = {}
+    payload = payload.strip()
+    if payload:
+        try:
+            updates = json.loads(_sanitize_state_json(payload))
+        except Exception:
+            updates = {}
+        if not isinstance(updates, dict):
+            updates = {}
+
+    if allowed_keys is not None:
+        allowed_keys = set(allowed_keys)
+        updates = {k: v for k, v in updates.items() if k in allowed_keys}
+
+    return clean_text, updates
+
 
 class PromptEngine:
     """
@@ -88,11 +199,15 @@ class PromptEngine:
             logger.error(f"Failed to initialize tiktoken encoder: {e}")
             self.encoder = None
 
-        raw_size = self.configuration_settings.get_main_setting("context_size")
-        self.max_context_tokens = raw_size if raw_size is not None else 8192
         self.response_reserve = 500
 
         self.IMAGE_TOKEN_ESTIMATE = 300
+        
+        self.SOUL_MEMORY_MIN_MAX_TOKENS = 1500
+
+    def _get_max_context_tokens(self) -> int:
+        raw_size = self.configuration_settings.get_main_setting("context_size")
+        return raw_size if raw_size is not None else 8192
 
     def is_soul_memory_enabled(self) -> bool:
         try:
@@ -221,12 +336,12 @@ class PromptEngine:
                     semantic_trigger_text = entry.get("semantic_trigger", "")
                     if semantic_trigger_text:
                         if not model:
-                            model = EmbeddingCache.get_model()
+                            model = get_embedder()
                         if model:
                             if not semantic_context:
-                                semantic_context = full_text_to_scan
-                            emb1 = model.encode([semantic_context])
-                            emb2 = model.encode([semantic_trigger_text.lower()])
+                                semantic_context = full_text_to_scan[:1000]
+                            emb1 = model.encode([f"query: {semantic_context}"])
+                            emb2 = model.encode([f"passage: {semantic_trigger_text.lower()[:1000]}"])
                             sim = cosine_similarity(emb1, emb2)[0][0]
                             if sim > 0.72:
                                 is_triggered = True
@@ -338,8 +453,7 @@ class PromptEngine:
         Builds a robust system prompt list with structured blocks, memory, and lore integration.
         Returns a list of message dicts.
         """
-        raw_size = self.configuration_settings.get_main_setting("context_size")
-        self.max_context_tokens = raw_size if raw_size is not None else 8192
+        max_context_tokens = self._get_max_context_tokens()
 
         config = self.configuration_settings.load_configuration()
         user_data = config.get("user_data", {})
@@ -375,21 +489,27 @@ class PromptEngine:
                 state_prompt_block = "[CURRENT STATE CHARACTERISTICS]\n" + "\n".join(state_lines) + "\n"
                 
                 allowed_keys_str = ", ".join([f'"{v["id"]}"' for v in sow_variables])
+                type_hint_lines = "\n".join(
+                    f'- "{v["id"]}" ({v["type"]})' for v in sow_variables
+                )
                 state_prompt_block += (
                     "\n[SYSTEM DIRECTIVE — STATE UPDATES]\n"
                     "You are playing a game with state tracking. "
-                    "You MUST ALWAYS output the <state_update>...</state_update> XML tag at the absolute end of your response, even if no variables changed (in which case, output an empty JSON: <state_update>{}</state_update>).\n"
-                    f"ALLOWED JSON KEYS: [{allowed_keys_str}]\n\n"
+                    "You MUST ALWAYS output a <state_update>...</state_update> XML tag, and it MUST be the very last thing in your response — nothing may come after the closing tag. "
+                    "If nothing changed this turn, output <state_update>{}</state_update>.\n"
+                    f"ALLOWED JSON KEYS AND TYPES:\n{type_hint_lines}\n\n"
                     "Syntax rules:\n"
-                    "1. Only update variables that actually changed during this turn of dialogue. Use ONLY keys from the ALLOWED JSON KEYS list.\n"
-                    "2. For numerical variables (int), output the change delta (e.g., -10 or +5).\n"
-                    "3. For boolean variables (bool), output the new value (true or false).\n"
-                    "4. For lists (inventory), prefix the item with '+' to add or '-' to remove (e.g., \"+Key\" or \"-Sword\").\n"
-                    "5. Output the <state_update> tag at the absolute end of your response, with NO text after it.\n\n"
+                    "1. Only include keys that actually changed this turn. Use ONLY keys from the ALLOWED JSON KEYS list above, spelled exactly as shown.\n"
+                    "2. For numerical variables (int), output the CHANGE (delta), not the new total (e.g., -10 or 5 to add 5).\n"
+                    "3. For boolean variables (bool), output the new value as true or false (not the change).\n"
+                    "4. For lists (inventory), prefix each changed item with '+' to add it or '-' to remove it (e.g., \"+Key\" or \"-Sword\"). To change several list items in one turn, still use only ONE key with ONE string value — pick the single most important change.\n"
+                    "5. For text variables (str), output the new value directly, as plain text (no + or - prefix).\n"
+                    "6. Write STRICT JSON: double-quoted keys and string values, no trailing commas, no comments, no markdown code fences.\n"
+                    "7. The <state_update> tag must appear exactly once, fully closed, at the absolute end of your response, with NO narration, dialogue, or any other text after the closing tag.\n\n"
                     "CRITICAL EXAMPLE 1 (No changes):\n"
                     "*She nods slightly.* \"Fine, let's go.\" <state_update>{}</state_update>\n\n"
                     "CRITICAL EXAMPLE 2 (State changed):\n"
-                    "*She smiles softly.* \"Thank you for the tea, Lawrence.\" <state_update>{\"ice_wall\": -10, \"trust\": +5}</state_update>\n"
+                    "*She smiles softly.* \"Thank you for the tea, Lawrence.\" <state_update>{\"ice_wall\": -10, \"trust\": 5}</state_update>\n"
                 )
 
         current_chat_id = character_information.get("current_chat", "default")
@@ -517,14 +637,17 @@ class PromptEngine:
 
                 if topics_dir and topics_dir.exists():
                     query_context = " ".join([str(msg.get("content", "")) for msg in chat_messages[-4:]] + [final_user_message])
-                    
-                    model = EmbeddingCache.get_model()
-                    query_vec = model.encode([query_context])[0]
-                    
+
+                    model = get_embedder()
+                    if model is None:
+                        logger.info("[Soul Memory] Embedder unavailable — skipping semantic topic search.")
+                    topic_files = list(topics_dir.glob("*.md")) if model else []
+
                     found_topics = []
-                    topic_files = list(topics_dir.glob("*.md"))
-                    
-                    if topic_files:
+
+                    if model and topic_files:
+                        safe_query_context = str(query_context)[:1000]
+                        query_vec = model.encode([f"query: {safe_query_context}"])[0]
                         topic_vectors = []
                         topic_contents = []
                         
@@ -551,7 +674,7 @@ class PromptEngine:
                             if target_hash in self.embedding_cache:
                                 t_vec = self.embedding_cache[target_hash]
                             else:
-                                t_vec = model.encode([encoding_target])[0]
+                                t_vec = model.encode([f"passage: {encoding_target}"])[0]
                                 self.embedding_cache[target_hash] = t_vec
                             
                             topic_vectors.append(t_vec)
@@ -599,7 +722,7 @@ class PromptEngine:
 
         final_user_content = self._build_final_user_content(final_user_message, image_attachments, provider_style)
 
-        if self.max_context_tokens <= 0:
+        if max_context_tokens <= 0:
             logger.info("Unlimited context detected. Bypassing history truncation.")
             raw_history = []
             for msg in chat_messages:
@@ -618,7 +741,7 @@ class PromptEngine:
             self.log_prompt_structure(final_messages)
             return final_messages, activated_entries
 
-        available_tokens = self.max_context_tokens - current_token_count - self.response_reserve
+        available_tokens = max_context_tokens - current_token_count - self.response_reserve
         
         if available_tokens <= 128:
             logger.warning("Context full! Drastic compression triggered: sending only system blocks + last message.")
@@ -748,10 +871,23 @@ class PromptEngine:
         self.log_prompt_structure(messages)
         return messages
 
+    def _get_soul_memory_max_tokens(self) -> int:
+        configured = self.configuration_settings.get_main_setting("max_tokens")
+        try:
+            configured = int(configured) if configured is not None else 0
+        except (TypeError, ValueError):
+            configured = 0
+        return max(configured, self.SOUL_MEMORY_MIN_MAX_TOKENS)
+
     async def _memory_llm_call(self, provider, messages: list[dict]) -> str:
         try:
             full_response = ""
-            async for chunk in provider.generate_stream(messages, temperature=0.1, top_p=0.95, max_tokens=1500):
+            max_tokens = self._get_soul_memory_max_tokens()
+            reasoning_effort = self.configuration_settings.get_main_setting("soul_memory_reasoning_effort") or "none"
+            async for chunk in provider.generate_stream(
+                messages, temperature=0.1, top_p=0.95, max_tokens=max_tokens,
+                reasoning_effort=reasoning_effort, reasoning_mode=False
+            ):
                 full_response += chunk
             return full_response.strip()
         except asyncio.CancelledError:

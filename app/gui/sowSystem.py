@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import QMainWindow
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QBrush, QLinearGradient, QPen
 
+from app.gui.custom_widgets import safe_paint
+
 class C:
     ROOT        = "#08080e"
     PANEL       = "#0c0c0c"
@@ -159,7 +161,8 @@ class WaveformWidget(QtWidgets.QWidget):
                           for i in range(n)]
         self.update()
 
-    def paintEvent(self, _e):
+    @safe_paint
+    def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h, n = self.width(), self.height(), self.N

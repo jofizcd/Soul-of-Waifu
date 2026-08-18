@@ -1,18 +1,20 @@
-import os
-import shutil
-import re
-import uuid
+import datetime
 import json
 import logging
-import datetime
+import os
+import re
+import shutil
 import traceback
+import uuid
 
 logger = logging.getLogger("Configuration")
 
-class ConfigurationSettings():
+
+class ConfigurationSettings:
     """
     A class that manages a JSON configuration file containing application settings and user data.
     """
+
     def __init__(self):
         self.settings_path = "app/configuration/settings.json"
 
@@ -21,7 +23,7 @@ class ConfigurationSettings():
         Loads and returns the configuration data from the JSON file.
         """
         if not os.path.exists(self.settings_path):
-            
+            # Generate default configuration if the file does not exist
             return {
                 "main_settings": {
                     "conversation_method": "0",
@@ -32,23 +34,34 @@ class ConfigurationSettings():
                     "input_device": "0",
                     "output_device": "0",
                     "translator": "0",
-                    "target_language": "0"
+                    "target_language": "0",
+                    "context_size": 8192,
+                    "max_tokens": 4096,
+                    "temperature": 0.7,
+                    "top_p": 0.9,
+                    "frequency_penalty": 0.0,
+                    "presence_penalty": 0.0,
+                    "stop_strings": "",
+                    "reasoning_mode": True,
+                    "reasoning_effort": "medium",
+                    "soul_memory_reasoning_effort": "none",
+                    "soul_stage_reasoning_effort": "none",
                 },
                 "user_data": {
                     "default_persona": "None",
                     "personas": {},
                     "presets": {},
-                    "current_character_image": "None"
-                }
+                    "current_character_image": "None",
+                },
             }
-        with open(self.settings_path, 'r', encoding='utf-8') as file:
+        with open(self.settings_path, encoding="utf-8") as file:
             return json.load(file)
 
     def save_configuration_edit(self, data):
         """
         Saves provided configuration data to the JSON file.
         """
-        with open(self.settings_path, 'w', encoding="utf-8") as file:
+        with open(self.settings_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
 
     def update_main_setting(self, setting, value):
@@ -60,10 +73,10 @@ class ConfigurationSettings():
             value (any): The new value to assign to the specified key.
         """
         configuration_data = self.load_configuration()
-        
+
         if "main_settings" not in configuration_data:
             configuration_data["main_settings"] = {}
-        
+
         configuration_data["main_settings"][setting] = value
         self.save_configuration_edit(configuration_data)
 
@@ -89,10 +102,10 @@ class ConfigurationSettings():
             value (any): The new value to assign to the specified key.
         """
         configuration_data = self.load_configuration()
-        
+
         if "user_data" not in configuration_data:
             configuration_data["user_data"] = {}
-        
+
         configuration_data["user_data"][key] = value
         self.save_configuration_edit(configuration_data)
 
@@ -108,7 +121,7 @@ class ConfigurationSettings():
         """
         configuration_data = self.load_configuration()
         return configuration_data["user_data"].get(key, None)
-    
+
     def update_preset(self, preset_name, preset_data):
         config = self.load_configuration()
         if "user_data" not in config:
@@ -121,7 +134,7 @@ class ConfigurationSettings():
 
     def get_all_presets(self):
         return self.load_configuration().get("user_data", {}).get("presets", {})
-    
+
     def delete_preset(self, name):
         presets = self.load_configuration().get("user_data", {}).get("presets", {})
 
@@ -142,7 +155,7 @@ class ConfigurationSettings():
 
         config["user_data"]["lorebooks"][name] = lorebook_data
         self.save_configuration_edit(config)
-    
+
     def delete_lorebook(self, name):
         """
         Deletes a lorebook by name from the configuration.
@@ -165,11 +178,13 @@ class ConfigurationSettings():
 
         config["user_data"]["lorebooks"] = lorebooks
         self.save_configuration_edit(config)
-    
-class ConfigurationAPI():
+
+
+class ConfigurationAPI:
     """
     A class for managing API tokens stored in a JSON configuration file.
     """
+
     def __init__(self):
         self.api_tokens_path = "app/configuration/api.json"
 
@@ -179,26 +194,26 @@ class ConfigurationAPI():
         """
         if not os.path.exists(self.api_tokens_path):
             return {}
-        with open(self.api_tokens_path, 'r', encoding='utf-8') as file:
+        with open(self.api_tokens_path, "r", encoding="utf-8") as file:
             return json.load(file)
 
     def save_configuration_edit(self, data):
         """
         Saves provided configuration data directly to the JSON file.
         """
-        with open(self.api_tokens_path, 'w', encoding="utf-8") as file:
+        with open(self.api_tokens_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
-    
+
     def save_api_token(self, variable, variable_value):
         """
         Saves or updates an API token in the configuration file.
-        
+
         Args:
             variable (str): Variable name.
             value (any): Variable value.
         """
         configuration_data = self.load_configuration()
-        
+
         configuration_data[variable] = variable_value
         self.save_configuration_edit(configuration_data)
 
@@ -207,13 +222,15 @@ class ConfigurationAPI():
         Retrieves the value of an API token from the configuration file.
         """
         configuration_data = self.load_configuration()
-        
+
         return configuration_data.get(api)
 
-class ConfigurationCharacters():
+
+class ConfigurationCharacters:
     """
     A class for managing character data stored in a JSON configuration file.
     """
+
     def __init__(self):
         self.characters_path = "app/configuration/characters.json"
         self.configuration_data = self.load_configuration()
@@ -225,7 +242,7 @@ class ConfigurationCharacters():
         if not os.path.exists(self.characters_path):
             return {}
         try:
-            with open(self.characters_path, 'r', encoding='utf-8') as file:
+            with open(self.characters_path, "r", encoding="utf-8") as file:
                 return json.load(file)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON configuration file '{self.characters_path}': {e}")
@@ -235,43 +252,61 @@ class ConfigurationCharacters():
         """
         Saves the provided character configuration data directly to the JSON file.
         """
-        with open(self.characters_path, 'w', encoding="utf-8") as file:
+        with open(self.characters_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
 
-    def save_character_card(self, character_name, character_title, character_avatar, 
-                            character_description, character_personality, first_message, 
-                            scenario, example_messages, alternate_greetings, selected_persona, 
-                            selected_system_prompt_preset, selected_lorebook, elevenlabs_voice_id, 
-                            voice_type, rvc_enabled, rvc_file, expression_images_folder, 
-                            live2d_model_folder, vrm_model_file, conversation_method, 
-                            selected_lorebooks=None, sow_variables=None):
+    def save_character_card(
+        self,
+        character_name,
+        character_title,
+        character_avatar,
+        character_description,
+        character_personality,
+        first_message,
+        scenario,
+        example_messages,
+        alternate_greetings,
+        selected_persona,
+        selected_system_prompt_preset,
+        selected_lorebook,
+        elevenlabs_voice_id,
+        voice_type,
+        rvc_enabled,
+        rvc_file,
+        expression_images_folder,
+        live2d_model_folder,
+        vrm_model_file,
+        conversation_method,
+        selected_lorebooks=None,
+        sow_variables=None,
+    ):
         """
         Saves or updates a character's card information in the configuration.
         """
         cached_avatar_path = character_avatar
-        
+
         if character_avatar and os.path.exists(character_avatar):
             try:
                 cache_dir = os.path.join("app", "cache", "avatars")
                 os.makedirs(cache_dir, exist_ok=True)
-                
-                sanitized_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', character_name)
-                
+
+                sanitized_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", character_name)
+
                 _, ext = os.path.splitext(character_avatar)
                 if not ext:
                     ext = ".png"
-                
+
                 dest_filename = f"{sanitized_name}_avatar{ext.lower()}"
                 dest_path = os.path.join(cache_dir, dest_filename)
-                
+
                 abs_src = os.path.abspath(character_avatar)
                 abs_dest = os.path.abspath(dest_path)
-                
+
                 if abs_src != abs_dest:
                     shutil.copy2(abs_src, abs_dest)
-                
+
                 cached_avatar_path = f"app/cache/avatars/{dest_filename}"
-                
+
             except Exception as e:
                 print(f"[Error] Failed to cache avatar for {character_name}: {e}")
                 cached_avatar_path = character_avatar
@@ -282,20 +317,15 @@ class ConfigurationCharacters():
                 selected_lorebooks = [selected_lorebook]
 
         configuration_data = self.load_configuration()
-        if 'character_list' not in configuration_data:
-            configuration_data['character_list'] = {}
+        if "character_list" not in configuration_data:
+            configuration_data["character_list"] = {}
 
         message_id = str(uuid.uuid4())
 
-        variants = [
-            {"variant_id": "default", "text": first_message}
-        ]
+        variants = [{"variant_id": "default", "text": first_message}]
 
         for i, greeting in enumerate(alternate_greetings):
-            variants.append({
-                "variant_id": f"v{i+1}",
-                "text": greeting.strip()
-            })
+            variants.append({"variant_id": f"v{i + 1}", "text": greeting.strip()})
 
         main_message = {
             "message_id": message_id,
@@ -303,17 +333,14 @@ class ConfigurationCharacters():
             "author_name": character_name,
             "is_user": False,
             "current_variant_id": "default",
-            "variants": variants
+            "variants": variants,
         }
 
         chat_content = {message_id: main_message}
 
         chat_history = []
-        chat_history.append({
-            "user": "",
-            "character": first_message
-        })
-        
+        chat_history.append({"user": "", "character": first_message})
+
         character_information_parts = []
 
         if character_description.strip():
@@ -341,7 +368,7 @@ class ConfigurationCharacters():
             for var in sow_variables:
                 initial_state[var["id"]] = var["default"]
 
-        configuration_data['character_list'][character_name] = {
+        configuration_data["character_list"][character_name] = {
             "character_avatar": cached_avatar_path,
             "character_title": character_title,
             "character_description": character_description,
@@ -376,19 +403,19 @@ class ConfigurationCharacters():
                     "last_summarized_sequence": 0,
                     "chat_history": chat_history,
                     "chat_content": chat_content,
-                    "variables_state": initial_state
+                    "variables_state": initial_state,
                 }
-            }
+            },
         }
 
         self.save_configuration_edit(configuration_data)
-    
+
     def update_chat_history(self, character_name):
         """
         Updates the chat history for a specific character based on their chat content.
         """
         configuration_data = self.load_configuration()
-        character_data = configuration_data['character_list'].get(character_name)
+        character_data = configuration_data["character_list"].get(character_name)
 
         if not character_data or "chats" not in character_data:
             return
@@ -396,18 +423,22 @@ class ConfigurationCharacters():
         current_chat_id = character_data.get("current_chat", None)
         if not current_chat_id or current_chat_id not in character_data["chats"]:
             return
-        
+
         chat_data = character_data["chats"][current_chat_id]
         chat_content = chat_data.get("chat_content", {})
-        
+
         chat_history = []
         user_turn = {"user": "", "character": ""}
 
         for msg_id, msg_data in sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", 0)):
             current_variant_id = msg_data.get("current_variant_id", "default")
             current_text = next(
-                (variant["text"] for variant in msg_data.get("variants", []) if variant["variant_id"] == current_variant_id),
-                ""
+                (
+                    variant["text"]
+                    for variant in msg_data.get("variants", [])
+                    if variant["variant_id"] == current_variant_id
+                ),
+                "",
             )
 
             if msg_data["is_user"]:
@@ -427,8 +458,8 @@ class ConfigurationCharacters():
 
         chat_data["chat_history"] = chat_history
         character_data["chats"][current_chat_id] = chat_data
-        configuration_data['character_list'][character_name] = character_data
-        
+        configuration_data["character_list"][character_name] = character_data
+
         self.save_configuration_edit(configuration_data)
 
     def add_message_to_config(self, character_name, author_name, is_user, text, message_id):
@@ -436,7 +467,7 @@ class ConfigurationCharacters():
         Adds a new message to the chat content of a specific character in the configuration.
         """
         configuration_data = self.load_configuration()
-        character_data = configuration_data['character_list'].get(character_name)
+        character_data = configuration_data["character_list"].get(character_name)
 
         if not character_data or "chats" not in character_data:
             return
@@ -459,24 +490,18 @@ class ConfigurationCharacters():
             "author_name": author_name,
             "is_user": is_user,
             "current_variant_id": "default",
-            "variants": [
-                {
-                    "variant_id": "default",
-                    "text": text,
-                    "created_at": datetime.datetime.now().isoformat()
-                }
-            ]
+            "variants": [{"variant_id": "default", "text": text, "created_at": datetime.datetime.now().isoformat()}],
         }
 
         for extra_key in ("image", "image_status", "image_prompt", "tts_audio", "attachments"):
             if extra_key in existing_entry:
                 new_message[extra_key] = existing_entry[extra_key]
-        
+
         chat_content[message_id] = new_message
         chat_data["chat_content"] = chat_content
 
         character_data["chats"][current_chat_id] = chat_data
-        configuration_data['character_list'][character_name] = character_data
+        configuration_data["character_list"][character_name] = character_data
 
         self.save_configuration_edit(configuration_data)
 
@@ -488,7 +513,7 @@ class ConfigurationCharacters():
         Regenerates a message by adding a new variant to the same message_id.
         """
         configuration_data = self.load_configuration()
-        character_data = configuration_data['character_list'].get(character_name)
+        character_data = configuration_data["character_list"].get(character_name)
 
         if not character_data or "chats" not in character_data:
             logger.error(f"Character '{character_name}' not found or has no chats.")
@@ -511,17 +536,14 @@ class ConfigurationCharacters():
         regen_count = sum(1 for vid in variant_ids if vid.startswith("regen_"))
         new_variant_id = f"regen_{regen_count}"
 
-        msg["variants"].append({
-            "variant_id": new_variant_id,
-            "text": text
-        })
+        msg["variants"].append({"variant_id": new_variant_id, "text": text})
 
         msg["current_variant_id"] = new_variant_id
 
         chat_content[message_id] = msg
         chat_data["chat_content"] = chat_content
         character_data["chats"][current_chat_id] = chat_data
-        configuration_data['character_list'][character_name] = character_data
+        configuration_data["character_list"][character_name] = character_data
 
         self.save_configuration_edit(configuration_data)
 
@@ -567,20 +589,16 @@ class ConfigurationCharacters():
                     break
 
             if not updated and variants:
-                logger.warning(f"Current variant {current_variant_id} not found in variants. Creating new default variant.")
-                variants.append({
-                    "variant_id": "default",
-                    "text": edited_text
-                })
+                logger.warning(
+                    f"Current variant {current_variant_id} not found in variants. Creating new default variant."
+                )
+                variants.append({"variant_id": "default", "text": edited_text})
                 target["variants"] = variants
                 target["current_variant_id"] = "default"
                 updated = True
 
             if not variants:
-                target["variants"] = [{
-                    "variant_id": "default",
-                    "text": edited_text
-                }]
+                target["variants"] = [{"variant_id": "default", "text": edited_text}]
                 target["current_variant_id"] = "default"
                 updated = True
 
@@ -604,7 +622,7 @@ class ConfigurationCharacters():
             logger.error(f"Edit message error: {e}")
             traceback.print_exc()
             return False
-    
+
     def delete_chat_message(self, message_id, character_name):
         """
         Deletes a message from the currently selected chat of a character.
@@ -626,26 +644,26 @@ class ConfigurationCharacters():
 
             chat_data = char_data["chats"][current_chat_id]
             chat_content = chat_data.get("chat_content", {})
-            
+
             if message_id in chat_content:
                 del chat_content[message_id]
-                
+
             chat_data["chat_content"] = chat_content
             char_data["chats"][current_chat_id] = chat_data
             configuration_data["character_list"][character_name] = char_data
-            
+
             self.save_configuration_edit(configuration_data)
-            
+
             self.renumber_sequence_numbers(character_name)
             self.update_chat_history(character_name)
-            
+
             return True
-        
+
         except Exception as e:
             logger.error(f"Error deleting message: {e}")
             traceback.print_exc()
             return False
-    
+
     def delete_chat_messages(self, character_name, message_ids):
         """
         Deletes multiple messages from the currently selected chat of a character.
@@ -677,18 +695,31 @@ class ConfigurationCharacters():
             configuration_data["character_list"][character_name] = char_data
 
             self.save_configuration_edit(configuration_data)
-            
+
             self.renumber_sequence_numbers(character_name)
             self.update_chat_history(character_name)
-            
+
             return True
-        
+
         except Exception as e:
             logger.error(f"Error deleting messages: {e}")
             traceback.print_exc()
             return False
-    
-    def create_new_chat(self, character_name, conversation_method, new_name, new_description, new_personality, new_scenario, new_first_message, new_example_messages, new_alternate_greetings, new_creator_notes, chat_name):
+
+    def create_new_chat(
+        self,
+        character_name,
+        conversation_method,
+        new_name,
+        new_description,
+        new_personality,
+        new_scenario,
+        new_first_message,
+        new_example_messages,
+        new_alternate_greetings,
+        new_creator_notes,
+        chat_name,
+    ):
         """
         Creates a new chat session for the specified character with updated information, including support for variants.
 
@@ -722,15 +753,10 @@ class ConfigurationCharacters():
 
         message_id = str(uuid.uuid4())
 
-        variants = [
-            {"variant_id": "default", "text": new_first_message}
-        ]
+        variants = [{"variant_id": "default", "text": new_first_message}]
 
         for i, greeting in enumerate(new_alternate_greetings):
-            variants.append({
-                "variant_id": f"v{i+1}",
-                "text": greeting.strip()
-            })
+            variants.append({"variant_id": f"v{i + 1}", "text": greeting.strip()})
 
         main_message = {
             "message_id": message_id,
@@ -738,16 +764,13 @@ class ConfigurationCharacters():
             "author_name": new_name or character_name,
             "is_user": False,
             "current_variant_id": "default",
-            "variants": variants
+            "variants": variants,
         }
 
         chat_content = {message_id: main_message}
 
         chat_history = []
-        chat_history.append({
-            "user": "",
-            "character": new_first_message
-        })
+        chat_history.append({"user": "", "character": new_first_message})
 
         system_prompt_parts = []
 
@@ -774,17 +797,20 @@ class ConfigurationCharacters():
         for var in sow_variables:
             initial_state[var["id"]] = var["default"]
 
-        character_data.update({
-            "character_title": new_creator_notes,
-            "character_description": new_description,
-            "character_personality": new_personality,
-            "first_message": new_first_message,
-            "scenario": new_scenario,
-            "example_messages": new_example_messages,
-            "alternate_greetings": new_alternate_greetings,
-            "conversation_method": conversation_method,
-            "system_prompt": system_prompt
-        })
+        character_data.update(
+            {
+                "character_title": new_creator_notes,
+                "character_description": new_description,
+                "character_personality": new_personality,
+                "first_message": new_first_message,
+                "scenario": new_scenario,
+                "example_messages": new_example_messages,
+                "alternate_greetings": new_alternate_greetings,
+                "conversation_method": conversation_method,
+                "character_information": system_prompt,
+                "system_prompt": system_prompt,
+            }
+        )
 
         new_chat = {
             "name": chat_name,
@@ -792,9 +818,9 @@ class ConfigurationCharacters():
             "current_emotion": "neutral",
             "chat_history": chat_history,
             "chat_content": chat_content,
-            "variables_state": initial_state
+            "variables_state": initial_state,
         }
-        
+
         if "chats" not in character_data:
             character_data["chats"] = {}
 
@@ -807,10 +833,10 @@ class ConfigurationCharacters():
         else:
             character_list[character_name] = character_data
 
-        configuration_data['character_list'] = character_list
+        configuration_data["character_list"] = character_list
         self.save_configuration_edit(configuration_data)
         logger.info(f"Created new chat '{chat_name}' for character '{character_name}'")
-    
+
     def get_character_data(self, name, key):
         """
         Retrieves a specific value from a character's configuration data.
@@ -835,20 +861,20 @@ class ConfigurationCharacters():
         char_data = config["character_list"].get(character_name)
         if not char_data:
             return
-        
+
         if conversation_method is None:
             conversation_method = char_data.get("conversation_method")
 
         chat_id = char_data.get("current_chat")
         if not chat_id or "chats" not in char_data:
             return
-        
+
         chat_data = char_data["chats"][chat_id]
         if not chat_data:
             return
-        
+
         chat_content = chat_data.get("chat_content", {})
-        sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float('inf')))
+        sorted_messages = sorted(chat_content.items(), key=lambda x: x[1].get("sequence_number", float("inf")))
 
         for idx, (msg_id, msg) in enumerate(sorted_messages):
             msg["sequence_number"] = idx + 1
