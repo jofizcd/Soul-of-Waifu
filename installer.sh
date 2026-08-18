@@ -61,9 +61,7 @@ case $choice in
         $PIXI_EXE run pip install --no-cache-dir --upgrade --force-reinstall torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
         ;;
     2)
-        echo "Installing PyTorch for CPU only..."
-        $PIXI_EXE run pip uninstall -y torch torchvision torchaudio >/dev/null 2>&1
-        $PIXI_EXE run pip install --no-cache-dir --upgrade --force-reinstall torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0
+        echo "PyTorch CPU already installed via Pixi, continuing..."
         ;;
     *)
         printf "Invalid choice. Exiting.\n"

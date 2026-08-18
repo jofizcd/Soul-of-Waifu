@@ -66,9 +66,7 @@ if "%choice%"=="1" (
     "%PIXI%" run pip uninstall -y torch torchvision torchaudio >nul 2>&1
     "%PIXI%" run pip install --no-cache-dir --upgrade --force-reinstall torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
 ) else if "%choice%"=="2" (
-    echo Installing PyTorch CPU...
-    "%PIXI%" run pip uninstall -y torch torchvision torchaudio >nul 2>&1
-    "%PIXI%" run pip install --no-cache-dir --upgrade --force-reinstall torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0
+    echo PyTorch CPU already installed via Pixi, continuing...
 ) else (
     echo Invalid choice.
     pause
