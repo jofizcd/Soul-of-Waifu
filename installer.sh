@@ -73,9 +73,11 @@ fi
 
 echo ""
 echo "[3/3] Final checks..."
-$PIXI_EXE run python -m pip check
-$PIXI_EXE run python -c "import torch, numpy, transformers, PyQt6; print('Core imports OK')"
-$PIXI_EXE run python -c "from TTS.api import TTS; print('Coqui TTS import OK')" || echo WARNING: Coqui TTS import failed - possible version conflict!
+"$PIXI_EXE" run sh -c '
+    python -m pip check
+    python -c "import torch, numpy, transformers, PyQt6; print(\"Core imports OK\")"
+    python -c "from TTS.api import TTS; print(\"Coqui TTS import OK\")" || echo "WARNING: Coqui TTS import failed - possible version conflict!"
+'
 
 # if user chose CUDA, check if torch can access GPU
 if [ "$choice" == "1" ]; then

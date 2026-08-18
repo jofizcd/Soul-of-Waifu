@@ -75,9 +75,11 @@ if %errorlevel% neq 0 (
 echo.
 
 echo [3/3] Final checks...
-"%PIXI%" run python -m pip check
-"%PIXI%" run python -c "import torch, numpy, transformers, PyQt6; print('Core imports OK')"
-"%PIXI%" run python -c "from TTS.api import TTS; print('Coqui TTS import OK')" || echo WARNING: Coqui TTS import failed - possible version conflict!
+"%PIXI%" run cmd /d /c ^
+    "python -m pip check & ^
+    python -c ^"import torch, numpy, transformers, PyQt6; print('Core imports OK')^" & ^
+    python -c ^"from TTS.api import TTS; print('Coqui TTS import OK')^" || ^
+    echo WARNING: Coqui TTS import failed - possible version conflict!"
 
 @REM If user chose CUDA, check if torch can access GPU
 if "%choice%"=="1" (
