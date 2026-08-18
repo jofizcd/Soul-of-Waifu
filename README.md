@@ -48,6 +48,7 @@
 **Soul of Waifu (SoW)** is a free, open-source desktop app where AI characters can remember, evolve, and exist across multiple dimensions of interaction simultaneously. The core idea: a character you create once exists across multiple interconnected modes at the same time - text and voice conversation, a full tabletop RPG engine, a desktop agent with real OS and tool access, and a persistent memory architecture that builds genuine continuity across all your sessions.
 
 Create or import a character once, and seamlessly interact with them across interconnected dimensions:
+
 1. **Interactive Text & Voice Chat** with customizable UI, Live2D/VRM avatars, and real-time voice calls.
 2. **Soul Memory Architecture** featuring long-term emotional evolution, a personal diary, and self-healing memory logs.
 3. **Soul Stage RPG Engine** running a full tabletop text-RPG driven by a dedicated AI Game Master, complete with dice rolls and hidden story arcs.
@@ -65,7 +66,7 @@ Soul of Waifu has been moving fast since the original Soul Trinity (v2.4.0) rele
 - **Soul Stage grew into a genuine tabletop RPG simulator.** Deterministic dice rolls and skill checks, hidden Story Arcs your party has to actually uncover, a live Campaign Board with pressure clocks, structural relationship tracking that never forgets a grudge or a bond, and Scene Folders to organize whole campaigns.
 - **Tool calling isn't companion-exclusive anymore.** Web search, clipboard access, and app control now work in regular 1-on-1 text and voice chats too.
 - **Discord Gateway got smarter.** Full computer vision for images/GIFs, plus per-member awareness so it never mixes up who said what in a server.
-> The full, detailed changelog for every version lives on the [Releases page](https://github.com/jofizcd/Soul-of-Waifu/releases).
+  > The full, detailed changelog for every version lives on the [Releases page](https://github.com/jofizcd/Soul-of-Waifu/releases).
 
 ---
 
@@ -75,12 +76,12 @@ Soul of Waifu has been moving fast since the original Soul Trinity (v2.4.0) rele
 
 Every character you build is a single continuous identity that steps through several connected modes - the same personality and memories follow them everywhere.
 
-| Mode | Description |
-|---|---|
-| 🧠 **Soul Memory** | An independent digital brain for every character - tracking mood, relationships, and lived history far beyond basic keyword fact-searching. |
-| 💬 **Text & Voice Chat** | Full-duplex conversation with Live2D & VRM avatars, a customizable state variable HUD, lorebooks, and real-time voice calls. |
-| 🎲 **Soul Stage** | A full tabletop RPG under a virtual Game Master - dice rolls, generating options for your answers, WorldState tracking, inventory, and dynamic NPCs with its own memory. |
-| 🖥️ **Soul Companion** | An autonomous desktop agent powered by neurohormones - reads your screen, controls your mouse/keyboard, browses the web on its own, runs code, and organizes your files, extensible with custom plugins and MCP servers. |
+| Mode                     | Description                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🧠 **Soul Memory**       | An independent digital brain for every character - tracking mood, relationships, and lived history far beyond basic keyword fact-searching.                                                                              |
+| 💬 **Text & Voice Chat** | Full-duplex conversation with Live2D & VRM avatars, a customizable state variable HUD, lorebooks, and real-time voice calls.                                                                                             |
+| 🎲 **Soul Stage**        | A full tabletop RPG under a virtual Game Master - dice rolls, generating options for your answers, WorldState tracking, inventory, and dynamic NPCs with its own memory.                                                 |
+| 🖥️ **Soul Companion**    | An autonomous desktop agent powered by neurohormones - reads your screen, controls your mouse/keyboard, browses the web on its own, runs code, and organizes your files, extensible with custom plugins and MCP servers. |
 
 ---
 
@@ -99,6 +100,7 @@ Standard vector-RAG approaches search old chat logs for keyword matches. **Soul 
 
 > [!TIP]
 > **Cognitive Mechanics:**
+>
 > - **Emotional Decay:** Grudges and negative mood spikes naturally cool down over time if not revisited.
 > - **Memory Self-Healing:** The system detects logical contradictions between new responses and past facts, automatically overwriting outdated information and logging corrections.
 > - **Duplicate Detection:** Near-identical memories are automatically merged so the archive stays clean over long-term use.
@@ -140,19 +142,19 @@ Soul Companion turns your character into an autonomous inhabitant of your Window
 
 **Computer Use & OS Control:**
 
-| Tool | What it does |
-|---|---|
-| 🖱️ **GUI Action Tool** | Moves the cursor, clicks (single/double/right-click), scrolls, dispatches keyboard shortcuts, and types text natively into any active window (Discord, Notepad, VS Code, browsers, etc.) |
-| 🌐 **Browser Agent** | Autonomously navigates URLs, extracts clean article text, clicks buttons, fills out forms, and downloads files through a real headless browser (Playwright) |
-| 🐍 **Code Execution** | Writes and runs sandboxed Python/PowerShell scripts on the fly for calculations, data parsing, or batch tasks, with strict timeouts |
-| 📁 **File Organizer** | Inspects your desktop and folders, auto-sorts loose files into categories, and runs fast filename search |
-| 🧭 **Task Planner** | Converts a complex spoken goal into a sequential, multi-step tool chain and executes it end-to-end |
-| ❤️‍🩹 **System Vitals Watchdog** | Proactively warns you about low battery, GPU overheating, or finished downloads |
-| 🔎 Screen Reader | Sees your screen and comments on, analyzes, or assists with what's visible |
-| 📋 Clipboard Reader | Reads and processes copied text on request |
-| 🔍 Web Search | Looks up information in real time |
-| 🎵 Music Control | Manages audio playback |
-| 🔌 Custom MCP Server | Connect any external MCP server for expanded integrations |
+| Tool                          | What it does                                                                                                                                                                             |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🖱️ **GUI Action Tool**        | Moves the cursor, clicks (single/double/right-click), scrolls, dispatches keyboard shortcuts, and types text natively into any active window (Discord, Notepad, VS Code, browsers, etc.) |
+| 🌐 **Browser Agent**          | Autonomously navigates URLs, extracts clean article text, clicks buttons, fills out forms, and downloads files through a real headless browser (Playwright)                              |
+| 🐍 **Code Execution**         | Writes and runs sandboxed Python/PowerShell scripts on the fly for calculations, data parsing, or batch tasks, with strict timeouts                                                      |
+| 📁 **File Organizer**         | Inspects your desktop and folders, auto-sorts loose files into categories, and runs fast filename search                                                                                 |
+| 🧭 **Task Planner**           | Converts a complex spoken goal into a sequential, multi-step tool chain and executes it end-to-end                                                                                       |
+| ❤️‍🩹 **System Vitals Watchdog** | Proactively warns you about low battery, GPU overheating, or finished downloads                                                                                                          |
+| 🔎 Screen Reader              | Sees your screen and comments on, analyzes, or assists with what's visible                                                                                                               |
+| 📋 Clipboard Reader           | Reads and processes copied text on request                                                                                                                                               |
+| 🔍 Web Search                 | Looks up information in real time                                                                                                                                                        |
+| 🎵 Music Control              | Manages audio playback                                                                                                                                                                   |
+| 🔌 Custom MCP Server          | Connect any external MCP server for expanded integrations                                                                                                                                |
 
 **Safety by design:** every potentially risky action - moving files, running code, controlling your mouse or keyboard - is intercepted by an on-screen approval banner with a 25-second fail-safe countdown. Nothing executes without your explicit confirmation, and the app automatically restores focus to your active window afterward so no keystrokes get lost.
 
@@ -164,7 +166,8 @@ Soul Companion turns your character into an autonomous inhabitant of your Window
   <img style="width:90%; border-radius: 8px;" alt="Custom State Variables HUD" src="https://i.ibb.co/rKVFcMY1/sc-screenshots-hud.png">
 </p>
 
-Build no-code Dating Sims, RPG stat systems, or Tamagotchi mechanics directly inside character cards without writing code. 
+Build no-code Dating Sims, RPG stat systems, or Tamagotchi mechanics directly inside character cards without writing code.
+
 - **Adaptive HUD Bar:** Displays animated progress bars (`int`), YES/NO badges (`bool`), item lists (`list`), or text labels (`str`) at the top of the chat.
 - **Resilient AI Interceptor:** Backend interceptor parses state updates robustly, making updates immune to LLM JSON syntax typos.
 - **11 Built-In Presets:** Ready-to-use templates for Romance, RPG, Survival, Interrogation, Horror, and Visual Novels.
@@ -190,6 +193,7 @@ Run Soul of Waifu on your main PC and connect from your phone or tablet over hom
 </p>
 
 Connect your Soul of Waifu characters directly to Discord bots. Chat with your characters inside server channels or private messages, preserving their full personality, system prompt settings, and long-term memories.
+
 - **Multi-User Server Awareness:** Distinguishes between individual server members and keeps a distinct conversation context per speaker.
 - **Computer Vision:** Sees, inspects, and reacts to images and GIFs sent in direct messages or server channels.
 
@@ -202,6 +206,7 @@ Connect your Soul of Waifu characters directly to Discord bots. Chat with your c
 </p>
 
 Generate illustrations directly within chat messages via context menu actions.
+
 - **Local Engines:** Automatic1111 WebUI, ComfyUI API.
 - **Cloud Engines:** NovelAI Diffusion, DALL-E 3, FLUX.
 - Automatically builds contextual visual prompts based on the character's appearance, current pose, emotional state, and scene environment.
@@ -242,7 +247,7 @@ Generate illustrations directly within chat messages via context menu actions.
 - **Semantic Situation Matching:** Local vector search matches lore entries based on situational context rather than strict keywords.
 - **Scene Tension Accumulator:** Dynamically builds story energy to trigger random events.
 - **Chain Dependencies:** Create multi-stage questlines with delayed entry unlocks.
-- **Injection Modes:** Choose between *Passive (Background Knowledge)* and *Active (System Directive)* injection.
+- **Injection Modes:** Choose between _Passive (Background Knowledge)_ and _Active (System Directive)_ injection.
 
 </details>
 
@@ -263,24 +268,23 @@ Generate illustrations directly within chat messages via context menu actions.
 
 No Python knowledge, Node.js, or command-line experience required.
 
-```
-1. Download the latest release archive (currently Soul-of-Waifu-v2.4.7.rar) from Releases.
-2. Extract it with 7-Zip or WinRAR to a path without spaces or Cyrillic characters (e.g. C:\AI\Soul-Of-Waifu\).
-3. Run installer.bat (Do NOT run as Administrator).
-4. Launch via start.bat.
-```
+1. Download the latest release archive (currently `Soul-of-Waifu-v2.4.7.rar`) from [Releases](https://github.com/jofizcd/Soul-of-Waifu/releases).
+2. Extract it with 7-Zip or WinRAR to a path without spaces or Cyrillic characters (e.g. `C:\AI\Soul-Of-Waifu`).
+3. Windows: Run `installer.bat` (Do NOT run as Administrator).
+   Linux: Run `installer.sh` (Do NOT run as sudo)
+4. Launch via `start.bat` (or `start.sh` for Linux).
 
 > [!WARNING]
 > **Do not run `installer.bat` as Administrator!** Windows changes the working directory for Administrator processes to `C:\Windows\System32`, causing installation path errors. Use a standard double-click.
 
 ### System Requirements
 
-| | Minimum | Recommended |
-|---|---|---|
-| **OS** | Windows 10/11 (64-bit) | Windows 10/11 (64-bit) |
-| **RAM** | 8 GB | 16 GB+ |
-| **GPU** | Any (for Cloud APIs) | NVIDIA / AMD with 6+ GB VRAM (for local models) |
-| **Storage** | 10 GB free space | Fast NVMe SSD |
+|             | Minimum                | Recommended                                     |
+| ----------- | ---------------------- | ----------------------------------------------- |
+| **OS**      | Windows 10/11 (64-bit) | Windows 10/11 (64-bit)                          |
+| **RAM**     | 8 GB                   | 16 GB+                                          |
+| **GPU**     | Any (for Cloud APIs)   | NVIDIA / AMD with 6+ GB VRAM (for local models) |
+| **Storage** | 10 GB free space       | Fast NVMe SSD                                   |
 
 ---
 
@@ -292,26 +296,27 @@ No Python knowledge, Node.js, or command-line experience required.
   Navigate to **Models Hub**, search for a model (e.g. `Gemma` or `Qwen`), and download a `Q4_K_M` GGUF quantization. In **Options -> LLM Settings**, select your GPU backend (CUDA/HIP/SYCL/Vulkan), enable Flash Attention, and launch the server via Models Hub.
 
 Once you're set up, web search, clipboard access, app control and other tools are available straight away in regular text and voice chats - no need to switch to Soul Companion mode to use them.
- 
+
 📖 Read full documentation & guides: **[jofizcd.github.io/soul-of-waifu-site/docs](https://jofizcd.github.io/soul-of-waifu-site/docs/)**
- 
+
 ---
- 
+
 ## 💖 Support & Community
- 
+
 Soul of Waifu is a solo-developer open-source project. All features are 100% free with no paywalls or premium tiers.
- 
+
 **Financial Support:**
+
 - **[Boosty](https://boosty.to/jofizcd)**
 - **[Donation Alerts](https://www.donationalerts.com/r/jofizcd)**
-**Community & Help:**
+  **Community & Help:**
 - **Star this repository** - helps boost visibility on GitHub!
 - **Join our [Discord Server](https://discord.com/invite/6vFtQGVfxM)** - share custom character cards, lorebooks, RPG scenes, and get help from the community.
 
 ---
- 
+
 ## 📊 Repository Stats
- 
+
 <div align="center">
   <img src="https://star-history.dera.page/svg?repos=jofizcd/Soul-of-Waifu&type=Date" alt="Star History Chart"/>
 </div>
@@ -321,9 +326,9 @@ Soul of Waifu is a solo-developer open-source project. All features are 100% fre
 </div>
 
 ---
- 
+
 ## 👤 Developer
- 
+
 <div align="center">
   <a href="https://github.com/jofizcd">
     <img style="border-radius: 50%;" width="110" src="https://i.ibb.co/Hj3g4j2/ava.jpg" alt="Jofi Avatar">

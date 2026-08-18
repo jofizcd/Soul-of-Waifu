@@ -3226,7 +3226,7 @@ class SoulMemoryViewer(QtWidgets.QDialog):
         main_layout.addLayout(bottom_layout)
 
         self.btn_refresh.clicked.connect(self.refresh_memory)
-        self.btn_open_folder.clicked.connect(lambda: os.startfile(str(self.memory_dir.absolute())))
+        self.btn_open_folder.clicked.connect(self._open_memory_folder)
         self.tabs.currentChanged.connect(self.on_tab_changed)
         
         self.topic_list.currentRowChanged.connect(self.load_db_content)
@@ -3420,6 +3420,19 @@ class SoulMemoryViewer(QtWidgets.QDialog):
                 self.logs_view.setPlainText(f"Error reading logs: {e}")
         else:
             self.logs_view.setPlainText(self.msg_logs_empty_tr)
+
+    def _open_memory_folder(self):
+        import sys
+        folder = str(self.memory_dir.absolute())
+        try:
+            if os.name == "nt":
+                os.startfile(folder)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", folder])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+        except Exception as e:
+            logger.error(f"Failed to open memory folder '{folder}': {e}")
 
     def on_tab_changed(self, index):
         if index == 1:

@@ -37,18 +37,27 @@ if errorlevel 1 (
 )
 echo.
 
-echo [3/4] Activating virtual environment...
-echo    Expected location: app\data\Scripts\activate.bat
-echo    Running: call app\data\Scripts\activate.bat app/data/envs/sow
-call app\data\Scripts\activate.bat app/data/envs/sow
-echo    SUCCESS: Virtual environment activated.
-echo    Python and required dependencies are now loaded in isolated environment.
+echo [3/4] Locating Pixi environment...
+set "PIXI_EXE=%~dp0.pixi-bin\pixi.exe"
+set "PIXI=pixi"
+where pixi >nul 2>&1
+if %errorlevel% neq 0 (
+    if exist "%PIXI_EXE%" (
+        set "PIXI=%PIXI_EXE%"
+    ) else (
+        echo    ERROR: Pixi was not found on PATH or in "%~dp0.pixi-bin".
+        echo    Please run installer.bat first.
+        pause >nul
+        exit /b 1
+    )
+)
+echo    SUCCESS: Using Pixi environment defined by pyproject.toml.
 echo.
 
 echo [4/4] Starting main application: main.py...
 echo.
 
-python main.py
+"%PIXI%" run python main.py
 if %errorlevel% neq 0 (
     echo.
     echo ===================================================

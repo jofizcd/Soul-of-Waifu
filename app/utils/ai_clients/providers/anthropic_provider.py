@@ -1,6 +1,8 @@
 import json
-import httpx
 import logging
+
+import httpx
+
 from app.utils.ai_clients.base_provider import BaseAIProvider
 
 logger = logging.getLogger("Anthropic Provider")
@@ -36,14 +38,18 @@ class AnthropicProvider(BaseAIProvider):
 
             if role == "tool":
                 tool_use_id = msg.get("tool_call_id") or msg.get("id") or ""
-                anthropic_messages.append({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": tool_use_id,
-                        "content": str(msg.get("content", "")),
-                    }]
-                })
+                anthropic_messages.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": tool_use_id,
+                                "content": str(msg.get("content", "")),
+                            }
+                        ],
+                    }
+                )
                 continue
 
             content = msg.get("content")
@@ -68,12 +74,14 @@ class AnthropicProvider(BaseAIProvider):
                         tool_input = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
                     except Exception:
                         tool_input = {}
-                    blocks.append({
-                        "type": "tool_use",
-                        "id": call_id,
-                        "name": name,
-                        "input": tool_input,
-                    })
+                    blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": call_id,
+                            "name": name,
+                            "input": tool_input,
+                        }
+                    )
                 anthropic_messages.append({"role": "assistant", "content": blocks})
                 continue
 
@@ -87,14 +95,9 @@ class AnthropicProvider(BaseAIProvider):
                         image_data = block["image_url"]["url"]
                         media_type = image_data.split(";")[0].split(":")[1]
                         b64_data = image_data.split(",")[1]
-                        anthropic_content.append({
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": b64_data
-                            }
-                        })
+                        anthropic_content.append(
+                            {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64_data}}
+                        )
                     elif block_type == "image":
                         anthropic_content.append(block)
                 anthropic_messages.append({"role": role, "content": anthropic_content})
@@ -103,7 +106,15 @@ class AnthropicProvider(BaseAIProvider):
 
         return system_text, anthropic_messages
 
-    def _build_payload(self, messages: list[dict], kwargs: dict, default_max_tokens: int, stream: bool, thinking_variant: str, tools=None) -> dict:
+    def _build_payload(
+        self,
+        messages: list[dict],
+        kwargs: dict,
+        default_max_tokens: int,
+        stream: bool,
+        thinking_variant: str,
+        tools=None,
+    ) -> dict:
         system_text, anthropic_messages = self._build_anthropic_messages(messages)
 
         max_tokens = kwargs.get("max_tokens", default_max_tokens)
@@ -143,11 +154,13 @@ class AnthropicProvider(BaseAIProvider):
             anthropic_tools = []
             for tool in tools:
                 func = tool.get("function", {})
-                anthropic_tools.append({
-                    "name": func.get("name"),
-                    "description": func.get("description"),
-                    "input_schema": func.get("parameters", {"type": "object", "properties": {}})
-                })
+                anthropic_tools.append(
+                    {
+                        "name": func.get("name"),
+                        "description": func.get("description"),
+                        "input_schema": func.get("parameters", {"type": "object", "properties": {}}),
+                    }
+                )
             payload["tools"] = anthropic_tools
 
         return payload
@@ -162,11 +175,7 @@ class AnthropicProvider(BaseAIProvider):
         return ["adaptive", "budget", "none"]
 
     async def generate_stream(self, messages: list[dict], **kwargs):
-        headers = {
-            "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
-        }
+        headers = {"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
 
         variants = self._thinking_variants(kwargs)
         last_error = None
@@ -213,11 +222,7 @@ class AnthropicProvider(BaseAIProvider):
         yield f"\n⚠️ Anthropic API Error: {last_error}"
 
     async def generate_summary(self, messages: list[dict], **kwargs) -> str:
-        headers = {
-            "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
-        }
+        headers = {"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
 
         variants = self._thinking_variants(kwargs)
         last_error = None
@@ -248,11 +253,7 @@ class AnthropicProvider(BaseAIProvider):
         return ""
 
     async def generate(self, messages: list[dict], **kwargs) -> dict:
-        headers = {
-            "x-api-key": self.api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
-        }
+        headers = {"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
 
         tools = kwargs.get("tools")
         variants = self._thinking_variants(kwargs)
@@ -282,18 +283,20 @@ class AnthropicProvider(BaseAIProvider):
                         if block.get("type") == "text":
                             content_str += block.get("text", "")
                         elif block.get("type") == "tool_use":
-                            tool_calls.append({
-                                "id": block.get("id"),
-                                "type": "function",
-                                "function": {
-                                    "name": block.get("name"),
-                                    "arguments": json.dumps(block.get("input", {}))
+                            tool_calls.append(
+                                {
+                                    "id": block.get("id"),
+                                    "type": "function",
+                                    "function": {
+                                        "name": block.get("name"),
+                                        "arguments": json.dumps(block.get("input", {})),
+                                    },
                                 }
-                            })
+                            )
 
                 return {
                     "content": content_str if content_str else None,
-                    "tool_calls": tool_calls if tool_calls else None
+                    "tool_calls": tool_calls if tool_calls else None,
                 }
 
         logger.error(f"Anthropic API Error: all thinking variants failed: {last_error}")

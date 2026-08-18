@@ -1,27 +1,25 @@
+import asyncio
+import ctypes
+import logging
 import os
 import sys
-import yaml
-import torch
-import ctypes
-import psutil
-import GPUtil
-import asyncio
-import logging
-import requests
 from datetime import datetime
+
+import GPUtil
+import psutil
+import requests
+import torch
+import yaml
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtGui import QFontDatabase
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from qasync import QEventLoop, asyncSlot
 
-from PyQt6.QtGui import QFontDatabase
-from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
-
 from app.configuration import configuration
-from app.gui.icons import resources
 from app.gui import interface_signals
-from app.utils.ai_clients.local_server_manager import LocalServerManager
-from app.gui.sowInterface import Ui_MainWindow
-
 from app.gui.custom_widgets import SowConfirmDialog
+from app.gui.sowInterface import Ui_MainWindow
+from app.utils.ai_clients.local_server_manager import LocalServerManager
 
 LOG_DIR = "logs"
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -410,6 +408,16 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_options.clicked.connect(self.interface_signals.on_pushButton_options_clicked)
         self.ui.pushButton_rp_editors.clicked.connect(self.on_rp_editors_clicked)
         self.ui.pushButton_soul_stage.clicked.connect(self.interface_signals._open_soul_stage_page)
+
+        # RP Editors landing page cards
+        self.ui.btn_open_character_editor.clicked.connect(self.interface_signals._prepare_blank_character_and_open_editor)
+        self.ui.btn_open_soul_stage.clicked.connect(self.interface_signals._open_soul_stage_page)
+        self.ui.btn_open_lorebook.clicked.connect(self.interface_signals.open_lorebook_editor)
+        self.ui.btn_open_personas.clicked.connect(self.interface_signals.open_personas_editor)
+        self.ui.btn_open_prompts.clicked.connect(self.interface_signals.open_system_prompt_editor)
+        self.ui.btn_open_discord_bot.clicked.connect(self.interface_signals.open_discord_gateway)
+        self.ui.btn_open_image_gen.clicked.connect(self.interface_signals.open_image_gen_settings)
+
         self.ui.about_btn.clicked.connect(self.interface_signals.set_about_program_button)
         self.ui.pushButton_youtube.clicked.connect(self.interface_signals.on_youtube)
         self.ui.pushButton_discord.clicked.connect(self.interface_signals.on_discord)

@@ -2,6 +2,8 @@ import os
 import json
 import shutil
 import zipfile
+import tarfile
+import platform
 import asyncio
 import aiohttp
 import logging
@@ -45,33 +47,63 @@ class LlamaUpdater(QtCore.QObject):
     def _match_assets(self, assets: list, backend_type: str) -> list:
         matched_urls = []
         backend_type = backend_type.lower()
-        
-        def matches(name, keywords):
-            return all(kw in name for kw in keywords) and "arm64" not in name
+        is_windows = platform.system() == "Windows"
+
+        def matches(name, keywords, exclude=()):
+            return (
+                all(kw in name for kw in keywords)
+                and not any(kw in name for kw in exclude)
+                and "arm64" not in name
+            )
 
         for asset in assets:
             name = asset.get("name", "").lower()
-            if asset.get("content_type") not in ["application/zip", "application/x-zip-compressed"] and not name.endswith(".zip"):
-                continue
 
-            if backend_type == "cpu" and matches(name, ["llama", "win", "cpu", "x64"]):
-                matched_urls.append(asset["browser_download_url"])
-            
-            elif backend_type == "cuda":
-                if matches(name, ["llama", "win", "cuda", "12", "x64"]):
+            if is_windows:
+                if asset.get("content_type") not in ["application/zip", "application/x-zip-compressed"] and not name.endswith(".zip"):
+                    continue
+
+                if backend_type == "cpu" and matches(name, ["llama", "win", "cpu", "x64"]):
                     matched_urls.append(asset["browser_download_url"])
-                elif matches(name, ["cudart", "win", "cuda", "12", "x64"]):
+
+                elif backend_type == "cuda":
+                    if matches(name, ["llama", "win", "cuda", "12", "x64"]):
+                        matched_urls.append(asset["browser_download_url"])
+                    elif matches(name, ["cudart", "win", "cuda", "12", "x64"]):
+                        matched_urls.append(asset["browser_download_url"])
+
+                elif backend_type == "vulkan" and matches(name, ["llama", "win", "vulkan", "x64"]):
                     matched_urls.append(asset["browser_download_url"])
-            
-            elif backend_type == "vulkan" and matches(name, ["llama", "win", "vulkan", "x64"]):
-                matched_urls.append(asset["browser_download_url"])
-            
-            elif backend_type == "hip" and matches(name, ["llama", "win", "hip", "radeon", "x64"]):
-                matched_urls.append(asset["browser_download_url"])
-            
-            elif backend_type == "sycl" and matches(name, ["llama", "win", "sycl", "x64"]):
-                matched_urls.append(asset["browser_download_url"])
-                
+
+                elif backend_type == "hip" and matches(name, ["llama", "win", "hip", "radeon", "x64"]):
+                    matched_urls.append(asset["browser_download_url"])
+
+                elif backend_type == "sycl" and matches(name, ["llama", "win", "sycl", "x64"]):
+                    matched_urls.append(asset["browser_download_url"])
+            else:
+                # llama.cpp publishes Linux binaries built on Ubuntu, packaged as .tar.gz
+                if not name.endswith(".tar.gz"):
+                    continue
+
+                if backend_type == "cpu" and matches(
+                    name, ["llama", "ubuntu", "x64"], exclude=["vulkan", "rocm", "sycl", "openvino"]
+                ):
+                    matched_urls.append(asset["browser_download_url"])
+
+                elif backend_type == "cuda":
+                    # llama.cpp does not publish prebuilt CUDA binaries for Linux;
+                    # NVIDIA GPU users on Linux currently need to build from source.
+                    continue
+
+                elif backend_type == "vulkan" and matches(name, ["llama", "ubuntu", "vulkan", "x64"]):
+                    matched_urls.append(asset["browser_download_url"])
+
+                elif backend_type == "hip" and matches(name, ["llama", "ubuntu", "rocm", "x64"]):
+                    matched_urls.append(asset["browser_download_url"])
+
+                elif backend_type == "sycl" and matches(name, ["llama", "ubuntu", "sycl", "fp16", "x64"]):
+                    matched_urls.append(asset["browser_download_url"])
+
         return matched_urls
 
     async def download_and_install(self, asset_urls: list, backend_type: str, version_tag: str):
@@ -81,9 +113,12 @@ class LlamaUpdater(QtCore.QObject):
         self._create_backup(target_folder)
         target_folder.mkdir(parents=True, exist_ok=True)
 
+        is_windows = platform.system() == "Windows"
+        archive_ext = ".zip" if is_windows else ".tar.gz"
+
         try:
             for idx, url in enumerate(asset_urls):
-                zip_path = self.cache_dir / f"update_{idx}.zip"
+                archive_path = self.cache_dir / f"update_{idx}{archive_ext}"
                 
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url) as response:
@@ -93,7 +128,7 @@ class LlamaUpdater(QtCore.QObject):
                         total_size = int(response.headers.get('content-length', 0))
                         downloaded = 0
                         
-                        with open(zip_path, 'wb') as f:
+                        with open(archive_path, 'wb') as f:
                             async for chunk in response.content.iter_chunked(8192):
                                 f.write(chunk)
                                 downloaded += len(chunk)
@@ -104,20 +139,61 @@ class LlamaUpdater(QtCore.QObject):
                 self.progress_signal.emit(100, f"Extracting part [{idx+1}/{len(asset_urls)}]...")
                 await asyncio.sleep(0.5)
 
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    for file_info in zip_ref.infolist():
-                        if file_info.filename.endswith(('.exe', '.dll')):
-                            filename = Path(file_info.filename).name
-                            extracted_path = target_folder / filename
-                            
-                            if extracted_path.exists():
+                if is_windows:
+                    with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                        for file_info in zip_ref.infolist():
+                            if file_info.filename.endswith(('.exe', '.dll')):
+                                filename = Path(file_info.filename).name
+                                extracted_path = target_folder / filename
+                                
+                                if extracted_path.exists():
+                                    os.remove(extracted_path)
+                                    
+                                with zip_ref.open(file_info) as source, open(extracted_path, "wb") as target:
+                                    shutil.copyfileobj(source, target)
+                else:
+                    with tarfile.open(archive_path, 'r:gz') as tar_ref:
+                        # First pass: extract regular files (binaries, real .so files).
+                        for member in tar_ref.getmembers():
+                            if not member.isfile():
+                                continue
+
+                            basename = os.path.basename(member.name)
+                            # Linux binaries (e.g. llama-server) have no extension;
+                            # shared libraries end in .so / .so.N / .so.N.N
+                            if "." in basename and ".so" not in basename:
+                                continue
+
+                            extracted_path = target_folder / basename
+                            if extracted_path.exists() or extracted_path.is_symlink():
                                 os.remove(extracted_path)
-                                
-                            with zip_ref.open(file_info) as source, open(extracted_path, "wb") as target:
+
+                            source = tar_ref.extractfile(member)
+                            if source is None:
+                                continue
+                            with source, open(extracted_path, "wb") as target:
                                 shutil.copyfileobj(source, target)
+                            os.chmod(extracted_path, 0o755)
+
+                        # Second pass: recreate symlinks (e.g. libllama.so -> libllama.so.0
+                        # -> libllama.so.0.0.10333). The dynamic linker resolves libraries
+                        # by these SONAME aliases, so skipping them breaks the binary.
+                        for member in tar_ref.getmembers():
+                            if not (member.issym() or member.islnk()):
+                                continue
+
+                            basename = os.path.basename(member.name)
+                            if "." in basename and ".so" not in basename:
+                                continue
+
+                            extracted_path = target_folder / basename
+                            if extracted_path.exists() or extracted_path.is_symlink():
+                                extracted_path.unlink()
+
+                            os.symlink(member.linkname, extracted_path)
                                 
-                if zip_path.exists():
-                    os.remove(zip_path)
+                if archive_path.exists():
+                    os.remove(archive_path)
 
             ver_data = {}
             if self.version_file.exists():
