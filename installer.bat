@@ -6,10 +6,13 @@ color 0A
 
 cd /d "%~dp0"
 
-echo Welcome to Soul of Waifu Installer
-echo.
+echo "=============================================================="
+echo "Welcome to the Soul of Waifu installer!"
+echo "=============================================================="
+echo .
 
-echo [1/4] Checking for Pixi...
+
+echo [1/3] Checking for Pixi...
 set "PIXI_BIN_DIR=%~dp0.pixi-bin"
 set "PIXI_EXE=%PIXI_BIN_DIR%\pixi.exe"
 set "PIXI=pixi"
@@ -44,16 +47,8 @@ if %errorlevel% neq 0 (
 )
 echo.
 
-echo [2/4] Installing dependencies via Pixi ^(pyproject.toml^)...
-"%PIXI%" install
-if %errorlevel% neq 0 (
-    echo INSTALLATION ERROR: Pixi failed to resolve/install dependencies.
-    pause
-    exit /b 1
-)
-echo.
 
-echo [3/4] Installing extras not managed by Pixi...
+echo [2/3] Installing dependencies via Pixi ^(pyproject.toml^)...
 echo.
 echo ==============================================================
 echo Please select PyTorch installation:
@@ -62,11 +57,11 @@ echo [2] CPU only
 echo ==============================================================
 set /p choice="Enter choice (1 or 2): "
 if "%choice%"=="1" (
-    echo Installing PyTorch with CUDA support...
-    "%PIXI%" run pip uninstall -y torch torchvision torchaudio >nul 2>&1
-    "%PIXI%" run pip install --no-cache-dir --upgrade --force-reinstall torch==2.10.0 torchvision==0.25.0 torchaudio==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+    echo Installing dependencies with PyTorch with CUDA support...
+    "%PIXI%" install -e gpu
 ) else if "%choice%"=="2" (
-    echo PyTorch CPU already installed via Pixi, continuing...
+    echo Installing dependencies with CPU-only PyTorch...
+    "%PIXI%" install -e cpu
 ) else (
     echo Invalid choice.
     pause
@@ -79,7 +74,7 @@ if %errorlevel% neq 0 (
 )
 echo.
 
-echo [4/4] Final checks...
+echo [3/3] Final checks...
 "%PIXI%" run python -m pip check
 "%PIXI%" run python -c "import torch, numpy, transformers, PyQt6; print('Core imports OK')"
 "%PIXI%" run python -c "from TTS.api import TTS; print('Coqui TTS import OK')" || echo WARNING: Coqui TTS import failed - possible version conflict!
@@ -92,7 +87,8 @@ echo.
 
 echo =====================================================
 echo Installation completed successfully!
-echo If there are warnings from pip check - RVC and Coqui may have minor conflicts.
+echo NOTE: If there are warnings from pip check,
+echo       RVC and Coqui may have minor conflicts.
 echo =====================================================
 echo [1] Start the program
 echo [2] Exit
