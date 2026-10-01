@@ -38,7 +38,7 @@
 ---
 
 <p align="center">
-  <img style="width:95%; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.6);" alt="Интерфейс Soul of Waifu v2.4.7" src="assets/readme/preview.gif">
+  <img style="width:95%; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.6);" alt="Интерфейс Soul of Waifu v2.5.1" src="assets/readme/preview.gif">
 </p>
 
 ---
@@ -264,7 +264,7 @@ Soul Companion превращает вашего персонажа в авто�
 Не требуется знание Python, Node.js или опыт работы с командной строкой.
 
 ```
-1. Скачайте архив последнего релиза (в настоящий момент Soul-of-Waifu-v2.4.7.rar) со страницы Releases.
+1. Скачайте архив последнего релиза (в настоящий момент Soul-of-Waifu-v2.5.1.rar) со страницы Releases.
 2. Распакуйте его с помощью 7-Zip или WinRAR по пути без пробелов и кириллических символов (например, C:\AI\Soul-Of-Waifu\).
 3. Запустите installer.bat (НЕ запускайте от имени администратора).
 4. Запустите приложение через start.bat.

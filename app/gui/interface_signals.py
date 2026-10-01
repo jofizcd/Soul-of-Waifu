@@ -206,7 +206,7 @@ class InterfaceSignals():
         self.emotion_resources = {
             emotion: {
                 "image": emotion,
-                "live2d_emotion": f"{emotions_path}\\{emotion}_animation.exp3.json",
+                "live2d_emotion": f"{emotions_path}/{emotion}_animation.exp3.json",
             }
             for emotion in [
                 "admiration", "amusement", "anger", "annoyance", "approval", "caring",
@@ -909,10 +909,11 @@ class InterfaceSignals():
             return
             
         config = self.configuration_characters.load_configuration()
-        if self.current_active_character not in config["character_list"]:
+        character_list = config.get("character_list", {})
+        if self.current_active_character not in character_list:
             return
             
-        mode = config["character_list"][self.current_active_character]["current_sow_system_mode"]
+        mode = character_list[self.current_active_character]["current_sow_system_mode"]
 
         if mode == "Live2D Model":
             if hasattr(self, 'live2d_widget') and self.live2d_widget and self.live2d_widget.isVisible():
@@ -5420,7 +5421,7 @@ class InterfaceSignals():
         """
         Prepares a blank character editor sheet, populates options dropdowns, and switches UI.
         """
-        self.ui.pushButton_rp_editors.click()
+        self.ui.pushButton_rp_editors.setChecked(True)
         self.prepare_new_character_editor()
         self.populate_editor_character_list()
 
@@ -6504,7 +6505,7 @@ class InterfaceSignals():
         if selected_image == "None":
             image_path = None
         else:
-            images_directory = "assets\\backgrounds"
+            images_directory = "assets/backgrounds"
             image_path = os.path.join(images_directory, selected_image)
 
         self.configuration_settings.update_main_setting("model_background_image", image_path)
@@ -6512,7 +6513,7 @@ class InterfaceSignals():
     def load_background_images_to_comboBox(self):
         self.ui.comboBox_model_bg_image.clear()
 
-        backgrounds_directory = "assets\\backgrounds"
+        backgrounds_directory = "assets/backgrounds"
         for filename in os.listdir(backgrounds_directory):
             if filename.endswith((".jpg", ".png", ".jpeg")):
                 self.ui.comboBox_model_bg_image.addItem(filename)
@@ -6530,7 +6531,7 @@ class InterfaceSignals():
             sound_path = None
         else:
             selected_file = self.ui.comboBox_ambient_mode.itemData(index)
-            ambient_directory = "assets\\ambient"
+            ambient_directory = "assets/ambient"
             sound_path = os.path.join(ambient_directory, selected_file)
 
         self.configuration_settings.update_main_setting("ambient_sound", sound_path)
@@ -6538,7 +6539,7 @@ class InterfaceSignals():
     def load_ambient_sound_to_comboBox(self):
         self.ui.comboBox_ambient_mode.clear()
 
-        ambient_directory = "assets\\ambient"
+        ambient_directory = "assets/ambient"
         for filename in os.listdir(ambient_directory):
             if filename.endswith((".mp3", ".wav")):
                 name_without_extension = os.path.splitext(filename)[0]
@@ -7872,7 +7873,7 @@ class InterfaceSignals():
         )
         
         if file_path:
-            self.ui.pushButton_rp_editors.click()
+            self.ui.pushButton_rp_editors.setChecked(True)
             self.prepare_new_character_editor()
             self.import_character_card(file_path)
             QtCore.QTimer.singleShot(0, lambda: self.ui.stackedWidget.setCurrentWidget(self.ui.create_character_page))
@@ -8829,7 +8830,7 @@ class InterfaceSignals():
         return widget
 
     def create_xttsv2_widgets(self, character_name, voice_type, rvc_enabled, file_name):
-        RVC_DIR = os.path.join(os.getcwd(), "assets\\rvc_models")
+        RVC_DIR = os.path.join(os.getcwd(), "assets/rvc_models")
 
         _SURF2    = "rgba(22, 22, 26, 0.5)"
         _SURF3    = "rgba(30, 30, 35, 0.5)"
@@ -9085,7 +9086,7 @@ class InterfaceSignals():
         return full_voice_name
 
     def create_edge_tts_widgets(self, character_name, voice_type, rvc_enabled, file_name, stacked_widget):
-        RVC_DIR = os.path.join(os.getcwd(), "assets\\rvc_models")
+        RVC_DIR = os.path.join(os.getcwd(), "assets/rvc_models")
 
         _SURF2    = "rgba(22, 22, 26, 0.5)"
         _SURF3    = "rgba(30, 30, 35, 0.5)"
@@ -9368,7 +9369,7 @@ class InterfaceSignals():
         return widget
 
     def create_kokoro_widgets(self, character_name, voice_name, rvc_enabled, file_name):
-        RVC_DIR = os.path.join(os.getcwd(), "assets\\rvc_models")
+        RVC_DIR = os.path.join(os.getcwd(), "assets/rvc_models")
 
         _SURF1    = "rgba(0, 0, 0, 0.3)"
         _SURF2    = "rgba(22, 22, 26, 0.5)"
@@ -9611,7 +9612,7 @@ class InterfaceSignals():
         return widget
 
     def create_silero_widgets(self, character_name, voice_name, rvc_enabled, file_name):
-        RVC_DIR = os.path.join(os.getcwd(), "assets\\rvc_models")
+        RVC_DIR = os.path.join(os.getcwd(), "assets/rvc_models")
         
         _SURF2    = "rgba(22, 22, 26, 0.5)"
         _SURF3    = "rgba(30, 30, 35, 0.5)"
@@ -9822,7 +9823,7 @@ class InterfaceSignals():
         return widget
 
     def create_qwen3_widgets(self, character_name, voice_name, rvc_enabled, file_name):
-        RVC_DIR = os.path.join(os.getcwd(), "assets\\rvc_models")
+        RVC_DIR = os.path.join(os.getcwd(), "assets/rvc_models")
 
         _SURF1    = "rgba(0, 0, 0, 0.3)"
         _SURF2    = "rgba(22, 22, 26, 0.5)"
@@ -10510,7 +10511,7 @@ class InterfaceSignals():
         return widget
 
     def create_expression_images_widgets(self, character_name, expression_images_folder):
-        EXP_DIR = os.path.join(os.getcwd(), "assets\\emotions\\images")
+        EXP_DIR = os.path.join(os.getcwd(), "assets/emotions/images")
         
         _SURF1    = "rgba(0, 0, 0, 0.3)"
         _SURF2    = "rgba(22, 22, 26, 0.5)"
@@ -10644,7 +10645,7 @@ class InterfaceSignals():
         return widget
 
     def create_live2d_model_widgets(self, character_name, live2d_model_folder):
-        LIVE2D_DIR = os.path.join(os.getcwd(), "assets\\emotions\\live2d")
+        LIVE2D_DIR = os.path.join(os.getcwd(), "assets/emotions/live2d")
         
         _SURF1    = "rgba(0, 0, 0, 0.3)"
         _SURF2    = "rgba(22, 22, 26, 0.5)"
@@ -10813,7 +10814,7 @@ class InterfaceSignals():
         return widget
 
     def create_vrm_model_widgets(self, character_name, vrm_model_file):
-        VRM_DIR = os.path.join(os.getcwd(), "assets\\emotions\\vrm")
+        VRM_DIR = os.path.join(os.getcwd(), "assets/emotions/vrm")
         
         _SURF1    = "rgba(0, 0, 0, 0.3)"
         _SURF2    = "rgba(22, 22, 26, 0.5)"
@@ -12390,7 +12391,7 @@ class InterfaceSignals():
         self.ui.listWidget_models_hub.setSpacing(8)
 
         models_dir = self.configuration_settings.get_main_setting("models_directory") \
-                     or "assets\\local_llm"
+                     or "assets/local_llm"
         models_dir = os.path.normpath(models_dir)
         if not os.path.exists(models_dir):
             os.makedirs(models_dir, exist_ok=True)
@@ -12541,18 +12542,23 @@ class InterfaceSignals():
 
     def _open_models_folder(self):
         models_dir = self.configuration_settings.get_main_setting("models_directory") \
-                     or "assets\\local_llm"
+                     or "assets/local_llm"
         models_dir = os.path.normpath(models_dir)
         if not os.path.exists(models_dir):
             os.makedirs(models_dir, exist_ok=True)
         try:
-            os.startfile(models_dir)
+            if os.name == "nt":
+                os.startfile(models_dir)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", models_dir])
+            else:
+                subprocess.Popen(["xdg-open", models_dir])
         except Exception as e:
             logger.warning(f"[ModelsHub] Cannot open folder: {e}")
 
     def _change_models_directory(self):
         current_dir = self.configuration_settings.get_main_setting("models_directory") \
-                      or "assets\\local_llm"
+                      or "assets/local_llm"
         new_dir = QFileDialog.getExistingDirectory(
             self.main_window,
             "Select LLM Models Directory",
@@ -17687,8 +17693,17 @@ Image prompt:"""
         if self.tokenizer is None or self.model is None:
             def _load_model():
                 tokenizer_path = os.path.join("app", "utils", "emotions", "detector")
-                tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-                model = AutoModelForSequenceClassification.from_pretrained(tokenizer_path)
+                model_name = "SamLowe/roberta-base-go_emotions"
+                if os.path.isdir(tokenizer_path) and os.listdir(tokenizer_path):
+                    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+                    model = AutoModelForSequenceClassification.from_pretrained(tokenizer_path)
+                else:
+                    logger.warning(f"Emotion detector not found at '{tokenizer_path}', downloading '{model_name}' from Hugging Face Hub.")
+                    os.makedirs(tokenizer_path, exist_ok=True)
+                    tokenizer = AutoTokenizer.from_pretrained(model_name)
+                    model = AutoModelForSequenceClassification.from_pretrained(model_name)
+                    tokenizer.save_pretrained(tokenizer_path)
+                    model.save_pretrained(tokenizer_path)
                 return tokenizer, model
             self.tokenizer, self.model = await asyncio.to_thread(_load_model)
 

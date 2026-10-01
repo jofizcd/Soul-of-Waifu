@@ -1,5 +1,6 @@
-import re
 import logging
+import re
+
 from app.utils.ai_clients.providers.openai_provider import OpenAIProvider
 
 logger = logging.getLogger("Gemini Provider")

@@ -28,8 +28,10 @@ from app.configuration import configuration
 from rvc_python.infer import RVCInference
 
 import torch.serialization
+
 try:
     from fairseq.data.dictionary import Dictionary
+
     torch.serialization.add_safe_globals([Dictionary])
 except ImportError:
     pass
@@ -44,15 +46,16 @@ os.environ["HUGGINGFACE_HUB_CACHE"] = CACHE_DIR
 
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+
 def fix_rvc_sample_rate(file_path, base_file_path=None, target_sr=48000):
     if not file_path or not os.path.exists(file_path):
         return file_path
     try:
-        data, sr = sf.read(file_path, dtype='float32')
+        data, sr = sf.read(file_path, dtype="float32")
 
         if sr != target_sr:
             if base_file_path and os.path.exists(base_file_path):
-                data_base, sr_base = sf.read(base_file_path, dtype='float32')
+                data_base, sr_base = sf.read(base_file_path, dtype="float32")
                 dur_base = len(data_base) / sr_base
                 if dur_base > 0:
                     target_sr = int(round(len(data) / dur_base))
@@ -62,6 +65,7 @@ def fix_rvc_sample_rate(file_path, base_file_path=None, target_sr=48000):
     except Exception as e:
         logger.warning(f"Failed to fix RVC sample rate: {e}")
     return file_path
+
 
 class ElevenLabs:
     def __init__(self):
@@ -80,10 +84,7 @@ class ElevenLabs:
             self.eleven = AsyncElevenLabs(api_key=self.eleven_labs_api)
 
             audio_stream = await self.eleven.generate(
-                text=text,
-                voice=voice_id,
-                model="eleven_multilingual_v2",
-                stream=True
+                text=text, voice=voice_id, model="eleven_multilingual_v2", stream=True
             )
             audio_data = b""
             async for chunk in audio_stream:
@@ -102,10 +103,7 @@ class ElevenLabs:
             self.eleven = AsyncElevenLabs(api_key=self.eleven_labs_api)
 
             audio_stream = await self.eleven.generate(
-                text=text,
-                voice=voice_id,
-                model="eleven_multilingual_v2",
-                stream=True
+                text=text, voice=voice_id, model="eleven_multilingual_v2", stream=True
             )
             audio_data = b""
             async for chunk in audio_stream:
@@ -151,7 +149,9 @@ class XTTSv2_SOW_System:
     def _load_tts_sync(self):
         if not self.tts_loaded:
             try:
-                self.tts = TTS(model_name='tts_models/multilingual/multi-dataset/xtts_v2', progress_bar=True).to(self.device)
+                self.tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", progress_bar=True).to(
+                    self.device
+                )
                 self.tts_loaded = True
             except Exception as e:
                 raise RuntimeError(f"Failed to load TTS model: {e}")
@@ -160,12 +160,16 @@ class XTTSv2_SOW_System:
         if not self.rvc_loaded:
             logger.info("Loading RVC model...")
             try:
+
                 def _init():
                     return RVCInference(
                         models_dir="assets/rvc_models",
                         device="cuda:0" if torch.cuda.is_available() else "cpu:0",
-                        f0up_key=f0up_key, index_rate=index_rate, protect=protect
+                        f0up_key=f0up_key,
+                        index_rate=index_rate,
+                        protect=protect,
                     )
+
                 self.rvc = await asyncio.to_thread(_init)
                 self.rvc_loaded = True
                 logger.info("RVC model loaded successfully.")
@@ -186,7 +190,7 @@ class XTTSv2_SOW_System:
         speaker_wav_map = {
             "Female Calm": "app/voices/calm_female.wav",
             "Female": "app/voices/female.wav",
-            "Male": "app/voices/male.wav"
+            "Male": "app/voices/male.wav",
         }
         speaker_wav = speaker_wav_map.get(xttsv2_voice_type)
         if not speaker_wav:
@@ -197,17 +201,13 @@ class XTTSv2_SOW_System:
         base_output_file = f"app/voices/xttsv2_audio/output_{unique_id}.wav"
 
         await asyncio.to_thread(
-            self.tts.tts_to_file,
-            text=text,
-            speaker_wav=speaker_wav,
-            language=language,
-            file_path=base_output_file
+            self.tts.tts_to_file, text=text, speaker_wav=speaker_wav, language=language, file_path=base_output_file
         )
 
         if xttsv2_rvc_enabled and xttsv2_rvc_file:
-            f0up_key   = char_config.get("rvc_f0up_key",   0)
+            f0up_key = char_config.get("rvc_f0up_key", 0)
             index_rate = char_config.get("rvc_index_rate", 0.75)
-            protect    = char_config.get("rvc_protect",    0.5)
+            protect = char_config.get("rvc_protect", 0.5)
 
             await self._load_rvc(f0up_key, index_rate, protect)
 
@@ -249,12 +249,16 @@ class EdgeTTS:
         if not self.rvc_loaded:
             logger.info("Loading RVC model...")
             try:
+
                 def _init():
                     return RVCInference(
                         models_dir="assets/rvc_models",
                         device="cuda:0" if torch.cuda.is_available() else "cpu:0",
-                        f0up_key=f0up_key, index_rate=index_rate, protect=protect
+                        f0up_key=f0up_key,
+                        index_rate=index_rate,
+                        protect=protect,
                     )
+
                 self.rvc = await asyncio.to_thread(_init)
                 self.rvc_loaded = True
                 logger.info("RVC model loaded successfully.")
@@ -266,6 +270,7 @@ class EdgeTTS:
         def _convert():
             audio = AudioSegment.from_mp3(mp3_file)
             audio.export(wav_file, format="wav")
+
         await asyncio.to_thread(_convert)
 
     async def _generate_base(self, text, character_name):
@@ -295,9 +300,9 @@ class EdgeTTS:
             return None
 
         if rvc_enabled and rvc_file:
-            f0up_key   = char_config.get("rvc_f0up_key",   0)
+            f0up_key = char_config.get("rvc_f0up_key", 0)
             index_rate = char_config.get("rvc_index_rate", 0.75)
-            protect    = char_config.get("rvc_protect",    0.5)
+            protect = char_config.get("rvc_protect", 0.5)
 
             await self._load_rvc(f0up_key, index_rate, protect)
             model_name = os.path.splitext(os.path.basename(rvc_file))[0]
@@ -332,12 +337,13 @@ class EdgeTTS:
     async def play_audio(self, file_path):
         def _play():
             try:
-                data, samplerate = sf.read(file_path, dtype='float32')
+                data, samplerate = sf.read(file_path, dtype="float32")
                 sd.default.device = self.device_index
                 sd.play(data, samplerate)
                 sd.wait()
             except Exception as e:
                 logger.error(f"Error: {e}")
+
         await asyncio.to_thread(_play)
 
     def stop_audio(self):
@@ -359,8 +365,10 @@ class KokoroTTS_SOW_System:
     async def _load_tts(self):
         if not self.tts_loaded:
             try:
+
                 def _init():
-                    return KPipeline(lang_code='a')
+                    return KPipeline(lang_code="a")
+
                 self.pipeline = await asyncio.to_thread(_init)
                 self.tts_loaded = True
             except Exception as e:
@@ -370,12 +378,16 @@ class KokoroTTS_SOW_System:
         if not self.rvc_loaded:
             logger.info("Loading RVC model...")
             try:
+
                 def _init():
                     return RVCInference(
                         models_dir="assets/rvc_models",
                         device="cuda:0" if torch.cuda.is_available() else "cpu:0",
-                        f0up_key=f0up_key, index_rate=index_rate, protect=protect
+                        f0up_key=f0up_key,
+                        index_rate=index_rate,
+                        protect=protect,
                     )
+
                 self.rvc = await asyncio.to_thread(_init)
                 self.rvc_loaded = True
                 logger.info("RVC model loaded successfully.")
@@ -412,9 +424,9 @@ class KokoroTTS_SOW_System:
         await asyncio.to_thread(sf.write, base_output_file, full_audio, 24000)
 
         if kokoro_rvc_enabled and kokoro_rvc_file:
-            f0up_key   = char_config.get("rvc_f0up_key",   0)
+            f0up_key = char_config.get("rvc_f0up_key", 0)
             index_rate = char_config.get("rvc_index_rate", 0.75)
-            protect    = char_config.get("rvc_protect",    0.5)
+            protect = char_config.get("rvc_protect", 0.5)
 
             await self._load_rvc(f0up_key, index_rate, protect)
             model_name = os.path.splitext(os.path.basename(kokoro_rvc_file))[0]
@@ -456,13 +468,13 @@ class SileroTTS_SOW_System:
             try:
                 self.model, _ = await asyncio.to_thread(
                     torch.hub.load,
-                    repo_or_dir='snakers4/silero-models',
-                    model='silero_tts',
-                    language='ru',
-                    speaker='v5_3_ru',
+                    repo_or_dir="snakers4/silero-models",
+                    model="silero_tts",
+                    language="ru",
+                    speaker="v5_3_ru",
                     trust_repo=True,
                     force_reload=False,
-                    verbose=True
+                    verbose=True,
                 )
                 self.model.to(self.device)
                 self.tts_loaded = True
@@ -474,12 +486,16 @@ class SileroTTS_SOW_System:
         if not self.rvc_loaded:
             logger.info("Loading RVC model...")
             try:
+
                 def _init():
                     return RVCInference(
                         models_dir="assets/rvc_models",
                         device="cuda:0" if torch.cuda.is_available() else "cpu:0",
-                        f0up_key=f0up_key, index_rate=index_rate, protect=protect
+                        f0up_key=f0up_key,
+                        index_rate=index_rate,
+                        protect=protect,
                     )
+
                 self.rvc = await asyncio.to_thread(_init)
                 self.rvc_loaded = True
                 logger.info("RVC model loaded successfully.")
@@ -501,18 +517,13 @@ class SileroTTS_SOW_System:
         unique_id = uuid.uuid4().hex
         base_output_file = f"app/voices/silero_audio/silero_output_{unique_id}.wav"
 
-        audio = await asyncio.to_thread(
-            self.model.apply_tts,
-            text=text,
-            speaker=silero_voice,
-            sample_rate=48000
-        )
+        audio = await asyncio.to_thread(self.model.apply_tts, text=text, speaker=silero_voice, sample_rate=48000)
         await asyncio.to_thread(sf.write, base_output_file, audio.cpu().numpy(), 48000)
 
         if silero_rvc_enabled and silero_rvc_file:
-            f0up_key   = char_config.get("rvc_f0up_key",   0)
+            f0up_key = char_config.get("rvc_f0up_key", 0)
             index_rate = char_config.get("rvc_index_rate", 0.75)
-            protect    = char_config.get("rvc_protect",    0.5)
+            protect = char_config.get("rvc_protect", 0.5)
 
             await self._load_rvc(f0up_key, index_rate, protect)
             model_name = os.path.splitext(os.path.basename(silero_rvc_file))[0]
@@ -522,7 +533,7 @@ class SileroTTS_SOW_System:
             if getattr(self, "_current_rvc_params", None) != rvc_params:
                 await asyncio.to_thread(self.rvc.load_model, model_name)
                 self._current_rvc_params = rvc_params
-            
+
             await asyncio.to_thread(self.rvc.infer_file, base_output_file, rvc_output_file)
 
             fix_rvc_sample_rate(rvc_output_file, base_output_file)
@@ -535,6 +546,7 @@ class SileroTTS_SOW_System:
             return rvc_output_file
 
         return base_output_file
+
 
 class Qwen3TTS_SOW_System:
     def __init__(self):
@@ -590,12 +602,13 @@ class Qwen3TTS_SOW_System:
                         device_map=target_device_map,
                         attn_implementation="sdpa",
                     )
-                    
+
                     if target_dtype == torch.float32:
+
                         def clean_and_cast_to_float32(obj, visited=None):
                             if visited is None:
                                 visited = set()
-                            
+
                             obj_id = id(obj)
                             if obj_id in visited:
                                 return
@@ -613,28 +626,28 @@ class Qwen3TTS_SOW_System:
                                     pass
                                 for child in obj.children():
                                     clean_and_cast_to_float32(child, visited)
-                            
+
                             elif hasattr(obj, "__dict__"):
                                 for attr_name, attr_val in list(obj.__dict__.items()):
                                     if attr_name.startswith("__"):
                                         continue
                                     clean_and_cast_to_float32(attr_val, visited)
-                            
+
                             elif isinstance(obj, (list, tuple)):
                                 for item in obj:
                                     clean_and_cast_to_float32(item, visited)
-                                    
+
                             elif isinstance(obj, dict):
                                 for value in obj.values():
                                     clean_and_cast_to_float32(value, visited)
 
                         clean_and_cast_to_float32(model)
-                            
+
                     return model
 
                 self.model = await asyncio.to_thread(_init)
                 self.tts_loaded = True
-                
+
                 logger.info(f"Qwen3-TTS {model_size}-{variant} loaded on {self.device.upper()} for '{character_name}'")
 
             except Exception as e:
@@ -645,12 +658,16 @@ class Qwen3TTS_SOW_System:
         if not self.rvc_loaded:
             logger.info("Loading RVC model for Qwen 3...")
             try:
+
                 def _init():
                     return RVCInference(
                         models_dir="assets/rvc_models",
                         device="cuda:0" if torch.cuda.is_available() else "cpu:0",
-                        f0up_key=f0up_key, index_rate=index_rate, protect=protect
+                        f0up_key=f0up_key,
+                        index_rate=index_rate,
+                        protect=protect,
                     )
+
                 self.rvc = await asyncio.to_thread(_init)
                 self.rvc_loaded = True
                 logger.info("RVC model loaded successfully.")
@@ -700,9 +717,7 @@ class Qwen3TTS_SOW_System:
                             # Voice Cloning
                             if qwen_ref_text:
                                 wavs, sr = self.model.generate_voice_clone(
-                                    ref_audio=qwen_ref_path,
-                                    ref_text=qwen_ref_text,
-                                    **generation_params
+                                    ref_audio=qwen_ref_path, ref_text=qwen_ref_text, **generation_params
                                 )
                             else:
                                 logger.warning(
@@ -711,23 +726,17 @@ class Qwen3TTS_SOW_System:
                                     f"(cloning quality may be reduced)."
                                 )
                                 wavs, sr = self.model.generate_voice_clone(
-                                    ref_audio=qwen_ref_path,
-                                    x_vector_only_mode=True,
-                                    **generation_params
+                                    ref_audio=qwen_ref_path, x_vector_only_mode=True, **generation_params
                                 )
 
                         elif qwen_mode == "prompt" and qwen_prompt:
                             # Voice Design
-                            wavs, sr = self.model.generate_voice_design(
-                                instruct=qwen_prompt,
-                                **generation_params
-                            )
+                            wavs, sr = self.model.generate_voice_design(instruct=qwen_prompt, **generation_params)
 
                         else:
                             # Preset Voices (CustomVoice)
                             wavs, sr = self.model.generate_custom_voice(
-                                speaker=voice_type, instruct=qwen_instruct,
-                                **generation_params
+                                speaker=voice_type, instruct=qwen_instruct, **generation_params
                             )
 
                 audio_data = wavs[0]
@@ -772,6 +781,7 @@ class Qwen3TTS_SOW_System:
             return rvc_output_file
 
         return base_output_file
+
 
 class AudioPlaybackWorker(QThread):
     queue_empty_signal = pyqtSignal()
@@ -825,7 +835,7 @@ class AudioPlaybackWorker(QThread):
                     continue
 
                 try:
-                    data, samplerate = sf.read(file_path, dtype='float32')
+                    data, samplerate = sf.read(file_path, dtype="float32")
                     sd.default.device = self.device_index
                     sd.play(data, samplerate)
 
@@ -844,7 +854,7 @@ class AudioPlaybackWorker(QThread):
                         current_chunk = data[start_idx:end_idx]
 
                         if len(current_chunk) > 0:
-                            rms = np.sqrt(np.mean(current_chunk ** 2))
+                            rms = np.sqrt(np.mean(current_chunk**2))
                             mouth_open = min(rms * 5.0, 1.0)
                             self.lipsync_signal.emit(float(mouth_open))
 
@@ -924,15 +934,15 @@ class TTSWorker(QThread):
     def add_text(self, text, message_id=None):
         if not text:
             return
-            
+
         text = self.clean_text_for_speech(text)
         if not text:
             return
 
-        raw_sentences = re.split(r'(?<=[.!?])\s+', text)
+        raw_sentences = re.split(r"(?<=[.!?])\s+", text)
         current_chunk = ""
-        max_chunk_len = 450 
-        
+        max_chunk_len = 450
+
         def _enqueue(chunk_text):
             if chunk_text:
                 self.queue.put((chunk_text, message_id))
@@ -941,18 +951,18 @@ class TTSWorker(QThread):
             sentence = sentence.strip()
             if not sentence:
                 continue
-                
+
             if len(sentence) > max_chunk_len:
                 if current_chunk:
                     _enqueue(current_chunk)
                     current_chunk = ""
-                
-                sub_chunks = re.split(r'(?<=[,;])\s', sentence)
+
+                sub_chunks = re.split(r"(?<=[,;])\s", sentence)
                 for sub in sub_chunks:
                     sub = sub.strip()
                     if len(sub) > max_chunk_len:
                         for i in range(0, len(sub), max_chunk_len):
-                            _enqueue(sub[i:i+max_chunk_len])
+                            _enqueue(sub[i : i + max_chunk_len])
                     else:
                         _enqueue(sub)
             else:
@@ -964,7 +974,7 @@ class TTSWorker(QThread):
                         current_chunk += " " + sentence
                     else:
                         current_chunk = sentence
-        
+
         if current_chunk:
             _enqueue(current_chunk)
 
@@ -972,9 +982,7 @@ class TTSWorker(QThread):
         if not source_file or not os.path.exists(source_file):
             return None
 
-        segment_dir = os.path.join(
-            os.getcwd(), "app", "data", ".soul", self.character_name, "tts_audio", message_id
-        )
+        segment_dir = os.path.join(os.getcwd(), "app", "data", ".soul", self.character_name, "tts_audio", message_id)
         os.makedirs(segment_dir, exist_ok=True)
 
         existing = [f for f in os.listdir(segment_dir) if f.lower().endswith((".wav", ".mp3"))]
@@ -1071,14 +1079,14 @@ class TTSWorker(QThread):
                 return re.sub(r"[*_~`#]", "", text).strip()
 
         return text.strip()
-    
+
     def clear_queue(self):
         with self.queue.mutex:
             self.queue.queue.clear()
         self.discard_current = True
         self._in_tts_quote = False
         self._in_asterisk = False
-        if hasattr(self, 'playback_worker'):
+        if hasattr(self, "playback_worker"):
             self.playback_worker.clear_queue()
 
     def run(self):
@@ -1140,12 +1148,13 @@ class TTSWorker(QThread):
                     if output_file:
                         try:
                             import base64
+
                             with open(output_file, "rb") as f:
                                 b64_audio = base64.b64encode(f.read()).decode("utf-8")
                             self.audio_ready_signal.emit(b64_audio)
                         except Exception as e:
                             logger.error(f"Error encoding audio for web client: {e}")
-                        
+
                         if message_id:
                             try:
                                 relative_path = self._persist_segment_for_replay(output_file, message_id)
@@ -1167,22 +1176,29 @@ class TTSWorker(QThread):
         self.is_running = False
         self.discard_current = True
         self.queue.put(None)
-        if hasattr(self, 'playback_worker'):
+        if hasattr(self, "playback_worker"):
             self.playback_worker.stop()
         self.quit()
         self.wait()
 
+
 class _AudioChunk:
     __slots__ = ("file_path", "text", "message_id", "persist", "is_poison")
 
-    def __init__(self, file_path: Optional[str] = None, text: str = "",
-                 message_id: Optional[str] = None, persist: bool = False,
-                 is_poison: bool = False):
+    def __init__(
+        self,
+        file_path: Optional[str] = None,
+        text: str = "",
+        message_id: Optional[str] = None,
+        persist: bool = False,
+        is_poison: bool = False,
+    ):
         self.file_path = file_path
         self.text = text
         self.message_id = message_id
         self.persist = persist
         self.is_poison = is_poison
+
 
 class PipelinedTTSWorker(QThread):
     audio_ready_signal = pyqtSignal(str)
@@ -1237,9 +1253,14 @@ class PipelinedTTSWorker(QThread):
         if self._tts_engines_initialized:
             return
         from app.utils.text_to_speech import (
-            XTTSv2_SOW_System, EdgeTTS, KokoroTTS_SOW_System,
-            SileroTTS_SOW_System, Qwen3TTS_SOW_System, ElevenLabs
+            XTTSv2_SOW_System,
+            EdgeTTS,
+            KokoroTTS_SOW_System,
+            SileroTTS_SOW_System,
+            Qwen3TTS_SOW_System,
+            ElevenLabs,
         )
+
         self.xtts = XTTSv2_SOW_System()
         self.edge = EdgeTTS()
         self.kokoro = KokoroTTS_SOW_System()
@@ -1260,7 +1281,7 @@ class PipelinedTTSWorker(QThread):
         if not text:
             return
 
-        raw_sentences = re.split(r'(?<=[.!?])\s+', text)
+        raw_sentences = re.split(r"(?<=[.!?])\s+", text)
         current_chunk = ""
         max_chunk_len = 450
 
@@ -1277,12 +1298,12 @@ class PipelinedTTSWorker(QThread):
                 if current_chunk:
                     _enqueue(current_chunk)
                     current_chunk = ""
-                sub_chunks = re.split(r'(?<=[,;])\s', sentence)
+                sub_chunks = re.split(r"(?<=[,;])\s", sentence)
                 for sub in sub_chunks:
                     sub = sub.strip()
                     if len(sub) > max_chunk_len:
                         for i in range(0, len(sub), max_chunk_len):
-                            _enqueue(sub[i:i+max_chunk_len])
+                            _enqueue(sub[i : i + max_chunk_len])
                     else:
                         _enqueue(sub)
             else:
@@ -1324,7 +1345,7 @@ class PipelinedTTSWorker(QThread):
                     continue
                 if self._in_tts_quote:
                     result.append(part)
-            
+
             cleaned = re.sub(r"[*_~`#]", "", "".join(result)).strip()
 
             if not cleaned and not any(q in text for q in ('"', "“", "”", "«", "»")):
@@ -1399,12 +1420,14 @@ class PipelinedTTSWorker(QThread):
         self._in_tts_quote = False
         self._in_asterisk = False
         if self._loop and self._audio_buffer and self._loop.is_running():
+
             def _drain():
                 while not self._audio_buffer.empty():
                     try:
                         self._audio_buffer.get_nowait()
                     except asyncio.QueueEmpty:
                         break
+
             self._loop.call_soon_threadsafe(_drain)
         try:
             self.lipsync_signal.emit(0.0)
@@ -1433,8 +1456,7 @@ class PipelinedTTSWorker(QThread):
         logger.info("[PipelinedTTS] worker stopped")
 
     def run(self):
-        logger.info(f"PipelinedTTSWorker started (method={self.tts_method}, "
-                    f"buffer={self.AUDIO_BUFFER_SIZE})")
+        logger.info(f"PipelinedTTSWorker started (method={self.tts_method}, buffer={self.AUDIO_BUFFER_SIZE})")
 
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
@@ -1449,8 +1471,7 @@ class PipelinedTTSWorker(QThread):
 
         try:
             self._loop.run_until_complete(
-                asyncio.gather(self._producer_task, self._player_task,
-                               return_exceptions=True)
+                asyncio.gather(self._producer_task, self._player_task, return_exceptions=True)
             )
         except Exception as e:
             logger.error(f"[PipelinedTTS] run() error: {e}", exc_info=True)
@@ -1466,9 +1487,7 @@ class PipelinedTTSWorker(QThread):
 
         while self.is_running:
             try:
-                item = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: self.text_queue.get(timeout=0.5)
-                )
+                item = await asyncio.get_event_loop().run_in_executor(None, lambda: self.text_queue.get(timeout=0.5))
             except queue.Empty:
                 continue
             except Exception as e:
@@ -1476,7 +1495,6 @@ class PipelinedTTSWorker(QThread):
                 continue
 
             if item is None:
-
                 logger.info("[PipelinedTTS] producer received poison pill")
                 await self._audio_buffer.put(_AudioChunk(is_poison=True))
                 break
@@ -1498,10 +1516,7 @@ class PipelinedTTSWorker(QThread):
 
             output_file = None
             try:
-                output_file = await asyncio.wait_for(
-                    self._generate_wav(text),
-                    timeout=self.TTS_TIMEOUT_SEC
-                )
+                output_file = await asyncio.wait_for(self._generate_wav(text), timeout=self.TTS_TIMEOUT_SEC)
             except asyncio.TimeoutError:
                 logger.error(f"[PipelinedTTS] TTS timed out for: '{text[:40]}...'")
                 continue
@@ -1527,9 +1542,9 @@ class PipelinedTTSWorker(QThread):
 
             try:
                 import base64
+
                 b64_audio = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: base64.b64encode(open(output_file, "rb").read()).decode("utf-8")
+                    None, lambda: base64.b64encode(open(output_file, "rb").read()).decode("utf-8")
                 )
                 self.audio_ready_signal.emit(b64_audio)
             except Exception as e:
@@ -1553,8 +1568,10 @@ class PipelinedTTSWorker(QThread):
             )
             try:
                 await self._audio_buffer.put(chunk)
-                logger.info(f"[PipelinedTTS] producer: enqueued '{text[:40]}...' "
-                            f"(buffer now has {self._audio_buffer.qsize() + 1} items)")
+                logger.info(
+                    f"[PipelinedTTS] producer: enqueued '{text[:40]}...' "
+                    f"(buffer now has {self._audio_buffer.qsize() + 1} items)"
+                )
             except asyncio.CancelledError:
                 try:
                     if output_file and os.path.exists(output_file):
@@ -1614,7 +1631,7 @@ class PipelinedTTSWorker(QThread):
     async def _play_audio_with_lipsync(self, file_path: str, persist: bool):
         try:
             data, samplerate = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: sf.read(file_path, dtype='float32')
+                None, lambda: sf.read(file_path, dtype="float32")
             )
         except Exception as e:
             logger.error(f"[PipelinedTTS] read error: {e}")
@@ -1668,7 +1685,7 @@ class PipelinedTTSWorker(QThread):
                 end_idx = min(sample_idx + chunk_size, total_samples)
                 current_chunk = data_mono[sample_idx:end_idx]
                 if len(current_chunk) > 0:
-                    rms = float(np.sqrt(np.mean(current_chunk ** 2)))
+                    rms = float(np.sqrt(np.mean(current_chunk**2)))
                     mouth_open = min(rms * 5.0, 1.0)
                     try:
                         self.lipsync_signal.emit(mouth_open)
@@ -1689,7 +1706,6 @@ class PipelinedTTSWorker(QThread):
         except Exception as e:
             logger.error(f"[PipelinedTTS] lipsync loop error: {e}")
         finally:
-
             try:
                 self.lipsync_signal.emit(0.0)
             except Exception:
@@ -1710,23 +1726,17 @@ class PipelinedTTSWorker(QThread):
     async def _generate_wav(self, text: str) -> Optional[str]:
         method = self.tts_method
         if method == "XTTSv2":
-            return await self.xtts.generate_speech_with_xttsv2_sow_system(
-                text, self.language, self.character_name)
+            return await self.xtts.generate_speech_with_xttsv2_sow_system(text, self.language, self.character_name)
         elif method == "Edge TTS":
-            return await self.edge.generate_speech_with_edge_tts_sow_system(
-                text, self.character_name)
+            return await self.edge.generate_speech_with_edge_tts_sow_system(text, self.character_name)
         elif method == "Kokoro":
-            return await self.kokoro.generate_speech_with_kokoro(
-                text, self.character_name)
+            return await self.kokoro.generate_speech_with_kokoro(text, self.character_name)
         elif method == "Silero":
-            return await self.silero.generate_speech_with_silero(
-                text, self.character_name)
+            return await self.silero.generate_speech_with_silero(text, self.character_name)
         elif method == "Qwen-3 TTS":
-            return await self.qwen.generate_speech_with_qwen3(
-                text, self.character_name)
+            return await self.qwen.generate_speech_with_qwen3(text, self.character_name)
         elif method == "ElevenLabs":
-            return await self.eleven.generate_speech_with_elevenlabs_sow_system(
-                text, self.voice_id)
+            return await self.eleven.generate_speech_with_elevenlabs_sow_system(text, self.voice_id)
         else:
             logger.error(f"[PipelinedTTS] unknown TTS method: {method}")
             return None
@@ -1735,14 +1745,10 @@ class PipelinedTTSWorker(QThread):
         if not source_file or not os.path.exists(source_file):
             return None
 
-        segment_dir = os.path.join(
-            os.getcwd(), "app", "data", ".soul",
-            self.character_name, "tts_audio", message_id
-        )
+        segment_dir = os.path.join(os.getcwd(), "app", "data", ".soul", self.character_name, "tts_audio", message_id)
         os.makedirs(segment_dir, exist_ok=True)
 
-        existing = [f for f in os.listdir(segment_dir)
-                    if f.lower().endswith((".wav", ".mp3"))]
+        existing = [f for f in os.listdir(segment_dir) if f.lower().endswith((".wav", ".mp3"))]
         next_index = len(existing) + 1
         ext = os.path.splitext(source_file)[1] or ".wav"
         segment_filename = f"seg_{next_index:04d}{ext}"
