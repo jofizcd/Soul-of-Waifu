@@ -41,8 +41,41 @@ def _strip_json(raw: str) -> str:
     
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
         return cleaned[first_brace:last_brace + 1]
-        
+
     return cleaned
+
+
+def _parse_mcp_jsonrpc_event(raw: str, content_type: str) -> Optional[dict]:
+    """
+    Parse a single JSON-RPC result event out of an MCP HTTP response.
+
+    MCP streamable-HTTP endpoints answer either with plain JSON or with
+    an SSE stream. SSE frames are split on LF/CRLF only -- never
+    str.splitlines(), which would also cut non-ASCII payloads at
+    U+0085/U+2028 -- and notification frames (e.g. progress updates)
+    are skipped until the result frame arrives.
+    """
+    if "text/event-stream" in (content_type or ""):
+        for frame in raw.replace("\r\n", "\n").split("\n\n"):
+            data = "\n".join(
+                line[len("data:"):].strip()
+                for line in frame.split("\n")
+                if line.startswith("data:")
+            )
+            if not data:
+                continue
+            try:
+                event = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(event, dict) and "result" in event:
+                return event
+        return None
+    try:
+        event = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return event if isinstance(event, dict) and "result" in event else None
 
 
 COMPANION_SYSTEM_PROMPT = """You ARE {character_name}. You are a live desktop companion. Speak only as yourself in first-person.
@@ -437,6 +470,10 @@ class WebSearchTool(BaseTool):
         "https://searxng.world",
     ]
 
+    _YOUCOM_ENABLED: bool = os.environ.get("YOUCOM_SEARCH_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
+    _YOUCOM_API_KEY: str = os.environ.get("YOUCOM_API_KEY", "") or os.environ.get("YDC_API_KEY", "")
+    _YOUCOM_MCP_URL: str = os.environ.get("YOUCOM_MCP_URL", "").strip()
+
     def get_schema(self) -> dict:
         return {
             "type": "function",
@@ -482,9 +519,137 @@ class WebSearchTool(BaseTool):
             logger.warning(f"[WebSearch] 'ddgs' strategy execution failed: {e}")
             return None
 
+    async def _search_youcom(self, query: str) -> list[dict] | None:
+        """
+        Optional You.com search strategy (off by default).
+
+        Opt in with YOUCOM_SEARCH_ENABLED=1. Keyless through You.com's
+        free MCP profile; set YOUCOM_API_KEY (or YDC_API_KEY) to switch
+        to the authenticated endpoint with the fuller toolset. The
+        endpoint itself can be overridden with YOUCOM_MCP_URL.
+        """
+        if not self._YOUCOM_ENABLED:
+            logger.debug("[WebSearch] YOUCOM_SEARCH_ENABLED is not set. Skipping You.com strategy.")
+            return None
+
+        endpoint = self._YOUCOM_MCP_URL or (
+            "https://api.you.com/mcp" if self._YOUCOM_API_KEY
+            else "https://api.you.com/mcp?profile=free"
+        )
+        headers = {
+            "Accept": "application/json, text/event-stream",
+        }
+        if self._YOUCOM_API_KEY:
+            headers["Authorization"] = f"Bearer {self._YOUCOM_API_KEY}"
+            logger.info("[WebSearch] You.com API key detected. Using the authenticated endpoint.")
+        else:
+            logger.info("[WebSearch] Using the keyless You.com free-profile endpoint.")
+
+        try:
+            import aiohttp
+
+            async with aiohttp.ClientSession() as session:
+                # MCP streamable-HTTP handshake: initialize -> notifications/initialized -> tools/call
+                init_payload = {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {},
+                        "clientInfo": {"name": "soul-of-waifu", "version": "1.0"},
+                    },
+                }
+                async with session.post(endpoint, json=init_payload, headers=headers, timeout=15) as resp:
+                    if resp.status != 200:
+                        raw_err = await resp.text()
+                        logger.warning(f"[WebSearch] You.com initialize failed (HTTP {resp.status}): {raw_err[:200]}")
+                        return None
+                    session_id = resp.headers.get("Mcp-Session-Id")
+                    await resp.read()
+
+                if session_id:
+                    headers["Mcp-Session-Id"] = session_id
+
+                async with session.post(
+                    endpoint,
+                    json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+                    headers=headers,
+                    timeout=15,
+                ) as resp:
+                    await resp.read()  # 202 Accepted with an empty body is expected
+
+                call_payload = {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "you-search",
+                        "arguments": {"query": query, "count": 5},
+                    },
+                }
+                async with session.post(endpoint, json=call_payload, headers=headers, timeout=20) as resp:
+                    if resp.status != 200:
+                        raw_err = await resp.text()
+                        logger.warning(f"[WebSearch] You.com search failed (HTTP {resp.status}): {raw_err[:200]}")
+                        return None
+                    content_type = resp.headers.get("Content-Type", "")
+                    raw = await resp.text(encoding="utf-8", errors="replace")
+
+            event = _parse_mcp_jsonrpc_event(raw, content_type)
+            if not event:
+                logger.warning("[WebSearch] You.com response contained no JSON-RPC result.")
+                return None
+
+            result = event.get("result") or {}
+            if result.get("isError"):
+                logger.warning(f"[WebSearch] You.com returned an error result: {str(result)[:200]}")
+                return None
+
+            text_payload = "".join(
+                item.get("text", "")
+                for item in (result.get("content") or [])
+                if isinstance(item, dict) and item.get("type") == "text"
+            )
+            if not text_payload:
+                logger.warning("[WebSearch] You.com returned no text content.")
+                return None
+
+            try:
+                payload = json.loads(text_payload)
+            except json.JSONDecodeError:
+                logger.warning("[WebSearch] You.com text content was not valid JSON.")
+                return None
+
+            web_results = (payload.get("results") or {}).get("web") or []
+            if not web_results:
+                logger.warning("[WebSearch] You.com returned an empty results list.")
+                return None
+
+            mapped = []
+            for r in web_results[:5]:
+                snippet = r.get("description", "")
+                if not snippet:
+                    snippets = r.get("snippets")
+                    if isinstance(snippets, list) and snippets and isinstance(snippets[0], str):
+                        snippet = snippets[0]
+                mapped.append(
+                    {
+                        "title":   r.get("title", ""),
+                        "snippet": snippet,
+                        "url":     r.get("url", ""),
+                    }
+                )
+
+            logger.info(f"[WebSearch] You.com successfully retrieved {len(mapped)} results.")
+            return mapped
+        except Exception as e:
+            logger.warning(f"[WebSearch] You.com strategy failed with exception: {e}")
+            return None
+
     async def _search_brave(self, query: str) -> list[dict] | None:
         if not self._BRAVE_API_KEY:
-            logger.info("[WebSearch] BRAVE_SEARCH_API_KEY environment variable is empty. Skipping Strategy 2.")
+            logger.info("[WebSearch] BRAVE_SEARCH_API_KEY environment variable is empty. Skipping Strategy 3.")
             return None
             
         logger.info("[WebSearch] BRAVE_SEARCH_API_KEY detected. Sending request...")
@@ -593,14 +758,19 @@ class WebSearchTool(BaseTool):
             logger.info("[WebSearch] Strategy 1 (duckduckgo-search package) SUCCEEDED.")
             return self._format_results(results)
 
+        results = await self._search_youcom(query)
+        if results:
+            logger.info("[WebSearch] Strategy 2 (You.com) SUCCEEDED.")
+            return self._format_results(results)
+
         results = await self._search_brave(query)
         if results:
-            logger.info("[WebSearch] Strategy 2 (Brave Search API) SUCCEEDED.")
+            logger.info("[WebSearch] Strategy 3 (Brave Search API) SUCCEEDED.")
             return self._format_results(results)
 
         results = await self._search_searxng(query, context)
         if results:
-            logger.info("[WebSearch] Strategy 3 (SearXNG) SUCCEEDED.")
+            logger.info("[WebSearch] Strategy 4 (SearXNG) SUCCEEDED.")
             return self._format_results(results)
 
         logger.error("[WebSearch] Critical: All search strategies completely failed or were skipped.")
