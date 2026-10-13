@@ -79,6 +79,7 @@ FONT_STEP_NUM = _mk_font("Inter Tight", 11, QFont.Weight.Bold)
 CHAT_PROVIDERS = [
     ("Local LLM", "Local LLM", "app/gui/icons/local_llm.png", None),
     ("OpenAI / Custom", "Open AI", "app/gui/icons/openai.png", "OPEN_AI_API_TOKEN"),
+    ("ChatGPT", "ChatGPT", "app/gui/icons/openai.png", None),
     ("Anthropic Claude", "Anthropic", "app/gui/icons/anthropic.png", "ANTHROPIC_API_TOKEN"),
     ("Google Gemini", "Google Gemini", "app/gui/icons/gemini.png", "GEMINI_API_TOKEN"),
     ("DeepSeek", "DeepSeek", "app/gui/icons/deepseek.png", "DEEPSEEK_API_TOKEN"),
@@ -1354,6 +1355,15 @@ class CharacterAIAssistantDialog(QDialog):
         return btn.property("provider_value"), btn.property("token_key")
 
     def _check_provider_ready(self, provider_value: str, token_key: Optional[str]) -> tuple[bool, str]:
+        if provider_value == "ChatGPT":
+            from app.utils.chatgpt_auth import get_chatgpt_auth
+            try:
+                accounts = get_chatgpt_auth().list_accounts()
+                ready = any(a.get("active") and a.get("connected") and a.get("plan_enabled") for a in accounts)
+            except Exception:
+                ready = False
+            if not ready:
+                return False, self.tr_("chatgpt_setup_required", "Connect your ChatGPT account in Options → Configuration first.")
         if token_key is None:
             return True, ""
         token = ""

@@ -31,7 +31,7 @@ class Ui_MainWindow(object):
         """
         Loads translation strings from a YAML file based on the program language.
         """
-        file_path = f"app/translations/{language}.yaml"
+        file_path = Path(__file__).resolve().parents[1] / "translations" / f"{language}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as file:
                 self.translations = yaml.safe_load(file)
@@ -887,6 +887,7 @@ class Ui_MainWindow(object):
         providers_data = [
             ("Local LLM", "Local LLM", "app/gui/icons/local_llm.png"),
             ("OpenAI / Custom", "Open AI", "app/gui/icons/openai.png"),
+            ("ChatGPT", "ChatGPT", "app/gui/icons/openai.png"),
             ("Anthropic Claude", "Anthropic", "app/gui/icons/anthropic.png"),
             ("Google Gemini", "Google Gemini", "app/gui/icons/gemini.png"),
             ("DeepSeek", "DeepSeek", "app/gui/icons/deepseek.png"),
@@ -2171,7 +2172,7 @@ class Ui_MainWindow(object):
         self.comboBox_conversation_method.setFixedHeight(40)
         self.comboBox_conversation_method.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.comboBox_conversation_method.addItems([
-            "Mistral AI", "Open AI", "OpenRouter", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI"
+            "Mistral AI", "Open AI", "OpenRouter", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI", "ChatGPT"
         ])
         self.comboBox_conversation_method.setObjectName("comboBox_conversation_method")
         
@@ -2297,6 +2298,11 @@ class Ui_MainWindow(object):
 
         l_api.addLayout(form_api)
         conf_layout.addWidget(self.card_api)
+
+        from app.gui.chatgpt_settings import ChatGPTSettingsWidget
+        self.chatgpt_settings = ChatGPTSettingsWidget(self.configuration, self.translations)
+        self.chatgpt_settings.hide()
+        conf_layout.addWidget(self.chatgpt_settings)
         
         conf_layout.addStretch()
         self.tabWidget_options.addWidget(self.configuration_tab)
@@ -2363,10 +2369,14 @@ class Ui_MainWindow(object):
         self.max_tokens_horizontalSlider.setObjectName("max_tokens_horizontalSlider")
         self.lineEdit_maxTokens = QtWidgets.QLineEdit()
         self.lineEdit_maxTokens.setObjectName("lineEdit_maxTokens")
-        l_llm_gen.addLayout(create_slider_row(
+        self.chatgpt_unsupported_max_tokens = QtWidgets.QWidget()
+        max_tokens_layout = QtWidgets.QVBoxLayout(self.chatgpt_unsupported_max_tokens)
+        max_tokens_layout.setContentsMargins(0, 0, 0, 0)
+        max_tokens_layout.addLayout(create_slider_row(
             self.translations.get("max_tokens_text", "Max Tokens"), 
             self.max_tokens_horizontalSlider, self.lineEdit_maxTokens, 16, 131072, 64, 
             self.translations.get("max_tokens_tooltip", "Max Response Length. Raise this well above the default if you use reasoning/thinking models, since their internal reasoning tokens are also counted against this limit.")))
+        l_llm_gen.addWidget(self.chatgpt_unsupported_max_tokens)
 
         l_llm_gen.addSpacing(10)
 
@@ -2395,14 +2405,19 @@ class Ui_MainWindow(object):
 
         l_llm_gen.addSpacing(10)
 
+        self.chatgpt_unsupported_sampling = QtWidgets.QWidget()
+        sampling_layout = QtWidgets.QVBoxLayout(self.chatgpt_unsupported_sampling)
+        sampling_layout.setContentsMargins(0, 0, 0, 0)
+        l_llm_gen.addWidget(self.chatgpt_unsupported_sampling)
+
         # === CREATIVITY & SAMPLING ===
-        l_llm_gen.addLayout(create_section_header(self.translations.get("section_creativity", "CREATIVITY & SAMPLING")))
+        sampling_layout.addLayout(create_section_header(self.translations.get("section_creativity", "CREATIVITY & SAMPLING")))
 
         self.temperature_horizontalSlider = QtWidgets.QSlider()
         self.temperature_horizontalSlider.setObjectName("temperature_horizontalSlider")
         self.lineEdit_temperature = QtWidgets.QLineEdit()
         self.lineEdit_temperature.setObjectName("lineEdit_temperature")
-        l_llm_gen.addLayout(create_slider_row(
+        sampling_layout.addLayout(create_slider_row(
             self.translations.get("temperature_text", "Temperature"), 
             self.temperature_horizontalSlider, self.lineEdit_temperature, 0, 20, 1, 
             self.translations.get("temperature_tooltip", "0.0 to 2.0. Higher values make the output more creative.")))
@@ -2411,21 +2426,21 @@ class Ui_MainWindow(object):
         self.top_p_horizontalSlider.setObjectName("top_p_horizontalSlider")
         self.lineEdit_topP = QtWidgets.QLineEdit()
         self.lineEdit_topP.setObjectName("lineEdit_topP")
-        l_llm_gen.addLayout(create_slider_row(
+        sampling_layout.addLayout(create_slider_row(
             self.translations.get("top_p_text", "Top-P"), 
             self.top_p_horizontalSlider, self.lineEdit_topP, 0, 10, 1,
             self.translations.get("top_p_tooltip", "0.0 to 1.0. Core sampler. Set to 1.0 if using Min-P in Advanced Settings.")))
         
-        l_llm_gen.addSpacing(10)
+        sampling_layout.addSpacing(10)
 
         # === REPETITION PENALTIES ===
-        l_llm_gen.addLayout(create_section_header(self.translations.get("section_penalties", "REPETITION PENALTIES")))
+        sampling_layout.addLayout(create_section_header(self.translations.get("section_penalties", "REPETITION PENALTIES")))
 
         self.freq_penalty_horizontalSlider = QtWidgets.QSlider()
         self.freq_penalty_horizontalSlider.setObjectName("freq_penalty_horizontalSlider")
         self.lineEdit_freqPenalty = QtWidgets.QLineEdit()
         self.lineEdit_freqPenalty.setObjectName("lineEdit_freqPenalty")
-        l_llm_gen.addLayout(create_slider_row(
+        sampling_layout.addLayout(create_slider_row(
             self.translations.get("freq_penalty_text", "Frequency Penalty"), 
             self.freq_penalty_horizontalSlider, self.lineEdit_freqPenalty, 0, 20, 1, 
             self.translations.get("freq_penalty_tooltip", "0.0 to 2.0. Penalizes words based on their frequency in the text. Encourages wider vocabulary.")))
@@ -2434,7 +2449,7 @@ class Ui_MainWindow(object):
         self.pres_penalty_horizontalSlider.setObjectName("pres_penalty_horizontalSlider")
         self.lineEdit_presPenalty = QtWidgets.QLineEdit()
         self.lineEdit_presPenalty.setObjectName("lineEdit_presPenalty")
-        l_llm_gen.addLayout(create_slider_row(
+        sampling_layout.addLayout(create_slider_row(
             self.translations.get("pres_penalty_text", "Presence Penalty"), 
             self.pres_penalty_horizontalSlider, self.lineEdit_presPenalty, 0, 20, 1, 
             self.translations.get("pres_penalty_tooltip", "0.0 to 2.0. Penalizes words if they appeared at all. Encourages switching topics.")))

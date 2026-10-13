@@ -1,3 +1,5 @@
 app/configuration/api.json
 app/configuration/settings.json
 app/configuration/characters.json
+__pycache__/
+*.py[cod]

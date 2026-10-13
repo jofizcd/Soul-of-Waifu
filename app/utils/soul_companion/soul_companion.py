@@ -608,7 +608,8 @@ class WebSearchTool(BaseTool):
             "success": False,
             "result": (
                 "Web search is currently unavailable (all strategies failed). "
-                "Use your internal knowledge to answer the user."
+                "Tell the user the search failed. Do not invent sources or present internal knowledge "
+                "as verified current news."
             ),
             "speak": None,
         }

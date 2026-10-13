@@ -213,7 +213,7 @@ class MainWindow(QMainWindow):
         """
         Loads translation strings from a YAML file based on the program language.
         """
-        file_path = f"app/translations/{language}.yaml"
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "translations", f"{language}.yaml")
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as file:
                 self.translations = yaml.safe_load(file)
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
         self.ui.pushButton_rp_editors.setText(self.translations.get("rp_editors_button", " RP Editors"))
         self.ui.pushButton_soul_stage.setText(self.translations.get("soul_stage_button", " Soul Stage"))
         self.ui.pushButton_options.setText(self.translations.get("options_button", " Options"))
-        self.ui.version_label.setText(self.translations.get("version_label", "v2.4.7"))
+        self.ui.version_label.setText(self.translations.get("version_label", "v2.5.1"))
         
         # Main Tab Without Characters
         self.ui.main_no_characters_advice_label.setText(self.translations.get("no_characters_advice", "You haven\'t added any characters. Click on the button and create it"))
@@ -873,7 +873,7 @@ if __name__ == "__main__":
 
     main_window.show()    
 
-    current_version = "v2.4.7"
+    current_version = "v2.5.1"
 
     def deferred_update_check():
         latest_version, github_url = main_window.check_for_updates(current_version)
