@@ -1684,7 +1684,7 @@ class SceneEditorView(QWidget):
         self.f_method = QComboBox()
         self.f_method.addItems([
             "Local LLM", "Open AI", "Anthropic", "Google Gemini", 
-            "DeepSeek", "Grok", "Qwen", "Z.AI", "Mistral AI", "OpenRouter", "Player2"
+            "DeepSeek", "Grok", "Qwen", "Z.AI", "Mistral AI", "OpenRouter", "Player2", "ChatGPT"
         ])
         self.f_method.setFixedHeight(36)
         self.f_method.setStyleSheet(COMBO_STYLE)
@@ -1824,7 +1824,7 @@ class SceneEditorView(QWidget):
         self.f_method.setCurrentIndex({
             "Local LLM": 0, "Open AI": 1, "Anthropic": 2, "Google Gemini": 3,
             "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9,
-            "Player2": 10
+            "Player2": 10, "ChatGPT": 11
         }.get(scene_data.get("conversation_method", "Local LLM"), 0))
         self.f_persona.setCurrentText(scene_data.get("persona", "None"))
         self.f_narrator_style.setCurrentText(scene_data.get("narrator_style", "Standard evocative present-tense prose"))
@@ -1899,7 +1899,7 @@ class SceneEditorView(QWidget):
         self.f_method.setCurrentIndex({
             "Local LLM": 0, "Open AI": 1, "Anthropic": 2, "Google Gemini": 3,
             "DeepSeek": 4, "Grok": 5, "Qwen": 6, "Z.AI": 7, "Mistral AI": 8, "OpenRouter": 9,
-            "Player2": 10
+            "Player2": 10, "ChatGPT": 11
         }.get(import_data.get("conversation_method", "Local LLM"), 0))
         self.f_persona.setCurrentText(import_data.get("persona", "None"))
         self.f_narrator_style.setCurrentText(import_data.get("narrator_style", "Standard evocative present-tense prose"))

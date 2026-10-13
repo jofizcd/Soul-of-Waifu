@@ -51,6 +51,8 @@ from app.utils.ai_clients.prompt_engine import (
     strip_partial_reasoning_tag, extract_reasoning, find_reasoning_open, find_reasoning_close
 )
 from app.utils.ai_clients.ai_factory import AIFactory
+from app.utils.chatgpt_auth import ChatGPTAuthError
+from app.utils.ai_clients.providers.chatgpt_provider import ChatGPTProviderError
 from app.utils.ai_clients.tools import ToolRegistry, normalize_tool_call
 from app.utils.ai_clients.soul_stage_engine import (
         SoulStageOrchestrator,
@@ -189,7 +191,7 @@ class InterfaceSignals():
         self.MAX_IMAGE_DIMENSION = 1536
         
         self.OPENAI_STYLE_VISION_PROVIDERS = {
-            "Open AI", "OpenRouter", "Local LLM", "Mistral AI",
+            "Open AI", "ChatGPT", "OpenRouter", "Local LLM", "Mistral AI",
             "DeepSeek", "Grok", "Qwen", "Z.AI", "Google Gemini",
         }
         self.ANTHROPIC_STYLE_VISION_PROVIDERS = {"Anthropic"}
@@ -1113,6 +1115,9 @@ class InterfaceSignals():
         for _ in range(self.MAX_TOOL_LOOP_ITERATIONS):
             try:
                 result = await provider.generate(working_messages, tools=schemas, temperature=0.1, max_tokens=600)
+            except (ChatGPTAuthError, ChatGPTProviderError):
+                # A failed plan/auth request must not trigger another inference request.
+                raise
             except Exception as e:
                 logger.error(f"Tool loop: generate() call failed, skipping tools: {e}")
                 return messages
@@ -1164,6 +1169,7 @@ class InterfaceSignals():
                     QApplication.processEvents()
                     start_time = time.time()
                     
+                    self._chatgpt_tools_executed = True
                     tool_result = await self.tool_registry.execute(call["name"], call["arguments"], tool_context)
                     
                     elapsed = time.time() - start_time
@@ -1514,7 +1520,7 @@ class InterfaceSignals():
         """
         Loads translation data from a YAML file based on the program language.
         """
-        file_path = f"app/translations/{language}.yaml"
+        file_path = Path(__file__).resolve().parents[1] / "translations" / f"{language}.yaml"
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as file:
                 self.translations = yaml.safe_load(file)
@@ -1987,7 +1993,7 @@ class InterfaceSignals():
             self.configuration_settings.update_user_data("current_character_image", None)
 
         match conversation_method:
-            case "Mistral AI" | "Open AI" | "OpenRouter" | "Local LLM" | "Anthropic" | "Google Gemini" | "DeepSeek" | "Grok" | "Qwen" | "Z.AI" | "Player2":
+            case "Mistral AI" | "Open AI" | "OpenRouter" | "Local LLM" | "Anthropic" | "Google Gemini" | "DeepSeek" | "Grok" | "Qwen" | "Z.AI" | "Player2" | "ChatGPT":
                 return handle_generic_ai(conversation_method)
             case _:
                 logger.error(f"Unsupported conversation method: {conversation_method}")
@@ -3766,7 +3772,7 @@ class InterfaceSignals():
                 match conversation_method:
                     case "Mistral AI":
                         conversation_method_image = "app/gui/icons/mistralai.png"
-                    case "Open AI":
+                    case "Open AI" | "ChatGPT":
                         conversation_method_image = "app/gui/icons/openai.png"
                     case "OpenRouter":
                         conversation_method_image = "app/gui/icons/openrouter.png"
@@ -4698,7 +4704,7 @@ class InterfaceSignals():
         create_combo_section(
             layout0, 
             self.translations.get("character_edit_conv_method", "Conversation Method"), 
-            ["Mistral AI", "OpenRouter", "Open AI", "Local LLM", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI", "Player2"], conversation_method,
+            ["Mistral AI", "OpenRouter", "Open AI", "Local LLM", "Anthropic", "Google Gemini", "DeepSeek", "Grok", "Qwen", "Z.AI", "Player2", "ChatGPT"], conversation_method,
             lambda txt: update_character_conversation_method(character_name, txt)
         )
         
@@ -7132,6 +7138,15 @@ class InterfaceSignals():
         Changing the API token to the selected option and managing layout visibility dynamically.
         """
         selected_conversation_method = self.ui.comboBox_conversation_method.currentText()
+        is_chatgpt = selected_conversation_method == "ChatGPT"
+        self.ui.card_api.setVisible(not is_chatgpt)
+        self.ui.chatgpt_settings.setVisible(is_chatgpt)
+        self.ui.chatgpt_unsupported_sampling.setVisible(not is_chatgpt)
+        self.ui.chatgpt_unsupported_max_tokens.setVisible(not is_chatgpt)
+        off_index = self.ui.comboBox_reasoning_effort.findData("none")
+        if off_index >= 0:
+            reasoning_label = self.translations.get("chatgpt_reasoning_default", "Model default") if is_chatgpt else self.translations.get("reasoning_effort_none", "Off")
+            self.ui.comboBox_reasoning_effort.setItemText(off_index, reasoning_label)
 
         self.ui.label_base_url.hide()
         self.ui.lineEdit_base_url_options.hide()
@@ -11502,6 +11517,11 @@ class InterfaceSignals():
                 "app/gui/icons/openai.png"
             ),
             (
+                "ChatGPT",
+                self.translations.get("provider_desc_chatgpt", "Connect your ChatGPT account. Eligible requests use your ChatGPT plan."),
+                "app/gui/icons/openai.png"
+            ),
+            (
                 self.translations.get("provider_name_anthropic", "Anthropic"),
                 self.translations.get("provider_desc_anthropic", "Best-in-class prose, character consistency, and emotional depth"),
                 "app/gui/icons/anthropic.png"
@@ -11853,7 +11873,7 @@ class InterfaceSignals():
         target_method = conversation_method if conversation_method in [
             "Mistral AI", "Open AI", "OpenRouter", "Local LLM", 
             "Anthropic", "Google Gemini", "DeepSeek", "Grok", 
-            "Qwen", "Z.AI", "Player2"
+            "Qwen", "Z.AI", "Player2", "ChatGPT"
         ] else "Local LLM"
 
         try:
@@ -14840,7 +14860,14 @@ class InterfaceSignals():
                     .replace("{{Персонаж}}", character_name))
 
     def stop_generation(self):
+        if getattr(self, "_chatgpt_commit_in_progress", False):
+            return
         self.abort_generation = True
+        chatgpt_task = getattr(self, "_chatgpt_generation_task", None)
+        if chatgpt_task is not None and not chatgpt_task.done():
+            chatgpt_task.cancel()
+            self.ui.pushButton_stop_generation.hide()
+            return  # Send becomes available only after the cancelled handler restores its UI.
         self.ui.pushButton_stop_generation.hide()
         self.ui.pushButton_send_message.show()
         logger.info("The user requested to stop the generation.")
@@ -14873,6 +14900,13 @@ class InterfaceSignals():
         current_text_to_speech = character_info.get("current_text_to_speech", "Nothing")
         character_avatar = character_info.get("character_avatar")
 
+        if conversation_method == "ChatGPT":
+            self._chatgpt_generation_task = asyncio.current_task()
+            self._chatgpt_tools_executed = False
+            self._chatgpt_commit_in_progress = False
+        generator = None
+        user_text = ""
+        current_attachments = []
         try:
             if discord_context or discord_user_name:
                 author_display = discord_user_name or (discord_context.author.display_name if discord_context else "Discord User")
@@ -15164,6 +15198,15 @@ class InterfaceSignals():
 
                         await asyncio.sleep(0.005)
 
+                if conversation_method == "ChatGPT" and self.abort_generation:
+                    raise asyncio.CancelledError()
+
+                if conversation_method == "ChatGPT":
+                    # Streaming has completed; keep Send hidden until the commit is complete.
+                    self._chatgpt_generation_task = None
+                    self._chatgpt_commit_in_progress = True
+                    self.ui.pushButton_stop_generation.hide()
+
                 if _tts_active and sentence_buffer_chat.strip():
                     raw_tail = sentence_buffer_chat.strip()
                     if len(raw_tail) > 3 and hasattr(self, 'chat_tts_worker') and self.chat_tts_worker:
@@ -15184,6 +15227,8 @@ class InterfaceSignals():
                     )
                     await asyncio.sleep(0)
 
+            except (ChatGPTAuthError, ChatGPTProviderError):
+                raise
             except Exception as e:
                 if not first_chunk_received and 'typing_widget' in locals() and typing_widget:
                     try: typing_widget.deleteLater()
@@ -15252,7 +15297,8 @@ class InterfaceSignals():
                     )
 
             self.ui.pushButton_stop_generation.hide()
-            self.ui.pushButton_send_message.show()
+            if conversation_method != "ChatGPT":
+                self.ui.pushButton_send_message.show()
 
             if sow_system_status:
                 if current_sow_system_mode in ["Expressions Images", "Live2D Model", "VRM"]:
@@ -15279,6 +15325,8 @@ class InterfaceSignals():
                 logger.info("Text-to-Speech was canceled because the generation was interrupted by the user.")
 
             await self.render_messages(character_name)
+            if conversation_method == "ChatGPT":
+                self.ui.pushButton_send_message.show()
 
             translator_idx = self.configuration_settings.get_main_setting("translator") or 0
             auto_translate_setting = self.configuration_settings.get_main_setting("auto_translate_new_messages")
@@ -15307,6 +15355,16 @@ class InterfaceSignals():
             if getattr(self, "web_bridge", None):
                 asyncio.create_task(self.web_bridge.broadcast_message_end())
                     
+        except (ChatGPTAuthError, ChatGPTProviderError) as error:
+            await self._restore_chatgpt_chat(character_name, external_text, user_text, current_attachments)
+            self._show_chatgpt_error(error)
+        except asyncio.CancelledError:
+            if conversation_method != "ChatGPT":
+                raise
+            await self._restore_chatgpt_chat(character_name, external_text, user_text, current_attachments)
+            if getattr(self, "_chatgpt_tools_executed", False):
+                self._show_chatgpt_error(ChatGPTProviderError(self.translations.get(
+                    "chatgpt_cancelled_tools", "Generation cancelled. Tool actions may already have completed; check before retrying.")))
         except Exception:
             import traceback
             error_message = traceback.format_exc()
@@ -15319,6 +15377,49 @@ class InterfaceSignals():
             
             self.ui.pushButton_stop_generation.hide()
             self.ui.pushButton_send_message.show()
+        finally:
+            if conversation_method == "ChatGPT":
+                self._chatgpt_commit_in_progress = False
+                if getattr(self, "_chatgpt_generation_task", None) is asyncio.current_task():
+                    self._chatgpt_generation_task = None
+                if generator is not None:
+                    await generator.aclose()
+
+    async def _restore_chatgpt_chat(self, character_name, external_text, user_text, current_attachments):
+        # Restore saved history, preserving unsent input without committing partial output.
+        self.ui.pushButton_stop_generation.hide()
+        await self.first_render_messages(character_name)
+        if not external_text and not self.textEdit_write_user_message.toPlainText().strip():
+            self.textEdit_write_user_message.setPlainText(user_text)
+            self.pending_attachments = current_attachments
+            self._refresh_attachment_preview_bar()
+        bridge = getattr(self, "web_bridge", None)
+        if bridge is not None:
+            try:
+                await asyncio.wait_for(bridge.broadcast_message_end(), timeout=2)
+            except Exception:
+                # Local recovery must succeed even if a web client has disconnected.
+                logger.warning("Could not notify the web client that ChatGPT generation ended.")
+        self.ui.pushButton_send_message.show()
+
+    def _show_chatgpt_error(self, error):
+        from app.gui.chatgpt_settings import CHATGPT_DIALOG_STYLE
+        self._chatgpt_error_dialog = QMessageBox(self.main_window)
+        self._chatgpt_error_dialog.setStyleSheet(CHATGPT_DIALOG_STYLE)
+        self._chatgpt_error_dialog.setWindowTitle("ChatGPT")
+        self._chatgpt_error_dialog.setTextFormat(Qt.TextFormat.PlainText)
+        self._chatgpt_error_dialog.setText(str(error))
+        if getattr(self, "_chatgpt_tools_executed", False):
+            self._chatgpt_error_dialog.setInformativeText(self.translations.get(
+                "chatgpt_tools_notice", "Tool actions may already have completed. Check their results before retrying."))
+        manage = self._chatgpt_error_dialog.addButton(
+            self.translations.get("chatgpt_usage", "Manage ChatGPT usage and app access"),
+            QMessageBox.ButtonRole.ActionRole,
+        )
+        manage.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://chatgpt.com/settings/usage")))
+        self._chatgpt_error_dialog.addButton(QMessageBox.StandardButton.Close)
+        self._chatgpt_error_dialog.setDefaultButton(manage)
+        self._chatgpt_error_dialog.open()
 
     async def regenerate_message(self, conversation_method, character_name, message_id):
         """
@@ -15354,14 +15455,15 @@ class InterfaceSignals():
         selected_index = all_message_ids.index(message_id)
         ids_to_delete = all_message_ids[selected_index + 1:]
         
-        for msg_id in ids_to_delete:
-            if msg_id in self.messages:
-                self.messages[msg_id]["frame"].deleteLater()
-                del self.messages[msg_id]
-            if msg_id in self.message_order:
-                self.message_order.remove(msg_id)
+        if conversation_method != "ChatGPT":
+            for msg_id in ids_to_delete:
+                if msg_id in self.messages:
+                    self.messages[msg_id]["frame"].deleteLater()
+                    del self.messages[msg_id]
+                if msg_id in self.message_order:
+                    self.message_order.remove(msg_id)
 
-        self.configuration_characters.delete_chat_messages(character_name, ids_to_delete)
+            self.configuration_characters.delete_chat_messages(character_name, ids_to_delete)
 
         await asyncio.sleep(0.05)
 
@@ -15448,52 +15550,89 @@ class InterfaceSignals():
             image_attachments=image_attachments_b64 or None, provider_style=provider_style
         )
 
-        provider = AIFactory.get_provider(conversation_method)
-        if provider:
-            if self.tools_enabled and self.tool_registry.has_tools():
-                messages = await self.run_tool_loop(provider, messages, character_name, user_name)
+        generator = None
+        stream_completed = False
+        if conversation_method == "ChatGPT":
+            self.abort_generation = False
+            self._chatgpt_generation_task = asyncio.current_task()
+            self._chatgpt_tools_executed = False
+            self.ui.pushButton_send_message.hide()
+            self.ui.pushButton_stop_generation.show()
+        try:
+            provider = AIFactory.get_provider(conversation_method)
+            if provider:
+                if self.tools_enabled and self.tool_registry.has_tools():
+                    messages = await self.run_tool_loop(provider, messages, character_name, user_name)
 
-            gen_kwargs = self._get_gen_kwargs(conversation_method)
-            generator = provider.generate_stream(messages, **gen_kwargs)
+                gen_kwargs = self._get_gen_kwargs(conversation_method)
+                generator = provider.generate_stream(messages, **gen_kwargs)
 
-            async for chunk in generator:
-                if chunk:
-                    full_text += chunk
+                async for chunk in generator:
+                    if conversation_method == "ChatGPT" and self.abort_generation:
+                        raise asyncio.CancelledError()
+                    if chunk:
+                        full_text += chunk
 
-                    if not first_chunk_received:
-                        probe_text = full_text
-                        if probe_text.startswith(f"{character_name}:"):
-                            probe_text = probe_text[len(f"{character_name}:"):].lstrip()
-                        visible_probe, _ = extract_reasoning(probe_text)
+                        if not first_chunk_received:
+                            probe_text = full_text
+                            if probe_text.startswith(f"{character_name}:"):
+                                probe_text = probe_text[len(f"{character_name}:"):].lstrip()
+                            visible_probe, _ = extract_reasoning(probe_text)
 
-                        if not visible_probe.strip():
-                            await asyncio.sleep(0.005)
-                            continue
+                            if not visible_probe.strip():
+                                await asyncio.sleep(0.005)
+                                continue
 
-                        if typing_widget:
-                            try:
-                                typing_widget.deleteLater()
-                                self.chat_container.removeWidget(typing_widget)
-                            except Exception:
-                                pass
+                            if typing_widget:
+                                try:
+                                    typing_widget.deleteLater()
+                                    self.chat_container.removeWidget(typing_widget)
+                                except Exception:
+                                    pass
                         
-                        character_answer_frame.show()
-                        character_answer_label.setText("")
-                        first_chunk_received = True
+                            character_answer_frame.show()
+                            character_answer_label.setText("")
+                            first_chunk_received = True
 
-                    clean_partial_text = full_text
-                    if clean_partial_text.startswith(f"{character_name}:"):
-                        clean_partial_text = clean_partial_text[len(f"{character_name}:"):].lstrip()
+                        clean_partial_text = full_text
+                        if clean_partial_text.startswith(f"{character_name}:"):
+                            clean_partial_text = clean_partial_text[len(f"{character_name}:"):].lstrip()
 
-                    clean_partial_text = strip_partial_state_tag(clean_partial_text)
+                        clean_partial_text = strip_partial_state_tag(clean_partial_text)
 
-                    processed_html = self.markdown_to_html(clean_partial_text)
-                    processed_html = self.apply_macros(processed_html, character_name, user_name)
-                    character_answer_label.setText(processed_html)
+                        processed_html = self.markdown_to_html(clean_partial_text)
+                        processed_html = self.apply_macros(processed_html, character_name, user_name)
+                        character_answer_label.setText(processed_html)
 
-                    scrollbar = self.ui.scrollArea_chat.verticalScrollBar()
-                    scrollbar.setValue(scrollbar.maximum())
-                    await asyncio.sleep(0.01)
+                        scrollbar = self.ui.scrollArea_chat.verticalScrollBar()
+                        scrollbar.setValue(scrollbar.maximum())
+                        await asyncio.sleep(0.01)
+
+                if conversation_method == "ChatGPT" and self.abort_generation:
+                    raise asyncio.CancelledError()
+                stream_completed = True
+
+        except (ChatGPTAuthError, ChatGPTProviderError) as error:
+            await self.first_render_messages(character_name)
+            self._show_chatgpt_error(error)
+            return
+        except asyncio.CancelledError:
+            if conversation_method != "ChatGPT":
+                raise
+            await self.first_render_messages(character_name)
+            if getattr(self, "_chatgpt_tools_executed", False):
+                self._show_chatgpt_error(ChatGPTProviderError(self.translations.get(
+                    "chatgpt_cancelled_tools", "Generation cancelled. Tool actions may already have completed; check before retrying.")))
+            return
+        finally:
+            if conversation_method == "ChatGPT":
+                if getattr(self, "_chatgpt_generation_task", None) is asyncio.current_task():
+                    self._chatgpt_generation_task = None
+                self.ui.pushButton_stop_generation.hide()
+                if generator is not None:
+                    await generator.aclose()
+                if not stream_completed:
+                    self.ui.pushButton_send_message.show()
 
         if not first_chunk_received and 'typing_widget' in locals() and typing_widget:
             try:
@@ -15544,9 +15683,21 @@ class InterfaceSignals():
         character_answer_label.setProperty("original_text", final_html)
         character_answer_label.setProperty("is_translated", False)
 
+        if conversation_method == "ChatGPT":
+            for msg_id in ids_to_delete:
+                if msg_id in self.messages:
+                    self.messages[msg_id]["frame"].deleteLater()
+                    del self.messages[msg_id]
+                if msg_id in self.message_order:
+                    self.message_order.remove(msg_id)
+
+            self.configuration_characters.delete_chat_messages(character_name, ids_to_delete)
+
         self.configuration_characters.regenerate_message_in_config(character_name, message_id, full_text)
 
         await self.first_render_messages(character_name)
+        if conversation_method == "ChatGPT":
+            self.ui.pushButton_send_message.show()
 
         QtCore.QTimer.singleShot(0, lambda: self.ui.scrollArea_chat.verticalScrollBar().setValue(
             self.ui.scrollArea_chat.verticalScrollBar().maximum()

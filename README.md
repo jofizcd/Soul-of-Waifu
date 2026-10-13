@@ -286,6 +286,11 @@ No Python knowledge, Node.js, or command-line experience required.
 
 ## ⚡ Quick Start
 
+- **ChatGPT account:** Connect through **Options → Configuration → ChatGPT**, authorize
+  eligible ChatGPT plan usage in your browser, then select an available model.
+  No OpenAI API key is needed for this provider. See the
+  [connection guide and limitations](docs/chatgpt-account.md).
+
 - **Option A — Cloud AI (No GPU Required):**
   Go to **Options -> Configuration**, input your OpenRouter or OpenAI API key. Import a character card from the **Characters Gateway** or drag-and-drop a `.png` / `.json` file into the app window.
 - **Option B — Local AI:**

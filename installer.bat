@@ -65,6 +65,7 @@ pip install --no-cache-dir discord.py PyNaCl davey
 pip install --no-cache-dir pyautogui playwright && playwright install chromium
 pip install --no-cache-dir sentence-transformers==5.1.0
 pip install --no-cache-dir openai==1.70.0 mistralai==1.5.0
+pip install --no-cache-dir "PyJWT[crypto]>=2.10.1,<3" filelock
 pip install --no-cache-dir edge-tts==7.2.7 elevenlabs==1.52.0 kokoro==0.9.4
 pip install --no-cache-dir qwen-tts
 pip install --no-cache-dir faster-whisper

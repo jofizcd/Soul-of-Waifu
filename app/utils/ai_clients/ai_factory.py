@@ -11,6 +11,7 @@ from app.utils.ai_clients.providers.grok_provider import GrokProvider
 from app.utils.ai_clients.providers.qwen_provider import QwenProvider
 from app.utils.ai_clients.providers.zai_provider import ZAIProvider
 from app.utils.ai_clients.providers.player2_provider import Player2Provider
+from app.utils.ai_clients.providers.chatgpt_provider import ChatGPTProvider
 
 logger = logging.getLogger("AI Factory")
 
@@ -23,7 +24,10 @@ class AIFactory:
         config_settings = configuration.ConfigurationSettings()
         config_api = configuration.ConfigurationAPI()
 
-        if conversation_method == "Open AI":
+        if conversation_method == "ChatGPT":
+            return ChatGPTProvider(model=config_settings.get_main_setting("chatgpt_model"))
+
+        elif conversation_method == "Open AI":
             api_key = config_api.get_token("OPEN_AI_API_TOKEN")
             model = config_settings.get_main_setting("openai_model") or "gpt-4o-mini"
             base_url = config_api.get_token("CUSTOM_ENDPOINT_URL")

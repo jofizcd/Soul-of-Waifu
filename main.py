@@ -213,7 +213,7 @@ class MainWindow(QMainWindow):
         """
         Loads translation strings from a YAML file based on the program language.
         """
-        file_path = f"app/translations/{language}.yaml"
+        file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app", "translations", f"{language}.yaml")
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as file:
                 self.translations = yaml.safe_load(file)
