@@ -60,6 +60,14 @@ A response is successful only after `response.completed`. Account access and
 usage errors can arrive after text has started streaming. Signing in and listing
 models alone do not establish that generation will succeed.
 
+When chat tools are enabled, each round streams text as it arrives, including
+the answer after a tool result. Tool calls execute only after a validated
+terminal response; incomplete arguments are never executed. Text already shown
+is not replayed, and no extra request is made just to regenerate the answer. A validated
+`response.completed` ends the response without waiting for the HTTP connection
+to close. Transport diagnostics record only exception type, phase, timing and
+event counts; requests are not automatically replayed after a transport failure.
+
 ## Development checks
 
 Run the focused tests from the repository root:

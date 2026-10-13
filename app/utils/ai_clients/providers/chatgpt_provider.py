@@ -2,6 +2,9 @@
 
 import asyncio
 import json
+import logging
+import time
+from contextlib import aclosing
 
 import httpx
 from openai.types.chat import ChatCompletionMessageToolCall
@@ -11,10 +14,29 @@ from app.utils.ai_clients.base_provider import BaseAIProvider
 
 API_ROOT = "https://api.openai.com/v1"
 TOOL_NAMESPACE = "soul_of_waifu"
+logger = logging.getLogger(__name__)
 
 
 class ChatGPTProviderError(RuntimeError):
     """A safe, user-facing error that never includes remote bodies or credentials."""
+
+
+def _transport_error(error, *, operation, started, phase, events=0, received_text=False):
+    # Exception messages/tracebacks may contain URLs, credentials or request data.
+    # Keep diagnostics limited to local metadata and the exception class.
+    logger.warning(
+        "ChatGPT transport failure: operation=%s type=%s phase=%s elapsed=%.1fs events=%d received_text=%s",
+        operation, type(error).__name__, phase, time.monotonic() - started, events, received_text,
+    )
+    if isinstance(error, httpx.ConnectTimeout):
+        message = "Connecting to ChatGPT timed out. Check your connection and try again."
+    elif isinstance(error, httpx.ReadTimeout):
+        message = "ChatGPT stopped sending data before the response completed (read timeout). Try again."
+    elif isinstance(error, httpx.TimeoutException):
+        message = "The ChatGPT request timed out. Check your connection and try again."
+    else:
+        message = "ChatGPT connection interrupted. Check your connection and try again."
+    return ChatGPTProviderError(message)
 
 
 def _error(code=None, status=None):
@@ -104,21 +126,31 @@ def _tools(tools):
 
 async def _sse(response):
     data = []
-    async for line in response.aiter_lines():
-        if line.startswith("data:"):
-            data.append(line[5:].lstrip(" "))
-        elif not line and data:
-            raw = "\n".join(data)
-            data = []
-            if raw == "[DONE]":
-                return
-            try:
-                event = json.loads(raw)
-                if not isinstance(event, dict):
-                    raise ValueError()
-            except (ValueError, TypeError):
-                raise ChatGPTProviderError("ChatGPT returned an invalid event stream.") from None
-            yield event
+    lines = response.aiter_lines()
+    try:
+        async for line in lines:
+            if line.startswith("data:"):
+                data.append(line[5:].lstrip(" "))
+            elif not line and data:
+                raw = "\n".join(data)
+                data = []
+                if raw == "[DONE]":
+                    return
+                try:
+                    event = json.loads(raw)
+                    if not isinstance(event, dict):
+                        raise ValueError()
+                except (ValueError, TypeError):
+                    raise ChatGPTProviderError("ChatGPT returned an invalid event stream.") from None
+                yield event
+    finally:
+        # Close the transport in this task while httpx's nested iterators are
+        # still alive. Dropping them first can defer httpcore I/O cleanup to
+        # async-generator finalizers (notably under Qt's event loop).
+        try:
+            await response.aclose()
+        finally:
+            await lines.aclose()
     # A final event need not have a trailing empty line.
     if data and "\n".join(data) != "[DONE]":
         try:
@@ -170,6 +202,7 @@ class ChatGPTProvider(BaseAIProvider):
     async def list_models(self):
         """The catalog is account-specific; deliberately do not cache it."""
         account_id = await self._account_id()
+        started = time.monotonic()
         try:
             async with httpx.AsyncClient(timeout=30, transport=self.transport) as client:
                 for attempt in range(2):
@@ -184,8 +217,8 @@ class ChatGPTProvider(BaseAIProvider):
                         raise ChatGPTProviderError("ChatGPT returned an invalid model catalog.")
                     return [{"id": m["slug"], "label": m.get("display_name") or m["slug"]}
                             for m in models if m.get("visibility") == "list" and m.get("slug")]
-        except httpx.HTTPError:
-            raise ChatGPTProviderError("Cannot reach ChatGPT. Check your connection and try again.") from None
+        except httpx.HTTPError as error:
+            raise _transport_error(error, operation="models", started=started, phase="catalog") from None
         except (ValueError, TypeError, KeyError):
             raise ChatGPTProviderError("ChatGPT returned an invalid model catalog.") from None
 
@@ -202,6 +235,10 @@ class ChatGPTProvider(BaseAIProvider):
         if effort and effort != "none":
             payload["reasoning"] = {"effort": effort}
         account_id = await self._account_id()
+        started = time.monotonic()
+        phase = "request"
+        event_count = 0
+        received_text = False
         try:
             async with httpx.AsyncClient(timeout=120, transport=self.transport) as client:
                 for attempt in range(2):
@@ -218,53 +255,84 @@ class ChatGPTProvider(BaseAIProvider):
                             except (ValueError, AttributeError):
                                 code = None
                             raise _error(code, response.status_code)
-                        completed = False
+                        phase = "stream"
                         output_items = {}
-                        async for event in _sse(response):
-                            kind = event.get("type")
-                            if kind in ("error", "response.failed"):
-                                details = event.get("response", {}).get("error") or event.get("error") or event
-                                raise _error(details.get("code") if isinstance(details, dict) else None)
-                            if kind == "response.incomplete":
-                                raise ChatGPTProviderError("ChatGPT response was incomplete. Try again.")
-                            if kind == "response.output_item.done":
-                                item = event.get("item")
-                                index = event.get("output_index")
-                                if isinstance(item, dict) and isinstance(index, int):
-                                    output_items[index] = item
-                            if kind == "response.completed":
-                                final = event.get("response")
-                                if not isinstance(final, dict) or final.get("status") != "completed":
-                                    raise ChatGPTProviderError("ChatGPT returned an invalid completion event.")
-                                # The plan-sharing stream may leave terminal output
-                                # empty: completed items arrived in earlier events.
-                                # Never release those tools before terminal success.
-                                if not final.get("output") and output_items:
-                                    event = dict(event, response=dict(final, output=[
-                                        output_items[index] for index in sorted(output_items)]))
-                                completed = True
-                            yield event
-                        if not completed:
-                            raise ChatGPTProviderError("ChatGPT connection ended before the response completed. Try again.")
-                        return
-        except httpx.HTTPError:
-            raise ChatGPTProviderError("ChatGPT connection interrupted. Check your connection and try again.") from None
+                        async with aclosing(_sse(response)) as events:
+                            async for event in events:
+                                event_count += 1
+                                kind = event.get("type")
+                                if kind in ("response.output_text.delta", "response.refusal.delta") and event.get("delta"):
+                                    received_text = True
+                                if kind in ("error", "response.failed"):
+                                    details = event.get("response", {}).get("error") or event.get("error") or event
+                                    raise _error(details.get("code") if isinstance(details, dict) else None)
+                                if kind == "response.incomplete":
+                                    raise ChatGPTProviderError("ChatGPT response was incomplete. Try again.")
+                                if kind == "response.output_item.done":
+                                    item = event.get("item")
+                                    index = event.get("output_index")
+                                    if isinstance(item, dict) and isinstance(index, int):
+                                        output_items[index] = item
+                                if kind == "response.completed":
+                                    final = event.get("response")
+                                    if not isinstance(final, dict) or final.get("status") != "completed":
+                                        raise ChatGPTProviderError("ChatGPT returned an invalid completion event.")
+                                    # The plan-sharing stream may leave terminal output
+                                    # empty: completed items arrived in earlier events.
+                                    # Never release those tools before terminal success.
+                                    if not final.get("output") and output_items:
+                                        event = dict(event, response=dict(final, output=[
+                                            output_items[index] for index in sorted(output_items)]))
+                                    # response.completed is terminal. Do not wait for
+                                    # the server/proxy to close the HTTP connection.
+                                    yield event
+                                    return
+                                yield event
+                        raise ChatGPTProviderError("ChatGPT connection ended before the response completed. Try again.")
+        except httpx.HTTPError as error:
+            raise _transport_error(error, operation="response", started=started, phase=phase,
+                                   events=event_count, received_text=received_text) from None
 
     async def generate_stream(self, messages, **kwargs):
         emitted = False
-        async for event in self._events(messages, **kwargs):
-            if event.get("type") in ("response.output_text.delta", "response.refusal.delta"):
-                delta = event.get("delta", "")
-                emitted = emitted or bool(delta)
-                yield delta
-            elif event.get("type") == "response.completed" and not emitted:
-                content = _result(event["response"])["content"]
-                if content:
-                    yield content
+        async with aclosing(self._events(messages, **kwargs)) as events:
+            async for event in events:
+                if event.get("type") in ("response.output_text.delta", "response.refusal.delta"):
+                    delta = event.get("delta", "")
+                    emitted = emitted or bool(delta)
+                    yield delta
+                elif event.get("type") == "response.completed" and not emitted:
+                    content = _result(event["response"])["content"]
+                    if content:
+                        yield content
 
     async def generate_summary(self, messages, **kwargs):
-        async for chunk in self.generate_stream(messages, **kwargs):
-            yield chunk
+        async with aclosing(self.generate_stream(messages, **kwargs)) as chunks:
+            async for chunk in chunks:
+                yield chunk
+
+    async def generate_tool_stream(self, messages, tools=None, **kwargs):
+        """Stream visible text, then publish tool calls only on terminal success.
+
+        The completed event includes the full content and tool calls for replay;
+        its content must not be appended to text already emitted as deltas.
+        """
+        emitted = False
+        result = None
+        async with aclosing(self._events(messages, tools=tools, **kwargs)) as events:
+            async for event in events:
+                kind = event.get("type")
+                if kind in ("response.output_text.delta", "response.refusal.delta"):
+                    delta = event.get("delta", "")
+                    if delta:
+                        emitted = True
+                        yield {"type": "text_delta", "text": delta}
+                elif kind == "response.completed":
+                    result = _result(event["response"])
+        # The HTTP stream is closed before callers can execute these tools.
+        if not emitted and result["content"]:
+            yield {"type": "text_delta", "text": result["content"]}
+        yield {"type": "completed", "result": result}
 
     async def generate(self, messages, tools=None, **kwargs):
         final = None
