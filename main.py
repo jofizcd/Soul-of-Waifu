@@ -549,6 +549,9 @@ class MainWindow(QMainWindow):
         self.ui.comboBox_reasoning_effort.currentIndexChanged.connect(self.interface_signals.on_comboBox_reasoning_effort_changed)
         self.ui.checkBox_enable_tool_calling.stateChanged.connect(self.interface_signals.on_checkBox_enable_tool_calling_stateChanged)
         self.ui.checkBox_enable_mcp.stateChanged.connect(self.interface_signals.on_checkBox_enable_mcp_stateChanged)
+        self.ui.checkBox_enable_parallel_search.stateChanged.connect(
+            self.interface_signals.on_checkBox_enable_parallel_search_stateChanged
+        )
 
         self.ui.anchor_menu_building.currentRowChanged.connect(self.interface_signals._scroll_character_creation)
         self.ui.scrollArea_character_building.verticalScrollBar().valueChanged.connect(self.interface_signals._update_anchor_menu_from_scroll)

@@ -42,9 +42,10 @@ class MCPClient:
 
     _PROTOCOL_VERSION = "2025-06-18"
 
-    def __init__(self, name: str, url: str):
+    def __init__(self, name: str, url: str, headers: Optional[Dict[str, str]] = None):
         self.name = name
         self.url = url.strip()
+        self.headers = dict(headers or {})
         self.session: Optional[aiohttp.ClientSession] = None
 
         self.transport: Optional[str] = None
@@ -68,7 +69,7 @@ class MCPClient:
     # ------------------------------------------------------------------
 
     async def start(self) -> bool:
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(headers=self.headers)
         try:
             logger.info(f"Connecting to MCP server '{self.name}' at: {self.url}")
 
@@ -90,6 +91,9 @@ class MCPClient:
                 f"transport (protocol {self.protocol_version})."
             )
             return True
+        except asyncio.CancelledError:
+            await self.stop()
+            raise
         except Exception as e:
             logger.error(f"Failed to initialize MCP client '{self.name}': {e}")
             await self.stop()
@@ -431,6 +435,10 @@ class MCPClient:
                     text_result += item.get("text", "")
 
             return {"success": not result.get("isError", False), "result": text_result, "speak": None}
+        except asyncio.TimeoutError:
+            message = f"MCP request to '{self.name}' timed out. Please try again later."
+            logger.error(message)
+            return {"success": False, "result": message, "speak": None}
         except Exception as e:
             logger.error(f"Failed to call tool '{name}' on '{self.name}': {e}")
             return {"success": False, "result": str(e), "speak": None}
@@ -438,6 +446,9 @@ class MCPClient:
 
 class MCPManager:
     _instance = None
+    PARALLEL_URL = "https://search.parallel.ai/mcp"
+    PARALLEL_NAME = "parallel_search"
+    PARALLEL_USER_AGENT = "Soul-of-Waifu (https://github.com/jofizcd/Soul-of-Waifu)"
 
     def __new__(cls):
         if cls._instance is None:
@@ -446,11 +457,31 @@ class MCPManager:
             cls._instance._config = configuration.ConfigurationSettings()
         return cls._instance
 
+    def _parallel_enabled(self) -> bool:
+        return bool(
+            self._config.get_main_setting("enable_mcp")
+            and self._config.get_main_setting("enable_parallel_search")
+        )
+
     async def initialize_all(self):
+        # Drop a cached preset when disabled; saved custom servers are independent.
+        if not self._parallel_enabled():
+            client = self.clients.pop(self.PARALLEL_NAME, None)
+            if client:
+                await client.stop()
+
         enable_mcp = self._config.get_main_setting("enable_mcp")
         if not enable_mcp:
             logger.info("MCP Proxy Integration is disabled. Skipping initialization.")
             return
+
+        if self._parallel_enabled() and self.PARALLEL_NAME not in self.clients:
+            client = MCPClient(
+                self.PARALLEL_NAME, self.PARALLEL_URL,
+                headers={"User-Agent": self.PARALLEL_USER_AGENT},
+            )
+            if await client.start():
+                self.clients[self.PARALLEL_NAME] = client
 
         mcp_url = self._config.get_main_setting("mcp_server")
         if mcp_url and (mcp_url.startswith("http://") or mcp_url.startswith("https://")):
@@ -461,17 +492,21 @@ class MCPManager:
                     self.clients["proxy_server"] = client
                 else:
                     logger.warning(f"Failed to initialize proxy MCP server on {mcp_url}")
-        else:
+        elif not self._parallel_enabled():
             logger.warning("No valid HTTP/SSE MCP URL configured in settings.")
 
     async def get_all_tools(self) -> List[dict]:
         all_tools = []
-        for client in self.clients.values():
+        for client_name, client in self.clients.items():
+            if client_name == self.PARALLEL_NAME and not self._parallel_enabled():
+                continue
             tools = await client.get_tools()
             all_tools.extend(tools)
         return all_tools
 
     async def call_tool(self, name: str, args: dict) -> Optional[dict]:
+        if name.startswith(f"{self.PARALLEL_NAME}__") and not self._parallel_enabled():
+            return {"success": False, "result": "Parallel Search MCP is disabled.", "speak": None}
         for client_name, client in self.clients.items():
             prefix = f"{client_name}__"
             if name.startswith(prefix):

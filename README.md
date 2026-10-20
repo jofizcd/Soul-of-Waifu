@@ -154,6 +154,8 @@ Soul Companion turns your character into an autonomous inhabitant of your Window
 | 🎵 Music Control | Manages audio playback |
 | 🔌 Custom MCP Server | Connect any external MCP server for expanded integrations |
 
+For optional free web search and page reading in **Soul Companion**, enable **MCP Proxy Integration** and **Add Parallel Search (free, no API key)** in the MCP settings, then restart Soul Companion. The [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) preset provides `parallel_search__web_search` (Fast mode) and `parallel_search__web_fetch` without an account or API key. Leave the MCP Server URL empty or keep your custom server alongside it. The preset is off by default; native web search stays available. Queries and requested page URLs are sent to Parallel. Free usage has service limits; failures are returned to the companion without switching providers. Uncheck either setting to block further preset calls.
+
 **Safety by design:** every potentially risky action - moving files, running code, controlling your mouse or keyboard - is intercepted by an on-screen approval banner with a 25-second fail-safe countdown. Nothing executes without your explicit confirmation, and the app automatically restores focus to your active window afterward so no keystrokes get lost.
 
 ---

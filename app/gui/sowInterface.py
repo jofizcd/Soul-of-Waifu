@@ -3034,6 +3034,18 @@ class Ui_MainWindow(object):
         mcp_settings_layout.setContentsMargins(15, 0, 0, 0)
         mcp_settings_layout.setSpacing(15)
 
+        self.checkBox_enable_parallel_search = QtWidgets.QCheckBox(
+            self.translations.get("enable_parallel_search_text", "Add Parallel Search (free, no API key)")
+        )
+        self.checkBox_enable_parallel_search.setFont(font_input)
+        self.checkBox_enable_parallel_search.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.checkBox_enable_parallel_search.setToolTip(self.translations.get(
+            "parallel_search_tooltip",
+            "Web search and page reading for Soul Companion. Queries and requested URLs are sent to Parallel. "
+            "Restart Soul Companion after enabling. The custom MCP server remains available."
+        ))
+        mcp_settings_layout.addWidget(self.checkBox_enable_parallel_search)
+
         # === MCP URL ===
         mcp_url_layout = QtWidgets.QHBoxLayout()
         mcp_url_layout.setSpacing(20)
