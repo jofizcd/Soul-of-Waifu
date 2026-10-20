@@ -191,6 +191,7 @@ class ParallelMCPTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(mcp_client.aiohttp, "ClientTimeout", side_effect=lambda **kw: timeout_type(total=0.03)):
             result = await self.search()
         self.assertFalse(result["success"])
+        self.assertIn("timed out", result["result"])
         self.started.clear()
         task = asyncio.create_task(self.search())
         await self.started.wait()

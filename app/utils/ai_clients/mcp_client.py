@@ -435,6 +435,10 @@ class MCPClient:
                     text_result += item.get("text", "")
 
             return {"success": not result.get("isError", False), "result": text_result, "speak": None}
+        except asyncio.TimeoutError:
+            message = f"MCP request to '{self.name}' timed out. Please try again later."
+            logger.error(message)
+            return {"success": False, "result": message, "speak": None}
         except Exception as e:
             logger.error(f"Failed to call tool '{name}' on '{self.name}': {e}")
             return {"success": False, "result": str(e), "speak": None}
