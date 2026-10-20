@@ -6770,6 +6770,11 @@ class InterfaceSignals():
         else:
             self.configuration_settings.update_main_setting("enable_tool_calling", False)
     
+    def on_checkBox_enable_parallel_search_stateChanged(self):
+        self.configuration_settings.update_main_setting(
+            "enable_parallel_search", self.ui.checkBox_enable_parallel_search.isChecked()
+        )
+
     def on_checkBox_enable_mcp_stateChanged(self):
         if self.ui.checkBox_enable_mcp.isChecked():
             self.configuration_settings.update_main_setting("enable_mcp", True)
@@ -7026,6 +7031,12 @@ class InterfaceSignals():
             self.ui.checkBox_enable_tool_calling.setChecked(False)
         else:
             self.ui.checkBox_enable_tool_calling.setChecked(True)
+
+        self.ui.checkBox_enable_parallel_search.blockSignals(True)
+        self.ui.checkBox_enable_parallel_search.setChecked(bool(
+            self.configuration_settings.get_main_setting("enable_parallel_search")
+        ))
+        self.ui.checkBox_enable_parallel_search.blockSignals(False)
 
         mcp_enabled_state = self.configuration_settings.get_main_setting("enable_mcp")
         if mcp_enabled_state == False:

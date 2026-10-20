@@ -517,6 +517,8 @@ mcp_title: "Model Context Protocol (MCP)"
 section_mcp_settings: "EXTERNAL MCP SERVERS"
 mcp_description: "Connect external MCP servers (like SearXNG, GitHub, etc.) without writing native Python plugins. This acts as a proxy between Soul of Waifu and the AI. Can be used in conjunction with other built-in tools."
 enable_mcp_text: "Enable MCP Proxy Integration"
+enable_parallel_search_text: "Add Parallel Search (free, no API key)"
+parallel_search_tooltip: "Web search and page reading for Soul Companion. Queries and requested URLs are sent to Parallel. Restart Soul Companion after enabling. The custom MCP server remains available."
 mcp_url_label: "MCP Server URL"
 mcp_url_placeholder: "e.g., http://127.0.0.1:8000"
 
